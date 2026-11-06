@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incident: a timeout | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="timeout">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Incident 5 of 6</p>
+<h1>A timeout</h1>
+<p class="lead">The frontend gives up after one second, and the user gets a 504. But the backend carries on working for two more seconds. This wasted work is very hard to see in logs, and obvious in a trace.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#search">4. Search</a></li><li><a href="#evidence">5. Evidence</a></li><li><a href="#cause">6. Root cause</a></li><li><a href="#fix">7. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p>The <code>timeout</code> scenario calls the backend with a 1-second limit, on a route that takes 3 seconds.</p>
+<div data-fire="timeout"></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>The user gets a 504 after about a second. A saved run took 1,029 ms. The frontend logged one line:</p>
+<figure class="code"><figcaption><span>Real log from the frontend</span></figcaption><pre><code>backend timed out after 1s</code></pre></figure>
+<p>The backend's own charts look fine, because from its point of view it succeeded.</p>
+
+<h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
+<ol>
+  <li>Check <a href="http://signoz.localhost:8080/exceptions" target="_blank" rel="noopener">Exceptions</a> for <code>httpx.ReadTimeout</code>. Its message is blank, because the exception has no text, so filter on the type.</li>
+  <li>Search for failed outgoing calls in the Traces Explorer.</li>
+  <li>Open a trace, and compare the lengths of the client and server spans.</li>
+</ol>
+
+<h2 class="step" id="search"><span class="n">4</span>Search</h2>
+<p>Use the scenario attribute, or look for outgoing calls that failed. The second search works in any app, because it needs no custom attribute:</p>
+<div data-query="t-scenario">Loading saved query...</div>
+<figure class="shot"><img src="screenshots/search-scenario.png" alt="SigNoz Traces Explorer with the search lab.scenario = timeout, listing frontend spans of about 1010 ms with status 504" width="1440" height="900" loading="lazy"><figcaption>The scenario search. <span class="badge ui">Seen in SigNoz UI</span> Every request gives up just after 1 second.</figcaption></figure>
+<div data-query="t-client-fail">Loading saved query...</div>
+<figure class="shot"><img src="screenshots/search-client-fail.png" alt="SigNoz Traces Explorer with a search for failed client spans in the frontend" width="1440" height="900" loading="lazy"><figcaption>Failed outgoing calls. <span class="badge ui">Seen in SigNoz UI</span> Timeouts appear here alongside calls that got a 500, so check the duration and status columns.</figcaption></figure>
+<div data-query="l-timeout">Loading saved query...</div>
+
+<h2 class="step" id="evidence"><span class="n">5</span>Evidence</h2>
+<div data-evidence="timeout">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/timeout-trace.png" alt="SigNoz trace page where the red frontend spans end at about 1 second while the backend span continues to 3 seconds" width="1440" height="900" loading="lazy"><figcaption>The key picture. <span class="badge ui">Seen in SigNoz UI</span> The frontend's spans end at 1.02 s. The backend span runs on to 3.00 s, well past the end of its parent.</figcaption></figure>
+<table>
+  <thead><tr><th>Span</th><th>Duration</th><th>Status</th><th>What it shows</th></tr></thead>
+  <tbody>
+    <tr><td>frontend Server</td><td>1,024.4 ms</td><td>Error, 504</td><td>The user's experience</td></tr>
+    <tr><td>frontend Client <code>GET</code></td><td>1,020.7 ms</td><td>Error, <code>httpx.ReadTimeout</code></td><td>Where the frontend gave up</td></tr>
+    <tr><td>backend Server <code>GET /work/slow</code></td><td>3,001.6 ms</td><td>Unset, 200</td><td>Kept working, then "succeeded"</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li>A child span outlasting its parent is the signature of a client giving up.</li>
+  <li>The backend reported HTTP 200, for a response nobody read.</li>
+  <li>Two seconds of backend work were wasted on each timed-out request.</li>
+</ul>
+<p>The <code>ReadTimeout</code> stack trace ends inside <code>httpx</code>, so it does not lead to your code. The Client span's position in the trace is what tells you which call it was.</p>
+
+<h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
+<p>The two sides disagree on how long the work should take:</p>
+<figure class="code"><figcaption><span><code>app/frontend.py</code> lines 97–103</span></figcaption><pre><code><span class="ln">97</span>async def s_timeout(_p: dict) -&gt; dict:
+<span class="ln">98</span>    try:
+<span class="ln">99</span>        r = await backend.get(&quot;/work/slow&quot;, params={&quot;ms&quot;: 3000}, timeout=1.0)
+<span class="ln">100</span>    except httpx.ReadTimeout as exc:
+<span class="ln">101</span>        log.error(&quot;backend timed out after 1s&quot;)
+<span class="ln">102</span>        raise HTTPException(status_code=504, detail=&quot;backend timeout&quot;) from exc
+<span class="ln">103</span>    return r.json()</code></pre></figure>
+<p>The frontend allows 1 second, and the backend takes 3. The backend has no idea the caller has gone: the handler is a plain sleep, and nothing cancels it.</p>
+
+<h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
+<p>There are three real options, and the right one depends on what the user needs.</p>
+<ol>
+  <li><strong>Make the backend faster</strong>, so it fits the budget. Usually best.</li>
+  <li><strong>Raise the timeout</strong>, if waiting 3 seconds is acceptable to users:</li>
+</ol>
+<figure class="code"><figcaption><span>Proposed change for app/frontend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> async def s_timeout(_p: dict) -&gt; dict:
+     try:
+<span class="del">-        r = await backend.get(&quot;/work/slow&quot;, params={&quot;ms&quot;: 3000}, timeout=1.0)</span><span class="add">+        r = await backend.get(&quot;/work/slow&quot;, params={&quot;ms&quot;: 3000}, timeout=4.0)</span>     except httpx.ReadTimeout as exc:
+<span class="del">-        log.error(&quot;backend timed out after 1s&quot;)</span><span class="add">+        log.error(&quot;backend timed out after 4s&quot;)</span>         raise HTTPException(status_code=504, detail=&quot;backend timeout&quot;) from exc
+</code></pre></figure>
+<ol start="3">
+  <li><strong>Stop the wasted work.</strong> Pass a deadline to the backend, and have it check that before and during expensive steps. This takes more work, but it matters under load: retries on top of timeouts multiply the wasted work, and that can turn a slowdown into an outage.</li>
+</ol>
+
+<div class="quiz" data-quiz="t1"><p class="q">Check yourself: In the timeout trace, why does the backend span show no error?</p><button type="button" data-right="true" data-why="The caller gave up. The callee kept working for two more seconds, with nothing to tell it to stop.">The backend did not know the client had left, so it finished and returned 200.</button><button type="button" data-right="false" data-why="It is there, and it lasts 3 s.">The span was lost.</button><button type="button" data-right="false" data-why="backend_500 shows they do.">Errors never appear on backend spans.</button></div>
+<div class="quiz" data-quiz="t2"><p class="q">Check yourself: Which span holds the httpx.ReadTimeout?</p><button type="button" data-right="true" data-why="The client span records what happened to the outgoing call. That is the right place to look for timeouts.">The frontend client span, GET.</button><button type="button" data-right="false" data-why="The backend saw nothing wrong.">The backend server span.</button><button type="button" data-right="false" data-why="There is no Postgres call on this path.">The Postgres span.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

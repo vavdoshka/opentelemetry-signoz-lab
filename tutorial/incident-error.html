@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incident: an unhandled error | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="error">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Incident 1 of 6</p>
+<h1>An unhandled error</h1>
+<p class="lead">A request fails with HTTP 500. You will go from the error rate to the exact line of code, and learn why one kind of failure never shows up as an error at all.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#search">4. Search</a></li><li><a href="#evidence">5. Evidence</a></li><li><a href="#cause">6. Root cause</a></li><li><a href="#fix">7. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p>The <code>crash</code> scenario raises an unhandled exception in the frontend.</p>
+<div data-fire="crash"></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>The caller gets a 500. A saved run answered in 8 ms with:</p>
+<figure class="code"><figcaption><span>Real response, trace <code>669d78bd98f4ee5e0558ef74f57fad39</code></span></figcaption><pre><code>{"status": 500, "error": "ZeroDivisionError('division by zero')", "trace_id": "669d78bd98f4ee5e0558ef74f57fad39"}</code></pre></figure>
+<p>At the service level, the frontend's error rate goes up. Over the load run it was 7.81% of calls.</p>
+<figure class="shot"><img src="screenshots/service-frontend.png" alt="SigNoz service page for frontend showing latency, rate and Apdex charts and a key operations table" width="1440" height="900" loading="lazy"><figcaption>The frontend service page. <span class="badge ui">Seen in SigNoz UI</span> Key Operations lists the error rate for each operation: 7.85% for <code>POST /api/scenario/{name}</code> in this 30-minute view.</figcaption></figure>
+
+<h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
+<ol>
+  <li><a href="http://signoz.localhost:8080/services" target="_blank" rel="noopener">Services</a> shows that something is failing, and in which service.</li>
+  <li><a href="http://signoz.localhost:8080/exceptions" target="_blank" rel="noopener">Exceptions</a> groups failures by type. This is the quickest way to answer "what is breaking".</li>
+  <li>From there, open a trace to see one concrete example.</li>
+</ol>
+<figure class="shot"><img src="screenshots/exceptions.png" alt="SigNoz Exceptions page listing UndefinedTable, RuntimeError, ReadTimeout and ZeroDivisionError with counts" width="1440" height="900" loading="lazy"><figcaption>The Exceptions page, with no setup needed. <span class="badge ui">Seen in SigNoz UI</span> It lists <code>ZeroDivisionError</code> with its message and service.</figcaption></figure>
+
+<h2 class="step" id="search"><span class="n">4</span>Search</h2>
+<p>Start broad, then narrow down to the scenario.</p>
+<div data-query="t-errors">Loading saved query...</div>
+<figure class="shot"><img src="screenshots/search-has-error.png" alt="SigNoz Traces Explorer with has_error = true listing frontend and backend spans with statuses 500, 502 and 504" width="1440" height="900" loading="lazy"><figcaption>The first search in the Traces Explorer. <span class="badge ui">Seen in SigNoz UI</span> Rows of 0.02 ms named <code>http send</code> are noise: each failed request appears more than once.</figcaption></figure>
+<div data-query="t-crash">Loading saved query...</div>
+<p>Logs have their own search box. The handler in <code>frontend.py</code> logs every unhandled error:</p>
+<div data-query="l-crash">Loading saved query...</div>
+<figure class="shot"><img src="screenshots/logs-errors.png" alt="SigNoz Logs Explorer with severity_text = ERROR, listing crash, timeout and database error messages" width="1440" height="900" loading="lazy"><figcaption>All error logs in the Logs Explorer. <span class="badge ui">Seen in SigNoz UI</span> Use <code>severity_text = 'ERROR'</code> to see every failure at once.</figcaption></figure>
+
+<div class="warn"><p><strong>A trap:</strong> <code>exception.type</code> works on logs but not on spans. On a span the exception is an <em>event</em>, not an attribute. SigNoz answers with a warning and zero rows.</p></div>
+<div data-query="t-neg-exception">Loading saved query...</div>
+<div data-query="l-exc-zde">Loading saved query...</div>
+
+<h2 class="step" id="evidence"><span class="n">5</span>Evidence</h2>
+<div data-evidence="crash">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/crash-trace.png" alt="SigNoz trace page for the crash scenario showing the frontend span in red with status 500" width="1440" height="900" loading="lazy"><figcaption>The crash trace. <span class="badge ui">Seen in SigNoz UI</span> A single service was involved, and the request never reached the backend.</figcaption></figure>
+<p>What this shows:</p>
+<ul>
+  <li>The Server span has status Error, HTTP 500 and one exception event of type <code>ZeroDivisionError</code>.</li>
+  <li>There is no backend span, so the failure happened inside the frontend.</li>
+  <li>The stack trace on the span names the file and line: <code>/app/frontend.py</code>, line 84, in <code>s_crash</code>.</li>
+  <li>An ERROR log, <code>unhandled error on POST /api/scenario/crash</code>, has the same trace ID.</li>
+</ul>
+
+<h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
+<figure class="code"><figcaption><span><code>app/frontend.py</code> lines 82–84</span></figcaption><pre><code><span class="ln">82</span>async def s_crash(_p: dict) -&gt; dict:
+<span class="ln">83</span>    basket = {&quot;items&quot;: 0}
+<span class="ln">84</span>    return {&quot;avg&quot;: 100 / basket[&quot;items&quot;]}  # ZeroDivisionError -&gt; unhandled 500</code></pre></figure>
+<p>The basket has zero items and the code divides by that count. Nothing catches the exception, so it escapes as a 500.</p>
+<p>The exception reaches telemetry in two ways: the FastAPI instrumentation records it on the span, and this handler logs it through <code>logging</code>:</p>
+<figure class="code"><figcaption><span><code>app/frontend.py</code> lines 230–236</span></figcaption><pre><code><span class="ln">230</span>@app.exception_handler(Exception)
+<span class="ln">231</span>async def unhandled(request: Request, exc: Exception) -&gt; JSONResponse:
+<span class="ln">232</span>    # Common app pattern: log unhandled errors through `logging` (so they reach
+<span class="ln">233</span>    # OTLP logs too) and return JSON. Starlette re-raises afterwards, so the
+<span class="ln">234</span>    # server span still records the exception.
+<span class="ln">235</span>    log.exception(&quot;unhandled error on %s %s&quot;, request.method, request.url.path)
+<span class="ln">236</span>    return JSONResponse({&quot;status&quot;: 500, &quot;error&quot;: repr(exc), &quot;trace_id&quot;: current_trace_id()}, status_code=500)</code></pre></figure>
+
+<h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
+<p>Handle the empty basket, and return a clear client error instead of crashing.</p>
+<figure class="code"><figcaption><span>Proposed fix for app/frontend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> async def s_crash(_p: dict) -&gt; dict:
+     basket = {&quot;items&quot;: 0}
+<span class="del">-    return {&quot;avg&quot;: 100 / basket[&quot;items&quot;]}  # ZeroDivisionError -&gt; unhandled 500</span><span class="add">+    if not basket[&quot;items&quot;]:</span><span class="add">+        raise HTTPException(status_code=422, detail=&quot;basket is empty&quot;)</span><span class="add">+    return {&quot;avg&quot;: 100 / basket[&quot;items&quot;]}</span></code></pre></figure>
+<p>To confirm a fix in real life: deploy it, fire the same request, and check that <code>ZeroDivisionError</code> stops growing on the Exceptions page.</p>
+
+<h2>Related: a failure that is not an error</h2>
+<p>The <code>bad_input</code> scenario returns HTTP 400. Try it, then look at the span.</p>
+<div data-fire="bad_input"></div>
+<div data-evidence="bad_input">Loading saved run...</div>
+<p>The status is Unset, not Error, so <code>has_error = true</code> never finds it and the error rate does not move. This follows OTel conventions, because a 4xx is usually the client's fault on a server span. If a spike in 4xx would matter to you, search for it and alert on it separately.</p>
+<div data-query="t-4xx">Loading saved query...</div>
+
+<div class="quiz" data-quiz="e1"><p class="q">Check yourself: You search spans for exception.type = &#x27;ZeroDivisionError&#x27; and get nothing. Why?</p><button type="button" data-right="false" data-why="It was. The Exceptions page and the span events both show it.">The exception was not recorded.</button><button type="button" data-right="true" data-why="Use the Exceptions page for spans. On logs, exception.type is an attribute, so the same expression does work there.">Exception details are on span events, not span attributes, so this search has nothing to match.</button><button type="button" data-right="false" data-why="Quotes are not the problem. SigNoz warns that the key was not found.">You need to use double quotes.</button></div>
+<div class="quiz" data-quiz="e2"><p class="q">Check yourself: bad_input returns HTTP 400. How do you find it?</p><button type="button" data-right="false" data-why="A 400 leaves span status Unset, so this never matches.">has_error = true</button><button type="button" data-right="true" data-why="4xx responses are not span errors in OTel conventions. Filter on the status code.">response_status_code &gt;= 400 AND response_status_code &lt; 500</button><button type="button" data-right="false" data-why="The span exists, with response_status_code 400.">It cannot be found.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Traefik for kind: same ingress class name as k3s, so the manifests in k8s/
+# work unchanged on both providers.
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+  name: traefik
+service:
+  type: ClusterIP
+ports:
+  web:
+    hostPort: 80
+nodeSelector:
+  ingress-ready: "true"
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule

@@ -1,0 +1,12 @@
+# Web stack
+fastapi
+uvicorn
+httpx
+psycopg[binary]
+
+# OpenTelemetry: SDK + OTLP/HTTP exporter + three instrumentation libraries.
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-httpx
+opentelemetry-instrumentation-psycopg

@@ -1,0 +1,4 @@
+# HA step: the only override to the SigNoz chart. Everything else is default.
+# Two collectors, so losing one node does not stop ingestion.
+otelCollector:
+  replicaCount: 2

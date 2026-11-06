@@ -1,0 +1,8 @@
+# Generated login for your local SigNoz. Never commit this.
+.lab-credentials
+
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+.playwright-mcp/

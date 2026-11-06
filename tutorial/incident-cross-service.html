@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incident: a cross-service failure | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="cross">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Incident 3 of 6</p>
+<h1>A cross-service failure</h1>
+<p class="lead">The frontend returns a 502, but the frontend is not broken. This is where distributed tracing earns its keep: it follows the failure to the service that caused it.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#search">4. Search</a></li><li><a href="#evidence">5. Evidence</a></li><li><a href="#cause">6. Root cause</a></li><li><a href="#fix">7. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p>The <code>backend_500</code> scenario makes the backend raise an unhandled exception, which the frontend turns into a 502.</p>
+<div data-fire="backend_500"></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>The user sees a 502, in 12 ms in a saved run. The frontend's logs show only that the backend call failed:</p>
+<figure class="code"><figcaption><span>Real log from the frontend</span></figcaption><pre><code>backend call failed: Server error '500 Internal Server Error' for url 'http://backend:8000/work/fail'</code></pre></figure>
+<p>From inside the frontend, you can only say "something downstream broke". You need the backend's side.</p>
+
+<h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
+<ol>
+  <li>Open the trace for the failed request. One trace spans both services.</li>
+  <li>Check <a href="http://signoz.localhost:8080/exceptions" target="_blank" rel="noopener">Exceptions</a>, which attributes each type to a service: <code>RuntimeError</code> belongs to <code>backend</code>.</li>
+  <li>Search spans by service in the Traces Explorer.</li>
+</ol>
+<div class="warn"><p><strong>Do not depend on the Services page here.</strong> It can leave <code>backend</code> out entirely, depending on the time range. See <a href="gaps.html#services">gap 2</a>. Traces and the Exceptions page are not affected.</p></div>
+
+<h2 class="step" id="search"><span class="n">4</span>Search</h2>
+<div data-query="l-backend-call">Loading saved query...</div>
+<div data-query="t-errors-backend">Loading saved query...</div>
+<div data-query="t-fail-route">Loading saved query...</div>
+
+<h2 class="step" id="evidence"><span class="n">5</span>Evidence</h2>
+<div data-evidence="backend_500">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/backend500-trace.png" alt="SigNoz trace page with frontend and backend error spans and five errors reported" width="1440" height="900" loading="lazy"><figcaption>The trace, with errors on both sides. <span class="badge ui">Seen in SigNoz UI</span> The header counts 5 errors because <code>http send</code> spans carry the error too.</figcaption></figure>
+<figure class="shot"><img src="screenshots/span-detail-backend500.png" alt="SigNoz trace page with the GET /work/fail span selected and its details panel open" width="1440" height="900" loading="lazy"><figcaption>The backend span selected. <span class="badge ui">Seen in SigNoz UI</span> Add <code>?spanId=</code> to a trace URL to open a span directly.</figcaption></figure>
+<p>Three real spans have status Error, but they differ:</p>
+<table>
+  <thead><tr><th>Span</th><th>HTTP</th><th>Exception on span?</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>frontend Server <code>POST /api/scenario/{name}</code></td><td>502</td><td>No</td><td>Reporting the failure to the user</td></tr>
+    <tr><td>frontend Client <code>GET</code></td><td>500</td><td>No</td><td>Received a failure from the backend</td></tr>
+    <tr><td>backend Server <code>GET /work/fail</code></td><td>500</td><td><code>RuntimeError</code></td><td><strong>The origin</strong></td></tr>
+  </tbody>
+</table>
+<div class="finding"><p><strong>The rule:</strong> errors bubble up through a trace. Walk down to the deepest failing span, and that is where to start. The exception event confirms it.</p></div>
+
+<h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
+<figure class="code"><figcaption><span><code>app/backend.py</code> lines 136–139</span></figcaption><pre><code><span class="ln">136</span>@app.get(&quot;/work/fail&quot;)
+<span class="ln">137</span>def fail() -&gt; dict:
+<span class="ln">138</span>    # Unhandled exception -&gt; 500. FastAPI instrumentation records it on the span.
+<span class="ln">139</span>    raise RuntimeError(&quot;backend exploded on purpose&quot;)</code></pre></figure>
+<p>The stack trace on the span points straight here: <code>/app/backend.py</code>, line 136, in <code>fail</code>. The frontend's job was to translate that into a 502:</p>
+<figure class="code"><figcaption><span><code>app/frontend.py</code> lines 87–94</span></figcaption><pre><code><span class="ln">87</span>async def s_backend_500(_p: dict) -&gt; dict:
+<span class="ln">88</span>    r = await backend.get(&quot;/work/fail&quot;)
+<span class="ln">89</span>    try:
+<span class="ln">90</span>        r.raise_for_status()
+<span class="ln">91</span>    except httpx.HTTPStatusError as exc:
+<span class="ln">92</span>        log.error(&quot;backend call failed: %s&quot;, exc)
+<span class="ln">93</span>        raise HTTPException(status_code=502, detail=&quot;backend failed&quot;) from exc
+<span class="ln">94</span>    return r.json()</code></pre></figure>
+
+<h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
+<p>In this lab the exception is deliberate, so the fix is simply to remove it.</p>
+<figure class="code"><figcaption><span>Proposed fix for app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> @app.get(&quot;/work/fail&quot;)
+ def fail() -&gt; dict:
+<span class="del">-    # Unhandled exception -&gt; 500. FastAPI instrumentation records it on the span.</span><span class="del">-    raise RuntimeError(&quot;backend exploded on purpose&quot;)</span><span class="add">+    return {&quot;ok&quot;: True}</span></code></pre></figure>
+<p>What carries over: the fix belongs in the backend, even though the alert would fire on the frontend's 502s. A trace stops you from debugging the wrong service.</p>
+
+<h2>A close relative: a failure that starts in the database</h2>
+<p>The <code>db_error</code> scenario goes one level deeper: <code>frontend → backend → Postgres</code>. The same walk down takes you to the SQL.</p>
+<div data-fire="db_error"></div>
+<div data-evidence="db_error">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/db-error-trace.png" alt="SigNoz trace page for db_error, with a failing SELECT at the bottom of the tree" width="1440" height="900" loading="lazy"><figcaption>The failure starts at the <code>SELECT</code>. <span class="badge ui">Seen in SigNoz UI</span></figcaption></figure>
+<figure class="shot"><img src="screenshots/span-detail-db-error.png" alt="SigNoz span detail panel for the failing SELECT span" width="1440" height="900" loading="lazy"><figcaption>The failing <code>SELECT</code> span selected, showing <code>db.statement</code>.</figcaption></figure>
+<figure class="shot"><img src="screenshots/span-events-db-error.png" alt="SigNoz span details panel on the Events tab, showing the exception with its type, message and stack trace" width="1440" height="900" loading="lazy"><figcaption>The <strong>Events</strong> tab is where a span keeps its exception. <span class="badge ui">Seen in SigNoz UI</span> The panel also shows the status message, <code>UndefinedTable: relation...</code></figcaption></figure>
+<figure class="shot"><img src="screenshots/span-logs-db-error.png" alt="SigNoz span details panel on the Logs tab, saying no logs were found for the selected span, with a button to view logs for the trace" width="1440" height="900" loading="lazy"><figcaption>The <strong>Logs</strong> tab is exact about spans. <span class="badge ui">Seen in SigNoz UI</span> It finds nothing for <code>SELECT</code>, because the app wrote its error log after that span had ended, under <code>GET /work/db-error</code>. Use "View Logs" to widen to the whole trace.</figcaption></figure>
+<div data-query="t-sql-errors">Loading saved query...</div>
+<p>Note a difference from <code>backend_500</code>. The backend catches this exception and raises its own <code>HTTPException</code>, so the exception event is on the database span, and not on the backend Server span. The logs tell the same story across both services, in order:</p>
+<div data-query="l-trace">Loading saved query...</div>
+<figure class="shot"><img src="screenshots/logs-by-trace.png" alt="SigNoz Logs Explorer filtered by one trace ID, showing three logs from two services" width="1360" height="900" loading="lazy"><figcaption>One trace ID, three logs, two services, in order. <span class="badge ui">Seen in SigNoz UI</span> The backend's <code>query failed</code> comes first, then the frontend's reaction.</figcaption></figure>
+<p>The log has the short class name, <code>UndefinedTable</code>. The span has the full name, <code>psycopg.errors.UndefinedTable</code>. If a search comes back empty, check which form you used.</p>
+<div data-query="l-exc">Loading saved query...</div>
+
+<div class="quiz" data-quiz="x1"><p class="q">Check yourself: Three spans in the backend_500 trace have status Error. Which one has the actual exception?</p><button type="button" data-right="false" data-why="It is Error because it returned 502. It has no exception event.">The frontend server span.</button><button type="button" data-right="false" data-why="It is Error because it received 500. It has no exception event.">The frontend client span.</button><button type="button" data-right="true" data-why="Errors bubble up. Walk to the deepest failing span to find the origin.">The backend server span, GET /work/fail.</button></div>
+<div class="quiz" data-quiz="x2"><p class="q">Check yourself: The Services page lists only frontend. Does that mean the backend is healthy?</p><button type="button" data-right="false" data-why="It is unrelated to health. See gap 2.">Yes, unlisted means no problems.</button><button type="button" data-right="true" data-why="Traces Explorer and the signoz_calls_total metric show backend even when Services does not.">No. Services can hide backend entirely, so check traces directly.</button><button type="button" data-right="false" data-why="Its spans are all stored.">It means the backend sends no telemetry.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

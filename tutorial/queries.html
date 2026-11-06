@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Search query reference | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="queries">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Reference</p>
+<h1>Search query reference</h1>
+<p class="lead">Every query here was run against this lab, and its real result is saved with it. Use <strong>Run live</strong> to run it again now. Start load first if you want recent data.</p>
+
+<h2>Three languages, not one</h2>
+<table>
+  <thead><tr><th>Language</th><th>Where you use it</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><strong>SigNoz search expression</strong></td><td>The search box in the Traces and Logs Explorers</td><td><code>has_error = true</code></td></tr>
+    <tr><td><strong>Metric query settings</strong></td><td>The Metrics Explorer builder: metric, time aggregation, space aggregation, group by</td><td><code>orders.created</code>, rate, sum, by <code>order.item</code></td></tr>
+    <tr><td><strong>ClickHouse SQL</strong></td><td>Directly against the database. It is not typed into the search box.</td><td><code>SELECT ... FROM signoz_traces.distributed_signoz_index_v3</code></td></tr>
+  </tbody>
+</table>
+
+<h2>Time range comes first</h2>
+<p>An empty result usually means the wrong time range, not a bad query. The Explorers default to the last 30 minutes. If you have not fired a scenario in that time, or if load is stopped, widen the range. <strong>Run live</strong> uses the window stated in each result.</p>
+
+<h2>Search expression syntax</h2>
+<p>Each operator was run with the example shown. Quote strings with single quotes. Attribute names are the OTel names, such as <code>http.route</code>.</p>
+<table>
+  <thead><tr><th>Operator</th><th>Example</th><th>Checked</th></tr></thead>
+  <tbody>
+    <tr><td><code>=</code></td><td><code>lab.scenario = 'timeout'</code></td><td><span class="badge ui">UI</span></td></tr>
+    <tr><td><code>!=</code></td><td><code>service.name != 'frontend'</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>&gt;</code> <code>&gt;=</code> <code>&lt;</code></td><td><code>response_status_code &gt;= 500</code></td><td><span class="badge ui">UI</span></td></tr>
+    <tr><td><code>BETWEEN</code></td><td><code>duration_nano BETWEEN 1000000000 AND 2000000000</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>IN</code></td><td><code>severity_text IN ('ERROR','WARN')</code></td><td><span class="badge ui">UI</span></td></tr>
+    <tr><td><code>NOT IN</code></td><td><code>service.name NOT IN ('frontend')</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>CONTAINS</code></td><td><code>db.statement CONTAINS 'pg_sleep'</code></td><td><span class="badge ui">UI</span></td></tr>
+    <tr><td><code>NOT CONTAINS</code></td><td><code>name NOT CONTAINS 'http send'</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>LIKE</code></td><td><code>name LIKE '%http send'</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>ILIKE</code></td><td><code>name ILIKE 'get /work%'</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>REGEXP</code></td><td><code>name REGEXP '^GET /work/.*'</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>EXISTS</code></td><td><code>db.statement EXISTS</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>NOT EXISTS</code></td><td><code>service.name NOT EXISTS</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>AND</code></td><td><code>service.name = 'backend' AND has_error = true</code></td><td><span class="badge ui">UI</span></td></tr>
+    <tr><td><code>OR</code>, brackets</td><td><code>(service.name = 'backend' OR service.name = 'frontend') AND has_error = true</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>NOT</code></td><td><code>NOT has_error = true</code></td><td><span class="badge api">API</span></td></tr>
+  </tbody>
+</table>
+
+<h3>Fields you will use most</h3>
+<table>
+  <thead><tr><th>Field</th><th>On</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td><code>service.name</code></td><td>Spans, logs</td><td>Blank on stdout log copies (<a href="gaps.html#logs">gap 4</a>)</td></tr>
+    <tr><td><code>trace_id</code></td><td>Spans, logs</td><td>The link between the two</td></tr>
+    <tr><td><code>name</code></td><td>Spans</td><td>The operation, such as <code>GET /work/slow</code></td></tr>
+    <tr><td><code>duration_nano</code></td><td>Spans</td><td>Nanoseconds: one second is <code>1000000000</code></td></tr>
+    <tr><td><code>has_error</code></td><td>Spans</td><td>True when span status is Error. It also matches ASGI <code>http send</code> spans, so counts run high.</td></tr>
+    <tr><td><code>kind_string</code></td><td>Spans</td><td><code>Server</code>, <code>Client</code> or <code>Internal</code></td></tr>
+    <tr><td><code>response_status_code</code></td><td>Spans</td><td>Compares numerically. Empty on non-HTTP spans.</td></tr>
+    <tr><td><code>body</code></td><td>Logs</td><td>The log message</td></tr>
+    <tr><td><code>severity_text</code></td><td>Logs</td><td><code>INFO</code>, <code>WARN</code>, <code>ERROR</code>. Note it is <code>WARN</code>, not <code>WARNING</code>.</td></tr>
+  </tbody>
+</table>
+
+<div class="note"><p><strong>Traces, what to count:</strong> <code>has_error = true</code> matched 4,568 spans in the load run, but 1,145 of those were <code>http send</code> copies of a Server span. Add <code>kind_string = 'Server'</code> if you want to count failed requests.</p></div>
+
+<h2>All queries</h2>
+<div data-query-index>Loading queries...</div>
+
+<h2>ClickHouse SQL</h2>
+<div class="warn"><p>These are <strong>not</strong> SigNoz searches. They run directly against the database, and they are useful for checking what is actually stored. Run them with:</p>
+<pre><code>kubectl -n signoz exec chi-signoz-clickhouse-cluster-0-0-0 -c clickhouse -- \
+  clickhouse-client --query "..."</code></pre>
+<p>The saved results below are from runs on this lab. There is no live button for these.</p></div>
+<div data-ch>Loading saved SQL...</div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

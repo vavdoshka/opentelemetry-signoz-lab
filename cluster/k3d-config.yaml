@@ -1,0 +1,15 @@
+# k3d cluster: two k3s nodes running in Docker.
+# k3s ships Traefik as its ingress controller. Host port 8080 reaches Traefik
+# through the k3d load balancer, so http://signoz.localhost:8080 and
+# http://app.localhost:8080 reach the cluster.
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: signoz-lab
+image: rancher/k3s:v1.26.4-k3s1
+servers: 1
+agents: 1
+ports:
+  - port: 8080:80
+    nodeFilters:
+      - loadbalancer

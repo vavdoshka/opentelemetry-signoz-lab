@@ -1,0 +1,7599 @@
+{
+ "generatedAt": "2026-11-05T01:17:29Z",
+ "source": "POST /api/v5/query_range on this lab",
+ "queries": [
+  {
+   "id": "t-errors",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "Every span that failed",
+   "why": "The first search in any error incident. `has_error` is true when span status is Error.",
+   "expr": "has_error = true",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "has_error = true"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:57.003549462Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name} http send",
+      "duration_nano": 19666,
+      "response_status_code": "502",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:57.002005087Z",
+      "service.name": "backend",
+      "name": "GET /work/db-error http send",
+      "duration_nano": 22125,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:56.999777587Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 1164166,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:56.993528753Z",
+      "service.name": "backend",
+      "name": "GET /work/db-error",
+      "duration_nano": 8868209,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:56.992061378Z",
+      "service.name": "frontend",
+      "name": "GET",
+      "duration_nano": 10607500,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     }
+    ],
+    "warnings": [],
+    "matched": 4568
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "t-errors-backend",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "Failures in one service",
+   "why": "Narrow by service. `service.name` is a resource attribute set by OTEL_SERVICE_NAME.",
+   "expr": "service.name = 'backend' AND has_error = true",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "service.name = 'backend' AND has_error = true"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:57.002005087Z",
+      "service.name": "backend",
+      "name": "GET /work/db-error http send",
+      "duration_nano": 22125,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:56.999777587Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 1164166,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:56.993528753Z",
+      "service.name": "backend",
+      "name": "GET /work/db-error",
+      "duration_nano": 8868209,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:50.756322375Z",
+      "service.name": "backend",
+      "name": "GET /work/db-error http send",
+      "duration_nano": 23459,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "5fabf3712119e259c80ff329fd284d93"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:50.752341792Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 1958583,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "5fabf3712119e259c80ff329fd284d93"
+     }
+    ],
+    "warnings": [],
+    "matched": 1415
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-scenario",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "One scenario, using a custom attribute",
+   "why": "`lab.scenario` is set by hand in frontend.py. Every scenario shares one operation name, so this attribute is what separates them.",
+   "expr": "lab.scenario = 'timeout'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "lab.scenario = 'timeout'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:53.154441543Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 1012724167,
+      "response_status_code": "504",
+      "has_error": true,
+      "trace_id": "b00df9fb3995c426d6a06d18e9a344f7"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:33.790879173Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 1005796751,
+      "response_status_code": "504",
+      "has_error": true,
+      "trace_id": "ed195e70340b27a2358e969281b86c2c"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:32.176959381Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 1005491334,
+      "response_status_code": "504",
+      "has_error": true,
+      "trace_id": "5315a9f8776d89d4513f238d949ecbb8"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:22.898797001Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 1006133584,
+      "response_status_code": "504",
+      "has_error": true,
+      "trace_id": "7ea3de570066fd7e00eef1daa6d24557"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:14.206265928Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 1026496334,
+      "response_status_code": "504",
+      "has_error": true,
+      "trace_id": "1f7a59891941cad54ddd0ca3eb9e893d"
+     }
+    ],
+    "warnings": [],
+    "matched": 298
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "t-slow",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "Anything slower than one second",
+   "why": "`duration_nano` is in nanoseconds: 1000000000 is one second.",
+   "expr": "duration_nano > 1000000000",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "duration_nano > 1000000000"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:58.806736379Z",
+      "service.name": "backend",
+      "name": "GET /work/slow",
+      "duration_nano": 1619016793,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "e48dbeff5ee7e25115aeb8fed2c2fdc5"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:58.805867337Z",
+      "service.name": "frontend",
+      "name": "GET",
+      "duration_nano": 1620122168,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "e48dbeff5ee7e25115aeb8fed2c2fdc5"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:58.805329171Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 1622087584,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "e48dbeff5ee7e25115aeb8fed2c2fdc5"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:57.59335717Z",
+      "service.name": "backend",
+      "name": "GET /work/slow",
+      "duration_nano": 1634586168,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "713f71092240abb812428dcdda2b7272"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:57.592509504Z",
+      "service.name": "frontend",
+      "name": "GET",
+      "duration_nano": 1636051584,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "713f71092240abb812428dcdda2b7272"
+     }
+    ],
+    "warnings": [],
+    "matched": 4676
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-slow-server",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "Slow requests, not slow internals",
+   "why": "`kind_string` picks the span kind. Server spans are one per request, so you count requests and not every child span.",
+   "expr": "kind_string = 'Server' AND duration_nano > 1000000000",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "kind_string = 'Server' AND duration_nano > 1000000000"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:58.806736379Z",
+      "service.name": "backend",
+      "name": "GET /work/slow",
+      "duration_nano": 1619016793,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "e48dbeff5ee7e25115aeb8fed2c2fdc5"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:58.805329171Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 1622087584,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "e48dbeff5ee7e25115aeb8fed2c2fdc5"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:57.59335717Z",
+      "service.name": "backend",
+      "name": "GET /work/slow",
+      "duration_nano": 1634586168,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "713f71092240abb812428dcdda2b7272"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:57.592062379Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 1637495209,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "713f71092240abb812428dcdda2b7272"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:56.181602336Z",
+      "service.name": "backend",
+      "name": "GET /work/slow",
+      "duration_nano": 1904456126,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "f35990f40fb91338961989575164732d"
+     }
+    ],
+    "warnings": [],
+    "matched": 3113
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "t-route",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "One backend route",
+   "why": "`http.route` is the route template, so it groups all requests to a route.",
+   "expr": "http.route = '/work/slow'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "http.route = '/work/slow'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:58.806736379Z",
+      "service.name": "backend",
+      "name": "GET /work/slow",
+      "duration_nano": 1619016793,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "e48dbeff5ee7e25115aeb8fed2c2fdc5"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:57.59335717Z",
+      "service.name": "backend",
+      "name": "GET /work/slow",
+      "duration_nano": 1634586168,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "713f71092240abb812428dcdda2b7272"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:56.181602336Z",
+      "service.name": "backend",
+      "name": "GET /work/slow",
+      "duration_nano": 1904456126,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "f35990f40fb91338961989575164732d"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:53.158756585Z",
+      "service.name": "backend",
+      "name": "GET /work/slow",
+      "duration_nano": 3010545918,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "b00df9fb3995c426d6a06d18e9a344f7"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:45.09036022Z",
+      "service.name": "backend",
+      "name": "GET /work/slow",
+      "duration_nano": 2132396501,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "5c7f385924b4d933dddcb403b5610d8f"
+     }
+    ],
+    "warnings": [],
+    "matched": 1547
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "t-sql-text",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "Find SQL by its text",
+   "why": "`db.statement` holds the statement. CONTAINS is a substring match.",
+   "expr": "db.statement CONTAINS 'pg_sleep'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "db.statement CONTAINS 'pg_sleep'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:56:06.085065299Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 2004649585,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "a0c2a6c71647d8835d9cec3a69b7a437"
+     },
+     {
+      "timestamp": "2026-11-04T23:56:04.054015215Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 2005873459,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "d1f9515027fa1d2ca9460a2b186c4f1a"
+     },
+     {
+      "timestamp": "2026-11-04T23:10:24.493722752Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 2002173210,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "8b6b213a9d5a8cf955bd290b175ca4e8"
+     }
+    ],
+    "warnings": [],
+    "matched": 3
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "t-sql-slow",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "Slow database calls",
+   "why": "`db.system` marks spans from the psycopg instrumentation.",
+   "expr": "db.system = 'postgresql' AND duration_nano > 500000000",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "db.system = 'postgresql' AND duration_nano > 500000000"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:56:06.085065299Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 2004649585,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "a0c2a6c71647d8835d9cec3a69b7a437"
+     },
+     {
+      "timestamp": "2026-11-04T23:56:04.054015215Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 2005873459,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "d1f9515027fa1d2ca9460a2b186c4f1a"
+     },
+     {
+      "timestamp": "2026-11-04T23:54:03.64028134Z",
+      "service.name": "backend",
+      "name": "INSERT",
+      "duration_nano": 1700822751,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "fbec8e450efb63efd27f49714488a997"
+     },
+     {
+      "timestamp": "2026-11-04T23:49:05.356036466Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 605537958,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "94a80aac9ff3f87672b9095adee3b1ec"
+     },
+     {
+      "timestamp": "2026-11-04T23:10:24.493722752Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 2002173210,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "8b6b213a9d5a8cf955bd290b175ca4e8"
+     }
+    ],
+    "warnings": [],
+    "matched": 5
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-sql-errors",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "Failed database calls",
+   "why": "The span that actually touched Postgres, with the failing statement in `db.statement`.",
+   "expr": "db.system = 'postgresql' AND has_error = true",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "db.system = 'postgresql' AND has_error = true"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:56.999777587Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 1164166,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:50.752341792Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 1958583,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "5fabf3712119e259c80ff329fd284d93"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:45.909930637Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 2231125,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "310437a9192777b41ff156fb63bfe677"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:33.602651173Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 1314708,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "2c7465b2726b30bd53ea317b20eb06b2"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:12.203283927Z",
+      "service.name": "backend",
+      "name": "SELECT",
+      "duration_nano": 1080709,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "a1dd2c8710aadb1c25ffac61b1139325"
+     }
+    ],
+    "warnings": [],
+    "matched": 287
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "t-5xx",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "Server errors by HTTP status",
+   "why": "`response_status_code` compares numerically here, so >= works.",
+   "expr": "response_status_code >= 500",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "response_status_code >= 500"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:57.003549462Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name} http send",
+      "duration_nano": 19666,
+      "response_status_code": "502",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:57.002005087Z",
+      "service.name": "backend",
+      "name": "GET /work/db-error http send",
+      "duration_nano": 22125,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:56.993528753Z",
+      "service.name": "backend",
+      "name": "GET /work/db-error",
+      "duration_nano": 8868209,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:56.992061378Z",
+      "service.name": "frontend",
+      "name": "GET",
+      "duration_nano": 10607500,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:56.988862253Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 14935000,
+      "response_status_code": "502",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     }
+    ],
+    "warnings": [],
+    "matched": 3982
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "t-4xx",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "Client errors, which has_error misses",
+   "why": "A 400 leaves span status Unset, so `has_error = true` never finds these.",
+   "expr": "response_status_code >= 400 AND response_status_code < 500",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "response_status_code >= 400 AND response_status_code < 500"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:59.006852129Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name} http send",
+      "duration_nano": 13042,
+      "response_status_code": "400",
+      "has_error": false,
+      "trace_id": "e879697376e4bcac7704d3853322d687"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:59.006470879Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 606084,
+      "response_status_code": "400",
+      "has_error": false,
+      "trace_id": "e879697376e4bcac7704d3853322d687"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:58.418670171Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name} http send",
+      "duration_nano": 32666,
+      "response_status_code": "400",
+      "has_error": false,
+      "trace_id": "430eef4188af7023ced21a3e6c89d7a9"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:58.417726421Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 1486041,
+      "response_status_code": "400",
+      "has_error": false,
+      "trace_id": "430eef4188af7023ced21a3e6c89d7a9"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:48.521062597Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name} http send",
+      "duration_nano": 20167,
+      "response_status_code": "400",
+      "has_error": false,
+      "trace_id": "9ecf571790882d396d2c5e6afb7a4a9b"
+     }
+    ],
+    "warnings": [],
+    "matched": 552
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-client-fail",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "Outgoing calls that failed",
+   "why": "Client spans are the caller's view of a dependency, including timeouts where the callee never reports an error.",
+   "expr": "kind_string = 'Client' AND service.name = 'frontend' AND has_error = true",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "kind_string = 'Client' AND service.name = 'frontend' AND has_error = true"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:56.992061378Z",
+      "service.name": "frontend",
+      "name": "GET",
+      "duration_nano": 10607500,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:53.155605751Z",
+      "service.name": "frontend",
+      "name": "GET",
+      "duration_nano": 1010640793,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "b00df9fb3995c426d6a06d18e9a344f7"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:50.740264709Z",
+      "service.name": "frontend",
+      "name": "GET",
+      "duration_nano": 16940916,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "5fabf3712119e259c80ff329fd284d93"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:45.899947429Z",
+      "service.name": "frontend",
+      "name": "GET",
+      "duration_nano": 16302083,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "310437a9192777b41ff156fb63bfe677"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:44.687273637Z",
+      "service.name": "frontend",
+      "name": "GET",
+      "duration_nano": 6531166,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "d8a77e6587a59cbd1e53a9abf9f27b0f"
+     }
+    ],
+    "warnings": [],
+    "matched": 863
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "t-no-noise",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "Hide the ASGI send and receive spans",
+   "why": "These zero-length spans crowd the list. See gap 6.",
+   "expr": "name NOT CONTAINS 'http send' AND name NOT CONTAINS 'http receive'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "name NOT CONTAINS 'http send' AND name NOT CONTAINS 'http receive'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:59.832245005Z",
+      "service.name": "backend",
+      "name": "INSERT",
+      "duration_nano": 1890083,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "cbb23edf25a543bbef8e2a720429f75d"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:59.814836338Z",
+      "service.name": "backend",
+      "name": "price_order",
+      "duration_nano": 8426042,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "cbb23edf25a543bbef8e2a720429f75d"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:59.814178713Z",
+      "service.name": "backend",
+      "name": "POST /orders",
+      "duration_nano": 21559708,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "cbb23edf25a543bbef8e2a720429f75d"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:59.812593963Z",
+      "service.name": "frontend",
+      "name": "POST",
+      "duration_nano": 24290167,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "cbb23edf25a543bbef8e2a720429f75d"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:59.811971338Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 26367542,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "cbb23edf25a543bbef8e2a720429f75d"
+     }
+    ],
+    "warnings": [],
+    "matched": 62918
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-one-trace",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "Every span of one trace",
+   "why": "The saved example is the timeout run. The trace page is usually nicer, but this works in any query.",
+   "expr": "trace_id = 'ab23d22ff92a4c83b20b29657447a38b'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 20160,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "trace_id = 'ab23d22ff92a4c83b20b29657447a38b'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:10:26.41823717Z",
+      "service.name": "backend",
+      "name": "GET /work/slow http send",
+      "duration_nano": 6500,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "ab23d22ff92a4c83b20b29657447a38b"
+     },
+     {
+      "timestamp": "2026-11-04T23:10:26.418159212Z",
+      "service.name": "backend",
+      "name": "GET /work/slow http send",
+      "duration_nano": 29166,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "ab23d22ff92a4c83b20b29657447a38b"
+     },
+     {
+      "timestamp": "2026-11-04T23:10:24.439423044Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name} http send",
+      "duration_nano": 20458,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "ab23d22ff92a4c83b20b29657447a38b"
+     },
+     {
+      "timestamp": "2026-11-04T23:10:24.437830627Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name} http send",
+      "duration_nano": 61334,
+      "response_status_code": "504",
+      "has_error": true,
+      "trace_id": "ab23d22ff92a4c83b20b29657447a38b"
+     },
+     {
+      "timestamp": "2026-11-04T23:10:23.41661096Z",
+      "service.name": "backend",
+      "name": "GET /work/slow",
+      "duration_nano": 3001639418,
+      "response_status_code": "200",
+      "has_error": false,
+      "trace_id": "ab23d22ff92a4c83b20b29657447a38b"
+     }
+    ],
+    "warnings": [],
+    "matched": 8
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-manual",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "A manual span and its attributes",
+   "why": "`price_order` and `order.total` exist only because backend.py creates them by hand.",
+   "expr": "name = 'price_order' AND order.total > 20",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "name = 'price_order' AND order.total > 20"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:59.210722588Z",
+      "service.name": "backend",
+      "name": "price_order",
+      "duration_nano": 15016583,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "0124537f131d3842814d8d50db286e6c"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:58.001443754Z",
+      "service.name": "backend",
+      "name": "price_order",
+      "duration_nano": 27676458,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "b595c05b1ff930b21076b99f3cd2e4ee"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:54.364856252Z",
+      "service.name": "backend",
+      "name": "price_order",
+      "duration_nano": 21314667,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "40070d78a9f85b431dc805896b12bf66"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:51.341826876Z",
+      "service.name": "backend",
+      "name": "price_order",
+      "duration_nano": 27576458,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "b4622b6cffde952ec1dae17c825cb7cd"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:51.140316876Z",
+      "service.name": "backend",
+      "name": "price_order",
+      "duration_nano": 12007833,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "5513ed1c76e0587192a931c681833065"
+     }
+    ],
+    "warnings": [],
+    "matched": 1574
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-cpu-span",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "The manual cpu_burn span",
+   "why": "Manual spans make slow code visible when no library would have traced it.",
+   "expr": "name = 'cpu_burn'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 1440,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "name = 'cpu_burn'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:10:00Z",
+    "end": "2026-11-04T23:24:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:15:43.902147053Z",
+      "service.name": "backend",
+      "name": "cpu_burn",
+      "duration_nano": 90004954042,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "0e2d66640ee0781e49893d003cc9ffd5"
+     },
+     {
+      "timestamp": "2026-11-04T23:11:10.94473051Z",
+      "service.name": "backend",
+      "name": "cpu_burn",
+      "duration_nano": 90000521542,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "d3d26febc59c3d75a0c3623ad9b52abe"
+     }
+    ],
+    "warnings": [],
+    "matched": 2
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-neg-exception",
+   "group": "Traces: what does not work",
+   "signal": "traces",
+   "title": "exception.type does not search spans",
+   "why": "Exception details live on span events, not span attributes. This returns no rows, with a warning. Use the Exceptions page.",
+   "expr": "exception.type = 'ZeroDivisionError'",
+   "neg": true,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "exception.type = 'ZeroDivisionError'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [],
+    "warnings": [
+     "key `exception.type` not found in metadata; querying the underlying data directly. If this is unexpected, check the key name for typos."
+    ],
+    "matched": 0
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-neg-k8s",
+   "group": "Traces: what does not work",
+   "signal": "traces",
+   "title": "No Kubernetes context on spans",
+   "why": "Zero rows proves gap 3: the app skips the agent that adds these attributes.",
+   "expr": "k8s.pod.name EXISTS",
+   "neg": true,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "k8s.pod.name EXISTS"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [],
+    "warnings": [
+     "key `k8s.pod.name` not found in metadata; querying the underlying data directly. If this is unexpected, check the key name for typos."
+    ],
+    "matched": 0
+   },
+   "verified": "api"
+  },
+  {
+   "id": "a-by-scenario",
+   "group": "Traces: aggregate",
+   "signal": "traces",
+   "title": "Count and P99 per scenario",
+   "why": "Turns spans into a table you can read at a glance. Use the Table view in the Traces Explorer.",
+   "expr": "lab.scenario EXISTS",
+   "neg": false,
+   "aggs": [
+    "count()",
+    "p99(duration_nano)"
+   ],
+   "by": [
+    "lab.scenario"
+   ],
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "lab.scenario EXISTS"
+    },
+    "aggregations": [
+     {
+      "expression": "count()"
+     },
+     {
+      "expression": "p99(duration_nano)"
+     }
+    ],
+    "limit": 20,
+    "groupBy": [
+     {
+      "name": "lab.scenario"
+     }
+    ]
+   },
+   "requestType": "scalar",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "table",
+    "columns": [
+     "lab.scenario",
+     "__result_0",
+     "__result_1"
+    ],
+    "data": [
+     [
+      "order",
+      7810,
+      174771471.97
+     ],
+     [
+      "list",
+      4167,
+      167456756.78
+     ],
+     [
+      "slow",
+      1249,
+      2991828799.2
+     ],
+     [
+      "timeout",
+      298,
+      1039673797.75
+     ],
+     [
+      "db_error",
+      287,
+      155668056.14
+     ],
+     [
+      "crash",
+      282,
+      33661306.79
+     ],
+     [
+      "backend_500",
+      277,
+      101866469.92
+     ],
+     [
+      "bad_input",
+      276,
+      4291489.25
+     ],
+     [
+      "slow_query",
+      3,
+      2048297384.34
+     ],
+     [
+      "cpu_burn",
+      2,
+      90012779465.42
+     ],
+     [
+      "log_burst",
+      2,
+      2301693.84
+     ]
+    ],
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "a-errors-by-service",
+   "group": "Traces: aggregate",
+   "signal": "traces",
+   "title": "Failed spans per service",
+   "why": "A quick way to see where failures are concentrated.",
+   "expr": "has_error = true",
+   "neg": false,
+   "aggs": [
+    "count()"
+   ],
+   "by": [
+    "service.name"
+   ],
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "has_error = true"
+    },
+    "aggregations": [
+     {
+      "expression": "count()"
+     }
+    ],
+    "limit": 20,
+    "groupBy": [
+     {
+      "name": "service.name"
+     }
+    ]
+   },
+   "requestType": "scalar",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "table",
+    "columns": [
+     "service.name",
+     "__result_0"
+    ],
+    "data": [
+     [
+      "frontend",
+      3153
+     ],
+     [
+      "backend",
+      1415
+     ]
+    ],
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "a-sql-by-op",
+   "group": "Traces: aggregate",
+   "signal": "traces",
+   "title": "SQL latency by statement type",
+   "why": "Per-operation database latency, from spans alone.",
+   "expr": "db.system = 'postgresql'",
+   "neg": false,
+   "aggs": [
+    "count()",
+    "avg(duration_nano)",
+    "p99(duration_nano)"
+   ],
+   "by": [
+    "name"
+   ],
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "db.system = 'postgresql'"
+    },
+    "aggregations": [
+     {
+      "expression": "count()"
+     },
+     {
+      "expression": "avg(duration_nano)"
+     },
+     {
+      "expression": "p99(duration_nano)"
+     }
+    ],
+    "limit": 20,
+    "groupBy": [
+     {
+      "name": "name"
+     }
+    ]
+   },
+   "requestType": "scalar",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "table",
+    "columns": [
+     "name",
+     "__result_0",
+     "__result_1",
+     "__result_2"
+    ],
+    "data": [
+     [
+      "INSERT",
+      7810,
+      4244281.441,
+      37520566.75
+     ],
+     [
+      "SELECT",
+      4456,
+      4755330.302,
+      25411656.25
+     ]
+    ],
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "a-route-latency",
+   "group": "Traces: aggregate",
+   "signal": "traces",
+   "title": "Backend latency by route",
+   "why": "Which route is slow, using server spans.",
+   "expr": "service.name = 'backend' AND kind_string = 'Server'",
+   "neg": false,
+   "aggs": [
+    "count()",
+    "p50(duration_nano)",
+    "p99(duration_nano)"
+   ],
+   "by": [
+    "http.route"
+   ],
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "service.name = 'backend' AND kind_string = 'Server'"
+    },
+    "aggregations": [
+     {
+      "expression": "count()"
+     },
+     {
+      "expression": "p50(duration_nano)"
+     },
+     {
+      "expression": "p99(duration_nano)"
+     }
+    ],
+    "limit": 20,
+    "groupBy": [
+     {
+      "name": "http.route"
+     }
+    ]
+   },
+   "requestType": "scalar",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "table",
+    "columns": [
+     "http.route",
+     "__result_0",
+     "__result_1",
+     "__result_2"
+    ],
+    "data": [
+     [
+      "/orders",
+      11976,
+      26664125,
+      154784160.81
+     ],
+     [
+      "/work/slow",
+      1547,
+      2225877403,
+      3024782558
+     ],
+     [
+      "/work/db-error",
+      287,
+      10170584,
+      153065235.88
+     ],
+     [
+      "/work/fail",
+      277,
+      3245708,
+      100193905.08
+     ],
+     [
+      "/work/slow-query",
+      3,
+      2018281042,
+      2025524426.82
+     ],
+     [
+      "/work/cpu",
+      2,
+      90007690062.5,
+      90007989758.75
+     ]
+    ],
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-errors",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "All error logs",
+   "why": "`severity_text` is set by the OTLP log bridge. The stdout copies have it blank (gap 4).",
+   "expr": "severity_text = 'ERROR'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "severity_text = 'ERROR'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:57.003290624Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "backend reported a database error",
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:57.00104576Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:54.166302464Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "backend timed out after 1s",
+      "trace_id": "b00df9fb3995c426d6a06d18e9a344f7"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:50.757966592Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "backend reported a database error",
+      "trace_id": "5fabf3712119e259c80ff329fd284d93"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:50.75444352Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "5fabf3712119e259c80ff329fd284d93"
+     }
+    ],
+    "warnings": [],
+    "matched": 1452
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "l-backend-bad",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "Warnings and errors from one service",
+   "why": "IN takes a list of values.",
+   "expr": "service.name = 'backend' AND severity_text IN ('ERROR','WARN')",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name = 'backend' AND severity_text IN ('ERROR','WARN')"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:57.00104576Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:50.75444352Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "5fabf3712119e259c80ff329fd284d93"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:45.912685568Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "310437a9192777b41ff156fb63bfe677"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:33.60411264Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "2c7465b2726b30bd53ea317b20eb06b2"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:12.204499968Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "a1dd2c8710aadb1c25ffac61b1139325"
+     }
+    ],
+    "warnings": [],
+    "matched": 289
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "l-trace",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "All logs from one trace",
+   "why": "The bridge between signals. The saved example is the db_error run.",
+   "expr": "trace_id = '8b890cacc615088c5d6508a6e8b7cfcc'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 20160,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "trace_id = '8b890cacc615088c5d6508a6e8b7cfcc'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:10:26.516532224Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "backend reported a database error",
+      "trace_id": "8b890cacc615088c5d6508a6e8b7cfcc"
+     },
+     {
+      "timestamp": "2026-11-04T23:10:26.515863808Z",
+      "service": "frontend",
+      "severity": "INFO",
+      "body": "HTTP Request: GET http://backend:8000/work/db-error \"HTTP/1.1 500 Internal Server Error\"",
+      "trace_id": "8b890cacc615088c5d6508a6e8b7cfcc"
+     },
+     {
+      "timestamp": "2026-11-04T23:10:26.514086144Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "8b890cacc615088c5d6508a6e8b7cfcc"
+     }
+    ],
+    "warnings": [],
+    "matched": 3
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "l-body",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "Search the message text",
+   "why": "`body` is the log message. CONTAINS is a substring match.",
+   "expr": "body CONTAINS 'query failed'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "body CONTAINS 'query failed'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:57.001657503Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:57,001 ERROR [backend] trace_id=924cc7fbfc3600347aad0e8d59b92937 span_id=f69f378313f4eb4f query failed: relation \"table_that_does_not_exist\" does not exi",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:57.00104576Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:50.756495709Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:50,754 ERROR [backend] trace_id=5fabf3712119e259c80ff329fd284d93 span_id=2a4d2ef1717955b6 query failed: relation \"table_that_does_not_exist\" does not exi",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:50.75444352Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "5fabf3712119e259c80ff329fd284d93"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:45.913987637Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:45,912 ERROR [backend] trace_id=310437a9192777b41ff156fb63bfe677 span_id=4df2c3477671a088 query failed: relation \"table_that_does_not_exist\" does not exi",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 574
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "l-attr",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "Filter on attributes from extra=",
+   "why": "Keys passed to `extra=` in Python logging become searchable attributes.",
+   "expr": "order.item = 'coffee' AND order.total > 10",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "order.item = 'coffee' AND order.total > 10"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:59.834349312Z",
+      "service": "backend",
+      "severity": "INFO",
+      "body": "order stored",
+      "trace_id": "cbb23edf25a543bbef8e2a720429f75d"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:56.616548864Z",
+      "service": "backend",
+      "severity": "INFO",
+      "body": "order stored",
+      "trace_id": "95f11896a87efb7d6d8446b93f519428"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:55.213444352Z",
+      "service": "backend",
+      "severity": "INFO",
+      "body": "order stored",
+      "trace_id": "bd82596cf5a69ec3546461ef6484d80d"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:54.997114624Z",
+      "service": "backend",
+      "severity": "INFO",
+      "body": "order stored",
+      "trace_id": "4843bf69162e2421a344b3de7e66b327"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:53.993394432Z",
+      "service": "backend",
+      "severity": "INFO",
+      "body": "order stored",
+      "trace_id": "e85afca1459c85dfbc7ffa1f549315f6"
+     }
+    ],
+    "warnings": [],
+    "matched": 1180
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "l-exc",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "Logs with a given exception type",
+   "why": "On logs the type is the short class name, `UndefinedTable`. On spans it is `psycopg.errors.UndefinedTable`.",
+   "expr": "exception.type = 'UndefinedTable'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "exception.type = 'UndefinedTable'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:57.00104576Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "924cc7fbfc3600347aad0e8d59b92937"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:50.75444352Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "5fabf3712119e259c80ff329fd284d93"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:45.912685568Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "310437a9192777b41ff156fb63bfe677"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:33.60411264Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "2c7465b2726b30bd53ea317b20eb06b2"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:12.204499968Z",
+      "service": "backend",
+      "severity": "ERROR",
+      "body": "query failed: relation \"table_that_does_not_exist\" does not exist",
+      "trace_id": "a1dd2c8710aadb1c25ffac61b1139325"
+     }
+    ],
+    "warnings": [],
+    "matched": 287
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "l-burst",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "Numeric attribute filter",
+   "why": "The log_burst scenario sets `burst.index` and `burst.size` through `extra=`.",
+   "expr": "burst.size = 20 AND burst.index = 3",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 1440,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "burst.size = 20 AND burst.index = 3"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:56:08.098405376Z",
+      "service": "frontend",
+      "severity": "WARN",
+      "body": "log burst line 4 of 20",
+      "trace_id": "e6290930c56589076a5d5251a4ba3409"
+     },
+     {
+      "timestamp": "2026-11-04T23:10:26.521525248Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "log burst line 4 of 20",
+      "trace_id": "6d35e4eb47823f88598c19e9c5adeee8"
+     }
+    ],
+    "warnings": [],
+    "matched": 2
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-stdout-copies",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "The stdout copies of app logs",
+   "why": "Gap 4: k8s-infra collects stdout too. These copies have no service.name.",
+   "expr": "service.name NOT EXISTS AND k8s.namespace.name = 'lab'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name NOT EXISTS AND k8s.namespace.name = 'lab'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:59.838839838Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:59,838 INFO [httpx] trace_id=6ae4a156c24d5eaeb32ab9b47f7f57a1 span_id=ff5913de10da1529 HTTP Request: POST http://127.0.0.1:8000/api/scenario/order \"HTTP/",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:59.83835388Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "INFO:     127.0.0.1:52192 - \"POST /api/scenario/order HTTP/1.1\" 200 OK",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:59.837541755Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:59,837 INFO [httpx] trace_id=cbb23edf25a543bbef8e2a720429f75d span_id=8a88bd8eced3cf93 HTTP Request: POST http://backend:8000/orders \"HTTP/1.1 200 OK\"",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:59.835403421Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "INFO:     10.42.0.20:49278 - \"POST /orders HTTP/1.1\" 200 OK",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:59.83467488Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:59,834 INFO [backend] trace_id=cbb23edf25a543bbef8e2a720429f75d span_id=f4b5ec7b9d226ce1 order stored",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [
+     "Key `k8s.namespace.name` is ambiguous, found 2 different combinations of field context / data type: [name=k8s.namespace.name,context=resource,datatype=string name=k8s.namespace.name,context=attribute,datatype=string]. Using `resource` context by default. To query another context explicitly, use the fully qualified name (e.g., 'attribute.k8s.namespace.name' or 'body.k8s.namespace.name')"
+    ],
+    "matched": 132914
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "l-otlp-k8s",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "OTLP logs with Kubernetes context",
+   "why": "Zero rows: OTLP copies have service.name but no Kubernetes attributes, which is gap 3 again.",
+   "expr": "service.name EXISTS AND k8s.namespace.name = 'lab'",
+   "neg": true,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name EXISTS AND k8s.namespace.name = 'lab'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [],
+    "warnings": [
+     "Key `k8s.namespace.name` is ambiguous, found 2 different combinations of field context / data type: [name=k8s.namespace.name,context=resource,datatype=string name=k8s.namespace.name,context=attribute,datatype=string]. Using `resource` context by default. To query another context explicitly, use the fully qualified name (e.g., 'attribute.k8s.namespace.name' or 'body.k8s.namespace.name')"
+    ],
+    "matched": 0
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-postgres",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "Postgres logs",
+   "why": "Postgres has no OTel SDK. These exist only because k8s-infra reads container stdout.",
+   "expr": "k8s.container.name = 'postgres'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 1440,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "k8s.container.name = 'postgres'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:57.000340212Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:57.000 UTC [19772] STATEMENT:  SELECT * FROM table_that_does_not_exist",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:57.000272962Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:57.000 UTC [19772] ERROR:  relation \"table_that_does_not_exist\" does not exist at character 15",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:50.753187417Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:50.752 UTC [19743] STATEMENT:  SELECT * FROM table_that_does_not_exist",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:50.753151042Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:50.752 UTC [19743] ERROR:  relation \"table_that_does_not_exist\" does not exist at character 15",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:45.910639304Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:45.910 UTC [19720] STATEMENT:  SELECT * FROM table_that_does_not_exist",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 594
+   },
+   "verified": "api"
+  },
+  {
+   "id": "a-logs-by-sev",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "Log volume by severity",
+   "why": "Count by severity, for OTLP logs only.",
+   "expr": "service.name EXISTS",
+   "neg": false,
+   "aggs": [
+    "count()"
+   ],
+   "by": [
+    "severity_text"
+   ],
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name EXISTS"
+    },
+    "aggregations": [
+     {
+      "expression": "count()"
+     }
+    ],
+    "limit": 20,
+    "groupBy": [
+     {
+      "name": "severity_text"
+     }
+    ]
+   },
+   "requestType": "scalar",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "table",
+    "columns": [
+     "severity_text",
+     "__result_0"
+    ],
+    "data": [
+     [
+      "INFO",
+      37578
+     ],
+     [
+      "ERROR",
+      1452
+     ],
+     [
+      "WARN",
+      298
+     ]
+    ],
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-crash",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "The crash scenario",
+   "why": "All spans tagged by the frontend for this scenario.",
+   "expr": "lab.scenario = 'crash'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "lab.scenario = 'crash'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:24.312529169Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 5157208,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "23aae01934c573b925b2abff0d569ac1"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:16.446552596Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 3912333,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "4fdd9b48819562ffaa0d1881383d4bd8"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:15.233674179Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 3269041,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "cbed745f2be3b236bf289bc02f590f07"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:14.80868822Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 4082458,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "6f3901d5dbe617af77c1da869034653d"
+     },
+     {
+      "timestamp": "2026-11-04T23:57:43.961315511Z",
+      "service.name": "frontend",
+      "name": "POST /api/scenario/{name}",
+      "duration_nano": 4648292,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "92fdecfc113fb09e5716ce119e75f181"
+     }
+    ],
+    "warnings": [],
+    "matched": 282
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-fail-route",
+   "group": "Traces: find spans",
+   "signal": "traces",
+   "title": "One failing backend route",
+   "why": "The route where the cross-service failure starts.",
+   "expr": "http.route = '/work/fail'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "http.route = '/work/fail'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:44.688903928Z",
+      "service.name": "backend",
+      "name": "GET /work/fail",
+      "duration_nano": 2637625,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "d8a77e6587a59cbd1e53a9abf9f27b0f"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:39.035918634Z",
+      "service.name": "backend",
+      "name": "GET /work/fail",
+      "duration_nano": 3043083,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "c4d30719a8ab450f8d7b2e6c04975e20"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:29.958111963Z",
+      "service.name": "backend",
+      "name": "GET /work/fail",
+      "duration_nano": 2079125,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "c166f9ffb47b4bfc6618e3a23be35e93"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:27.541692004Z",
+      "service.name": "backend",
+      "name": "GET /work/fail",
+      "duration_nano": 5894875,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "7990b85dd3caa6f2936d651a6c837424"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:18.465060055Z",
+      "service.name": "backend",
+      "name": "GET /work/fail",
+      "duration_nano": 7601500,
+      "response_status_code": "500",
+      "has_error": true,
+      "trace_id": "314dc209e23181913ed843ca0f6f92d3"
+     }
+    ],
+    "warnings": [],
+    "matched": 277
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-crash",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "The unhandled error log",
+   "why": "Written by the exception handler in frontend.py.",
+   "expr": "body CONTAINS 'unhandled error'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "body CONTAINS 'unhandled error'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:24.317574502Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:24,314 ERROR [frontend] trace_id=23aae01934c573b925b2abff0d569ac1 span_id=21b447752ccaa71e unhandled error on POST /api/scenario/crash",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:24.31448576Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "unhandled error on POST /api/scenario/crash",
+      "trace_id": "23aae01934c573b925b2abff0d569ac1"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:16.450236929Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:16,448 ERROR [frontend] trace_id=4fdd9b48819562ffaa0d1881383d4bd8 span_id=18f6946d6e2bc4b3 unhandled error on POST /api/scenario/crash",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:16.448237312Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "unhandled error on POST /api/scenario/crash",
+      "trace_id": "4fdd9b48819562ffaa0d1881383d4bd8"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:15.23685022Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:15,234 ERROR [frontend] trace_id=cbed745f2be3b236bf289bc02f590f07 span_id=b2e1e781c330ebb7 unhandled error on POST /api/scenario/crash",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 566
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-exc-zde",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "exception.type does work on logs",
+   "why": "The log bridge copies exception details onto the log record, so this works on logs even though it finds nothing on spans.",
+   "expr": "exception.type = 'ZeroDivisionError'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "exception.type = 'ZeroDivisionError'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:24.31448576Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "unhandled error on POST /api/scenario/crash",
+      "trace_id": "23aae01934c573b925b2abff0d569ac1"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:16.448237312Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "unhandled error on POST /api/scenario/crash",
+      "trace_id": "4fdd9b48819562ffaa0d1881383d4bd8"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:15.234848512Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "unhandled error on POST /api/scenario/crash",
+      "trace_id": "cbed745f2be3b236bf289bc02f590f07"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:14.81052672Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "unhandled error on POST /api/scenario/crash",
+      "trace_id": "6f3901d5dbe617af77c1da869034653d"
+     },
+     {
+      "timestamp": "2026-11-04T23:57:43.963627264Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "unhandled error on POST /api/scenario/crash",
+      "trace_id": "92fdecfc113fb09e5716ce119e75f181"
+     }
+    ],
+    "warnings": [],
+    "matched": 282
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-backend-call",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "The frontend reporting a backend failure",
+   "why": "This is the symptom log. It names the URL that failed.",
+   "expr": "body CONTAINS 'backend call failed'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "body CONTAINS 'backend call failed'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:44.694503262Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:44,694 ERROR [frontend] trace_id=d8a77e6587a59cbd1e53a9abf9f27b0f span_id=1b4b7da0c81aea33 backend call failed: Server error '500 Internal Server Error' ",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:44.694339584Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "backend call failed: Server error '500 Internal Server Error' for url 'http://backend:8000/work/fail'\nFor more information check: https://developer.mozilla.org/en-US/docs",
+      "trace_id": "d8a77e6587a59cbd1e53a9abf9f27b0f"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:39.039867009Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:39,039 ERROR [frontend] trace_id=c4d30719a8ab450f8d7b2e6c04975e20 span_id=7f9aaf0bfb862343 backend call failed: Server error '500 Internal Server Error' ",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:39.039668736Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "backend call failed: Server error '500 Internal Server Error' for url 'http://backend:8000/work/fail'\nFor more information check: https://developer.mozilla.org/en-US/docs",
+      "trace_id": "c4d30719a8ab450f8d7b2e6c04975e20"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:29.961211421Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:29,961 ERROR [frontend] trace_id=c166f9ffb47b4bfc6618e3a23be35e93 span_id=b7323c0dabd738f3 backend call failed: Server error '500 Internal Server Error' ",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 554
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-timeout",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "The timeout log",
+   "why": "Written by the frontend when httpx raises ReadTimeout.",
+   "expr": "body CONTAINS 'backend timed out'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "body CONTAINS 'backend timed out'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:58:54.166664794Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:54,166 ERROR [frontend] trace_id=b00df9fb3995c426d6a06d18e9a344f7 span_id=91e7d78776fb48d3 backend timed out after 1s",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:54.166302464Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "backend timed out after 1s",
+      "trace_id": "b00df9fb3995c426d6a06d18e9a344f7"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:34.796381465Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:34,796 ERROR [frontend] trace_id=ed195e70340b27a2358e969281b86c2c span_id=5b891e031b8174ec backend timed out after 1s",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:58:34.796143616Z",
+      "service": "frontend",
+      "severity": "ERROR",
+      "body": "backend timed out after 1s",
+      "trace_id": "ed195e70340b27a2358e969281b86c2c"
+     },
+     {
+      "timestamp": "2026-11-04T23:58:33.18219309Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:58:33,181 ERROR [frontend] trace_id=5315a9f8776d89d4513f238d949ecbb8 span_id=135b244ddd7dfbc5 backend timed out after 1s",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 596
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-burn",
+   "group": "Logs",
+   "signal": "logs",
+   "title": "The CPU burn log",
+   "why": "A WARN from the backend when the burn ends.",
+   "expr": "body CONTAINS 'burned CPU'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 1440,
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "body CONTAINS 'burned CPU'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "requestType": "raw",
+   "savedWindow": {
+    "start": "2026-11-04T23:10:00Z",
+    "end": "2026-11-04T23:24:00Z"
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-04T23:17:13.907870345Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:17:13,907 WARNING [backend] trace_id=0e2d66640ee0781e49893d003cc9ffd5 span_id=2c87343b56a50b9e burned CPU for 90.0s",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:17:13.907160576Z",
+      "service": "backend",
+      "severity": "WARN",
+      "body": "burned CPU for 90.0s",
+      "trace_id": "0e2d66640ee0781e49893d003cc9ffd5"
+     },
+     {
+      "timestamp": "2026-11-04T23:12:40.949577427Z",
+      "service": "(blank)",
+      "severity": "(blank)",
+      "body": "2026-11-04 23:12:40,945 WARNING [backend] trace_id=d3d26febc59c3d75a0c3623ad9b52abe span_id=94562c4f94b4fce2 burned CPU for 90.0s",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-04T23:12:40.945366528Z",
+      "service": "backend",
+      "severity": "WARN",
+      "body": "burned CPU for 90.0s",
+      "trace_id": "d3d26febc59c3d75a0c3623ad9b52abe"
+     }
+    ],
+    "warnings": [],
+    "matched": 4
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-orders",
+   "group": "Metrics: custom",
+   "signal": "metrics",
+   "title": "Orders per second by item",
+   "why": "Custom counter from backend.py. `rate` turns a cumulative counter into per-second values.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "order.item"
+   ],
+   "metric": {
+    "metricName": "orders.created",
+    "timeAggregation": "rate",
+    "spaceAggregation": "sum"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "orders.created",
+      "timeAggregation": "rate",
+      "spaceAggregation": "sum"
+     }
+    ],
+    "stepInterval": 60,
+    "groupBy": [
+     {
+      "name": "order.item"
+     }
+    ]
+   },
+   "requestType": "time_series",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "order.item": "coffee"
+      },
+      "points": 51,
+      "last": 0.75,
+      "peak": 0.967,
+      "peak_at": "23:55 UTC",
+      "values": [
+       [
+        1793834340000,
+        0.8
+       ],
+       [
+        1793834400000,
+        0.567
+       ],
+       [
+        1793834460000,
+        0.7
+       ],
+       [
+        1793834520000,
+        0.55
+       ],
+       [
+        1793834580000,
+        0.7
+       ],
+       [
+        1793834640000,
+        0.7
+       ],
+       [
+        1793834700000,
+        0.817
+       ],
+       [
+        1793834760000,
+        0.583
+       ],
+       [
+        1793834820000,
+        0.767
+       ],
+       [
+        1793834880000,
+        0.75
+       ],
+       [
+        1793834940000,
+        0.717
+       ],
+       [
+        1793835000000,
+        0.633
+       ],
+       [
+        1793835060000,
+        0.667
+       ],
+       [
+        1793835120000,
+        0.617
+       ],
+       [
+        1793835180000,
+        0.383
+       ],
+       [
+        1793835240000,
+        0.6
+       ],
+       [
+        1793835300000,
+        0.617
+       ],
+       [
+        1793835360000,
+        0.633
+       ],
+       [
+        1793835420000,
+        0.75
+       ],
+       [
+        1793835480000,
+        0.683
+       ],
+       [
+        1793835540000,
+        0.617
+       ],
+       [
+        1793835600000,
+        0.617
+       ],
+       [
+        1793835660000,
+        0.733
+       ],
+       [
+        1793835720000,
+        0.667
+       ],
+       [
+        1793835780000,
+        0.7
+       ],
+       [
+        1793835840000,
+        0.733
+       ],
+       [
+        1793835900000,
+        0.733
+       ],
+       [
+        1793835960000,
+        0.6
+       ],
+       [
+        1793836020000,
+        0.55
+       ],
+       [
+        1793836080000,
+        0.6
+       ],
+       [
+        1793836140000,
+        0.667
+       ],
+       [
+        1793836200000,
+        0.75
+       ],
+       [
+        1793836260000,
+        0.7
+       ],
+       [
+        1793836320000,
+        0.733
+       ],
+       [
+        1793836380000,
+        0.767
+       ],
+       [
+        1793836440000,
+        0.6
+       ],
+       [
+        1793836500000,
+        0.967
+       ],
+       [
+        1793836560000,
+        0.65
+       ],
+       [
+        1793836620000,
+        0.617
+       ],
+       [
+        1793836680000,
+        0.75
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "order.item": "cake"
+      },
+      "points": 51,
+      "last": 0.55,
+      "peak": 0.933,
+      "peak_at": "23:38 UTC",
+      "values": [
+       [
+        1793834340000,
+        0.65
+       ],
+       [
+        1793834400000,
+        0.7
+       ],
+       [
+        1793834460000,
+        0.717
+       ],
+       [
+        1793834520000,
+        0.65
+       ],
+       [
+        1793834580000,
+        0.8
+       ],
+       [
+        1793834640000,
+        0.633
+       ],
+       [
+        1793834700000,
+        0.667
+       ],
+       [
+        1793834760000,
+        0.783
+       ],
+       [
+        1793834820000,
+        0.767
+       ],
+       [
+        1793834880000,
+        0.75
+       ],
+       [
+        1793834940000,
+        0.833
+       ],
+       [
+        1793835000000,
+        0.75
+       ],
+       [
+        1793835060000,
+        0.683
+       ],
+       [
+        1793835120000,
+        0.717
+       ],
+       [
+        1793835180000,
+        0.75
+       ],
+       [
+        1793835240000,
+        0.5
+       ],
+       [
+        1793835300000,
+        0.6
+       ],
+       [
+        1793835360000,
+        0.817
+       ],
+       [
+        1793835420000,
+        0.683
+       ],
+       [
+        1793835480000,
+        0.933
+       ],
+       [
+        1793835540000,
+        0.733
+       ],
+       [
+        1793835600000,
+        0.6
+       ],
+       [
+        1793835660000,
+        0.733
+       ],
+       [
+        1793835720000,
+        0.6
+       ],
+       [
+        1793835780000,
+        0.75
+       ],
+       [
+        1793835840000,
+        0.65
+       ],
+       [
+        1793835900000,
+        0.667
+       ],
+       [
+        1793835960000,
+        0.65
+       ],
+       [
+        1793836020000,
+        0.85
+       ],
+       [
+        1793836080000,
+        0.65
+       ],
+       [
+        1793836140000,
+        0.733
+       ],
+       [
+        1793836200000,
+        0.733
+       ],
+       [
+        1793836260000,
+        0.667
+       ],
+       [
+        1793836320000,
+        0.75
+       ],
+       [
+        1793836380000,
+        0.617
+       ],
+       [
+        1793836440000,
+        0.5
+       ],
+       [
+        1793836500000,
+        0.683
+       ],
+       [
+        1793836560000,
+        0.567
+       ],
+       [
+        1793836620000,
+        0.483
+       ],
+       [
+        1793836680000,
+        0.55
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "order.item": "bagel"
+      },
+      "points": 51,
+      "last": 0.767,
+      "peak": 0.9,
+      "peak_at": "23:54 UTC",
+      "values": [
+       [
+        1793834340000,
+        0.533
+       ],
+       [
+        1793834400000,
+        0.483
+       ],
+       [
+        1793834460000,
+        0.6
+       ],
+       [
+        1793834520000,
+        0.567
+       ],
+       [
+        1793834580000,
+        0.65
+       ],
+       [
+        1793834640000,
+        0.583
+       ],
+       [
+        1793834700000,
+        0.65
+       ],
+       [
+        1793834760000,
+        0.75
+       ],
+       [
+        1793834820000,
+        0.717
+       ],
+       [
+        1793834880000,
+        0.733
+       ],
+       [
+        1793834940000,
+        0.55
+       ],
+       [
+        1793835000000,
+        0.717
+       ],
+       [
+        1793835060000,
+        0.833
+       ],
+       [
+        1793835120000,
+        0.633
+       ],
+       [
+        1793835180000,
+        0.567
+       ],
+       [
+        1793835240000,
+        0.617
+       ],
+       [
+        1793835300000,
+        0.633
+       ],
+       [
+        1793835360000,
+        0.717
+       ],
+       [
+        1793835420000,
+        0.7
+       ],
+       [
+        1793835480000,
+        0.667
+       ],
+       [
+        1793835540000,
+        0.617
+       ],
+       [
+        1793835600000,
+        0.65
+       ],
+       [
+        1793835660000,
+        0.75
+       ],
+       [
+        1793835720000,
+        0.767
+       ],
+       [
+        1793835780000,
+        0.617
+       ],
+       [
+        1793835840000,
+        0.667
+       ],
+       [
+        1793835900000,
+        0.783
+       ],
+       [
+        1793835960000,
+        0.85
+       ],
+       [
+        1793836020000,
+        0.65
+       ],
+       [
+        1793836080000,
+        0.633
+       ],
+       [
+        1793836140000,
+        0.817
+       ],
+       [
+        1793836200000,
+        0.617
+       ],
+       [
+        1793836260000,
+        0.783
+       ],
+       [
+        1793836320000,
+        0.467
+       ],
+       [
+        1793836380000,
+        0.667
+       ],
+       [
+        1793836440000,
+        0.9
+       ],
+       [
+        1793836500000,
+        0.517
+       ],
+       [
+        1793836560000,
+        0.833
+       ],
+       [
+        1793836620000,
+        0.667
+       ],
+       [
+        1793836680000,
+        0.767
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "order.item": "sandwich"
+      },
+      "points": 51,
+      "last": 0.617,
+      "peak": 0.867,
+      "peak_at": "23:57 UTC",
+      "values": [
+       [
+        1793834340000,
+        0.683
+       ],
+       [
+        1793834400000,
+        0.717
+       ],
+       [
+        1793834460000,
+        0.583
+       ],
+       [
+        1793834520000,
+        0.717
+       ],
+       [
+        1793834580000,
+        0.7
+       ],
+       [
+        1793834640000,
+        0.617
+       ],
+       [
+        1793834700000,
+        0.683
+       ],
+       [
+        1793834760000,
+        0.617
+       ],
+       [
+        1793834820000,
+        0.667
+       ],
+       [
+        1793834880000,
+        0.583
+       ],
+       [
+        1793834940000,
+        0.6
+       ],
+       [
+        1793835000000,
+        0.55
+       ],
+       [
+        1793835060000,
+        0.633
+       ],
+       [
+        1793835120000,
+        0.817
+       ],
+       [
+        1793835180000,
+        0.833
+       ],
+       [
+        1793835240000,
+        0.65
+       ],
+       [
+        1793835300000,
+        0.783
+       ],
+       [
+        1793835360000,
+        0.567
+       ],
+       [
+        1793835420000,
+        0.75
+       ],
+       [
+        1793835480000,
+        0.633
+       ],
+       [
+        1793835540000,
+        0.583
+       ],
+       [
+        1793835600000,
+        0.683
+       ],
+       [
+        1793835660000,
+        0.483
+       ],
+       [
+        1793835720000,
+        0.617
+       ],
+       [
+        1793835780000,
+        0.7
+       ],
+       [
+        1793835840000,
+        0.55
+       ],
+       [
+        1793835900000,
+        0.533
+       ],
+       [
+        1793835960000,
+        0.633
+       ],
+       [
+        1793836020000,
+        0.667
+       ],
+       [
+        1793836080000,
+        0.667
+       ],
+       [
+        1793836140000,
+        0.667
+       ],
+       [
+        1793836200000,
+        0.7
+       ],
+       [
+        1793836260000,
+        0.633
+       ],
+       [
+        1793836320000,
+        0.6
+       ],
+       [
+        1793836380000,
+        0.767
+       ],
+       [
+        1793836440000,
+        0.567
+       ],
+       [
+        1793836500000,
+        0.55
+       ],
+       [
+        1793836560000,
+        0.683
+       ],
+       [
+        1793836620000,
+        0.867
+       ],
+       [
+        1793836680000,
+        0.617
+       ]
+      ]
+     }
+    ],
+    "total_series": 4,
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-runs-error",
+   "group": "Metrics: custom",
+   "signal": "metrics",
+   "title": "Failed scenario runs",
+   "why": "Custom counter from frontend.py. `increase` gives runs per step.",
+   "expr": "outcome = 'error'",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "scenario"
+   ],
+   "metric": {
+    "metricName": "scenario.runs",
+    "timeAggregation": "increase",
+    "spaceAggregation": "sum"
+   },
+   "step": 300,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "filter": {
+     "expression": "outcome = 'error'"
+    },
+    "aggregations": [
+     {
+      "metricName": "scenario.runs",
+      "timeAggregation": "increase",
+      "spaceAggregation": "sum"
+     }
+    ],
+    "stepInterval": 300,
+    "groupBy": [
+     {
+      "name": "scenario"
+     }
+    ]
+   },
+   "requestType": "time_series",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "scenario": "timeout"
+      },
+      "points": 11,
+      "last": 22,
+      "peak": 39,
+      "peak_at": "23:15 UTC",
+      "values": [
+       [
+        1793833500000,
+        0
+       ],
+       [
+        1793833800000,
+        32
+       ],
+       [
+        1793834100000,
+        39
+       ],
+       [
+        1793834400000,
+        25
+       ],
+       [
+        1793834700000,
+        37
+       ],
+       [
+        1793835000000,
+        29
+       ],
+       [
+        1793835300000,
+        32
+       ],
+       [
+        1793835600000,
+        31
+       ],
+       [
+        1793835900000,
+        22
+       ],
+       [
+        1793836200000,
+        28
+       ],
+       [
+        1793836500000,
+        22
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "scenario": "db_error"
+      },
+      "points": 11,
+      "last": 20,
+      "peak": 38,
+      "peak_at": "23:20 UTC",
+      "values": [
+       [
+        1793833500000,
+        0
+       ],
+       [
+        1793833800000,
+        28
+       ],
+       [
+        1793834100000,
+        20
+       ],
+       [
+        1793834400000,
+        38
+       ],
+       [
+        1793834700000,
+        31
+       ],
+       [
+        1793835000000,
+        27
+       ],
+       [
+        1793835300000,
+        34
+       ],
+       [
+        1793835600000,
+        27
+       ],
+       [
+        1793835900000,
+        32
+       ],
+       [
+        1793836200000,
+        28
+       ],
+       [
+        1793836500000,
+        20
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "scenario": "crash"
+      },
+      "points": 11,
+      "last": 21,
+      "peak": 37,
+      "peak_at": "23:40 UTC",
+      "values": [
+       [
+        1793833500000,
+        0
+       ],
+       [
+        1793833800000,
+        31
+       ],
+       [
+        1793834100000,
+        29
+       ],
+       [
+        1793834400000,
+        22
+       ],
+       [
+        1793834700000,
+        33
+       ],
+       [
+        1793835000000,
+        27
+       ],
+       [
+        1793835300000,
+        25
+       ],
+       [
+        1793835600000,
+        37
+       ],
+       [
+        1793835900000,
+        31
+       ],
+       [
+        1793836200000,
+        26
+       ],
+       [
+        1793836500000,
+        21
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "scenario": "backend_500"
+      },
+      "points": 11,
+      "last": 31,
+      "peak": 35,
+      "peak_at": "23:45 UTC",
+      "values": [
+       [
+        1793833500000,
+        0
+       ],
+       [
+        1793833800000,
+        28
+       ],
+       [
+        1793834100000,
+        29
+       ],
+       [
+        1793834400000,
+        22
+       ],
+       [
+        1793834700000,
+        20
+       ],
+       [
+        1793835000000,
+        27
+       ],
+       [
+        1793835300000,
+        27
+       ],
+       [
+        1793835600000,
+        33
+       ],
+       [
+        1793835900000,
+        35
+       ],
+       [
+        1793836200000,
+        25
+       ],
+       [
+        1793836500000,
+        31
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "scenario": "bad_input"
+      },
+      "points": 11,
+      "last": 21,
+      "peak": 35,
+      "peak_at": "23:50 UTC",
+      "values": [
+       [
+        1793833500000,
+        0
+       ],
+       [
+        1793833800000,
+        27
+       ],
+       [
+        1793834100000,
+        31
+       ],
+       [
+        1793834400000,
+        27
+       ],
+       [
+        1793834700000,
+        25
+       ],
+       [
+        1793835000000,
+        29
+       ],
+       [
+        1793835300000,
+        19
+       ],
+       [
+        1793835600000,
+        26
+       ],
+       [
+        1793835900000,
+        34
+       ],
+       [
+        1793836200000,
+        35
+       ],
+       [
+        1793836500000,
+        21
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "scenario": "list"
+      },
+      "points": 9,
+      "last": 0,
+      "peak": 0,
+      "peak_at": "23:15 UTC",
+      "values": [
+       [
+        1793834100000,
+        0
+       ],
+       [
+        1793834400000,
+        0
+       ],
+       [
+        1793834700000,
+        0
+       ],
+       [
+        1793835000000,
+        0
+       ],
+       [
+        1793835300000,
+        0
+       ],
+       [
+        1793835600000,
+        0
+       ],
+       [
+        1793835900000,
+        0
+       ],
+       [
+        1793836200000,
+        0
+       ],
+       [
+        1793836500000,
+        0
+       ]
+      ]
+     }
+    ],
+    "total_series": 6,
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-order-value",
+   "group": "Metrics: custom",
+   "signal": "metrics",
+   "title": "Revenue per second by item",
+   "why": "A histogram also produces .sum, .count, .min, .max and .bucket metrics.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "order.item"
+   ],
+   "metric": {
+    "metricName": "orders.value.sum",
+    "timeAggregation": "rate",
+    "spaceAggregation": "sum"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "orders.value.sum",
+      "timeAggregation": "rate",
+      "spaceAggregation": "sum"
+     }
+    ],
+    "stepInterval": 60,
+    "groupBy": [
+     {
+      "name": "order.item"
+     }
+    ]
+   },
+   "requestType": "time_series",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "order.item": "sandwich"
+      },
+      "points": 51,
+      "last": 13.298,
+      "peak": 19.223,
+      "peak_at": "23:32 UTC",
+      "values": [
+       [
+        1793834340000,
+        15.932
+       ],
+       [
+        1793834400000,
+        18.828
+       ],
+       [
+        1793834460000,
+        14.088
+       ],
+       [
+        1793834520000,
+        16.722
+       ],
+       [
+        1793834580000,
+        18.433
+       ],
+       [
+        1793834640000,
+        13.562
+       ],
+       [
+        1793834700000,
+        16.722
+       ],
+       [
+        1793834760000,
+        16.327
+       ],
+       [
+        1793834820000,
+        14.483
+       ],
+       [
+        1793834880000,
+        14.352
+       ],
+       [
+        1793834940000,
+        14.22
+       ],
+       [
+        1793835000000,
+        12.772
+       ],
+       [
+        1793835060000,
+        16.458
+       ],
+       [
+        1793835120000,
+        19.223
+       ],
+       [
+        1793835180000,
+        19.092
+       ],
+       [
+        1793835240000,
+        16.985
+       ],
+       [
+        1793835300000,
+        18.302
+       ],
+       [
+        1793835360000,
+        13.298
+       ],
+       [
+        1793835420000,
+        18.697
+       ],
+       [
+        1793835480000,
+        15.668
+       ],
+       [
+        1793835540000,
+        12.377
+       ],
+       [
+        1793835600000,
+        16.985
+       ],
+       [
+        1793835660000,
+        12.245
+       ],
+       [
+        1793835720000,
+        13.035
+       ],
+       [
+        1793835780000,
+        14.615
+       ],
+       [
+        1793835840000,
+        13.298
+       ],
+       [
+        1793835900000,
+        15.273
+       ],
+       [
+        1793835960000,
+        13.957
+       ],
+       [
+        1793836020000,
+        15.01
+       ],
+       [
+        1793836080000,
+        15.01
+       ],
+       [
+        1793836140000,
+        13.957
+       ],
+       [
+        1793836200000,
+        16.327
+       ],
+       [
+        1793836260000,
+        15.142
+       ],
+       [
+        1793836320000,
+        12.113
+       ],
+       [
+        1793836380000,
+        18.302
+       ],
+       [
+        1793836440000,
+        15.142
+       ],
+       [
+        1793836500000,
+        14.352
+       ],
+       [
+        1793836560000,
+        15.537
+       ],
+       [
+        1793836620000,
+        19.223
+       ],
+       [
+        1793836680000,
+        13.298
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "order.item": "cake"
+      },
+      "points": 51,
+      "last": 8.154,
+      "peak": 14.092,
+      "peak_at": "23:38 UTC",
+      "values": [
+       [
+        1793834340000,
+        9.896
+       ],
+       [
+        1793834400000,
+        9.421
+       ],
+       [
+        1793834460000,
+        10.292
+       ],
+       [
+        1793834520000,
+        8.788
+       ],
+       [
+        1793834580000,
+        12.35
+       ],
+       [
+        1793834640000,
+        9.896
+       ],
+       [
+        1793834700000,
+        8.867
+       ],
+       [
+        1793834760000,
+        12.192
+       ],
+       [
+        1793834820000,
+        10.054
+       ],
+       [
+        1793834880000,
+        11.717
+       ],
+       [
+        1793834940000,
+        12.192
+       ],
+       [
+        1793835000000,
+        12.192
+       ],
+       [
+        1793835060000,
+        9.896
+       ],
+       [
+        1793835120000,
+        9.658
+       ],
+       [
+        1793835180000,
+        11.242
+       ],
+       [
+        1793835240000,
+        7.283
+       ],
+       [
+        1793835300000,
+        8.867
+       ],
+       [
+        1793835360000,
+        12.983
+       ],
+       [
+        1793835420000,
+        9.263
+       ],
+       [
+        1793835480000,
+        14.092
+       ],
+       [
+        1793835540000,
+        11.163
+       ],
+       [
+        1793835600000,
+        9.025
+       ],
+       [
+        1793835660000,
+        9.738
+       ],
+       [
+        1793835720000,
+        7.442
+       ],
+       [
+        1793835780000,
+        11.083
+       ],
+       [
+        1793835840000,
+        9.658
+       ],
+       [
+        1793835900000,
+        8.55
+       ],
+       [
+        1793835960000,
+        8.867
+       ],
+       [
+        1793836020000,
+        12.508
+       ],
+       [
+        1793836080000,
+        9.342
+       ],
+       [
+        1793836140000,
+        10.846
+       ],
+       [
+        1793836200000,
+        10.292
+       ],
+       [
+        1793836260000,
+        10.925
+       ],
+       [
+        1793836320000,
+        10.45
+       ],
+       [
+        1793836380000,
+        8.313
+       ],
+       [
+        1793836440000,
+        7.125
+       ],
+       [
+        1793836500000,
+        10.292
+       ],
+       [
+        1793836560000,
+        7.838
+       ],
+       [
+        1793836620000,
+        7.125
+       ],
+       [
+        1793836680000,
+        8.154
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "order.item": "coffee"
+      },
+      "points": 51,
+      "last": 7.7,
+      "peak": 9.625,
+      "peak_at": "23:55 UTC",
+      "values": [
+       [
+        1793834340000,
+        8.692
+       ],
+       [
+        1793834400000,
+        5.833
+       ],
+       [
+        1793834460000,
+        7.292
+       ],
+       [
+        1793834520000,
+        6.3
+       ],
+       [
+        1793834580000,
+        7.758
+       ],
+       [
+        1793834640000,
+        7.583
+       ],
+       [
+        1793834700000,
+        7.467
+       ],
+       [
+        1793834760000,
+        6.825
+       ],
+       [
+        1793834820000,
+        8.108
+       ],
+       [
+        1793834880000,
+        7.758
+       ],
+       [
+        1793834940000,
+        6.883
+       ],
+       [
+        1793835000000,
+        6.242
+       ],
+       [
+        1793835060000,
+        6.3
+       ],
+       [
+        1793835120000,
+        6.475
+       ],
+       [
+        1793835180000,
+        4.258
+       ],
+       [
+        1793835240000,
+        6.767
+       ],
+       [
+        1793835300000,
+        6.825
+       ],
+       [
+        1793835360000,
+        6.65
+       ],
+       [
+        1793835420000,
+        7.642
+       ],
+       [
+        1793835480000,
+        7.117
+       ],
+       [
+        1793835540000,
+        6.942
+       ],
+       [
+        1793835600000,
+        6.067
+       ],
+       [
+        1793835660000,
+        8.633
+       ],
+       [
+        1793835720000,
+        7.175
+       ],
+       [
+        1793835780000,
+        7.233
+       ],
+       [
+        1793835840000,
+        7.467
+       ],
+       [
+        1793835900000,
+        7.583
+       ],
+       [
+        1793835960000,
+        7
+       ],
+       [
+        1793836020000,
+        6.242
+       ],
+       [
+        1793836080000,
+        6.183
+       ],
+       [
+        1793836140000,
+        7.233
+       ],
+       [
+        1793836200000,
+        7.992
+       ],
+       [
+        1793836260000,
+        8.05
+       ],
+       [
+        1793836320000,
+        7.175
+       ],
+       [
+        1793836380000,
+        8.225
+       ],
+       [
+        1793836440000,
+        6.008
+       ],
+       [
+        1793836500000,
+        9.625
+       ],
+       [
+        1793836560000,
+        5.833
+       ],
+       [
+        1793836620000,
+        6.65
+       ],
+       [
+        1793836680000,
+        7.7
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "order.item": "bagel"
+      },
+      "points": 51,
+      "last": 5.738,
+      "peak": 6.713,
+      "peak_at": "23:16 UTC",
+      "values": [
+       [
+        1793834340000,
+        3.825
+       ],
+       [
+        1793834400000,
+        3.675
+       ],
+       [
+        1793834460000,
+        3.525
+       ],
+       [
+        1793834520000,
+        3.338
+       ],
+       [
+        1793834580000,
+        4.5
+       ],
+       [
+        1793834640000,
+        3.825
+       ],
+       [
+        1793834700000,
+        4.725
+       ],
+       [
+        1793834760000,
+        4.988
+       ],
+       [
+        1793834820000,
+        4.538
+       ],
+       [
+        1793834880000,
+        4.763
+       ],
+       [
+        1793834940000,
+        3.525
+       ],
+       [
+        1793835000000,
+        5.213
+       ],
+       [
+        1793835060000,
+        5.175
+       ],
+       [
+        1793835120000,
+        4.5
+       ],
+       [
+        1793835180000,
+        3.6
+       ],
+       [
+        1793835240000,
+        3.975
+       ],
+       [
+        1793835300000,
+        3.788
+       ],
+       [
+        1793835360000,
+        4.538
+       ],
+       [
+        1793835420000,
+        5.25
+       ],
+       [
+        1793835480000,
+        4.65
+       ],
+       [
+        1793835540000,
+        3.863
+       ],
+       [
+        1793835600000,
+        4.725
+       ],
+       [
+        1793835660000,
+        5.288
+       ],
+       [
+        1793835720000,
+        4.725
+       ],
+       [
+        1793835780000,
+        4.125
+       ],
+       [
+        1793835840000,
+        4.538
+       ],
+       [
+        1793835900000,
+        5.25
+       ],
+       [
+        1793835960000,
+        6.113
+       ],
+       [
+        1793836020000,
+        4.5
+       ],
+       [
+        1793836080000,
+        4.05
+       ],
+       [
+        1793836140000,
+        6.038
+       ],
+       [
+        1793836200000,
+        3.975
+       ],
+       [
+        1793836260000,
+        5.4
+       ],
+       [
+        1793836320000,
+        3.3
+       ],
+       [
+        1793836380000,
+        4.613
+       ],
+       [
+        1793836440000,
+        5.025
+       ],
+       [
+        1793836500000,
+        3.713
+       ],
+       [
+        1793836560000,
+        5.738
+       ],
+       [
+        1793836620000,
+        4.875
+       ],
+       [
+        1793836680000,
+        5.738
+       ]
+      ]
+     }
+    ],
+    "total_series": 4,
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-order-p95",
+   "group": "Metrics: custom",
+   "signal": "metrics",
+   "title": "P95 order value",
+   "why": "Percentiles come from .bucket with a percentile as the space aggregation.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": {
+    "metricName": "orders.value.bucket",
+    "spaceAggregation": "p95"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "orders.value.bucket",
+      "spaceAggregation": "p95"
+     }
+    ],
+    "stepInterval": 60
+   },
+   "requestType": "time_series",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {},
+      "points": 49,
+      "last": 33.229,
+      "peak": 41.957,
+      "peak_at": "23:20 UTC",
+      "values": [
+       [
+        1793834340000,
+        38.235
+       ],
+       [
+        1793834400000,
+        41.957
+       ],
+       [
+        1793834460000,
+        35
+       ],
+       [
+        1793834520000,
+        37.583
+       ],
+       [
+        1793834580000,
+        39.821
+       ],
+       [
+        1793834640000,
+        35.385
+       ],
+       [
+        1793834700000,
+        38.264
+       ],
+       [
+        1793834760000,
+        40.682
+       ],
+       [
+        1793834820000,
+        30.114
+       ],
+       [
+        1793834880000,
+        35.917
+       ],
+       [
+        1793834940000,
+        34.423
+       ],
+       [
+        1793835000000,
+        34.712
+       ],
+       [
+        1793835060000,
+        39.438
+       ],
+       [
+        1793835120000,
+        38.403
+       ],
+       [
+        1793835180000,
+        39.444
+       ],
+       [
+        1793835240000,
+        41.125
+       ],
+       [
+        1793835300000,
+        40.125
+       ],
+       [
+        1793835360000,
+        36.333
+       ],
+       [
+        1793835420000,
+        39.187
+       ],
+       [
+        1793835480000,
+        37.132
+       ],
+       [
+        1793835540000,
+        30.875
+       ],
+       [
+        1793835600000,
+        40.893
+       ],
+       [
+        1793835660000,
+        36.5
+       ],
+       [
+        1793835720000,
+        31.932
+       ],
+       [
+        1793835780000,
+        34.038
+       ],
+       [
+        1793835840000,
+        35
+       ],
+       [
+        1793835900000,
+        39.276
+       ],
+       [
+        1793835960000,
+        35.357
+       ],
+       [
+        1793836020000,
+        34.327
+       ],
+       [
+        1793836080000,
+        36.339
+       ],
+       [
+        1793836140000,
+        30.341
+       ],
+       [
+        1793836200000,
+        36.875
+       ],
+       [
+        1793836260000,
+        37.721
+       ],
+       [
+        1793836320000,
+        28.75
+       ],
+       [
+        1793836380000,
+        37.574
+       ],
+       [
+        1793836440000,
+        39.306
+       ],
+       [
+        1793836500000,
+        36.417
+       ],
+       [
+        1793836560000,
+        34.231
+       ],
+       [
+        1793836620000,
+        39.028
+       ],
+       [
+        1793836680000,
+        33.229
+       ]
+      ]
+     }
+    ],
+    "total_series": 1,
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-loadgen",
+   "group": "Metrics: custom",
+   "signal": "metrics",
+   "title": "Load generator target",
+   "why": "An observable gauge: the SDK calls a callback at each export.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": {
+    "metricName": "loadgen.target_rps",
+    "timeAggregation": "latest",
+    "spaceAggregation": "max"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "loadgen.target_rps",
+      "timeAggregation": "latest",
+      "spaceAggregation": "max"
+     }
+    ],
+    "stepInterval": 60
+   },
+   "requestType": "time_series",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {},
+      "points": 51,
+      "last": 5,
+      "peak": 5,
+      "peak_at": "23:10 UTC",
+      "values": [
+       [
+        1793834340000,
+        5
+       ],
+       [
+        1793834400000,
+        5
+       ],
+       [
+        1793834460000,
+        5
+       ],
+       [
+        1793834520000,
+        5
+       ],
+       [
+        1793834580000,
+        5
+       ],
+       [
+        1793834640000,
+        5
+       ],
+       [
+        1793834700000,
+        5
+       ],
+       [
+        1793834760000,
+        5
+       ],
+       [
+        1793834820000,
+        5
+       ],
+       [
+        1793834880000,
+        5
+       ],
+       [
+        1793834940000,
+        5
+       ],
+       [
+        1793835000000,
+        5
+       ],
+       [
+        1793835060000,
+        5
+       ],
+       [
+        1793835120000,
+        5
+       ],
+       [
+        1793835180000,
+        5
+       ],
+       [
+        1793835240000,
+        5
+       ],
+       [
+        1793835300000,
+        5
+       ],
+       [
+        1793835360000,
+        5
+       ],
+       [
+        1793835420000,
+        5
+       ],
+       [
+        1793835480000,
+        5
+       ],
+       [
+        1793835540000,
+        5
+       ],
+       [
+        1793835600000,
+        5
+       ],
+       [
+        1793835660000,
+        5
+       ],
+       [
+        1793835720000,
+        5
+       ],
+       [
+        1793835780000,
+        5
+       ],
+       [
+        1793835840000,
+        5
+       ],
+       [
+        1793835900000,
+        5
+       ],
+       [
+        1793835960000,
+        5
+       ],
+       [
+        1793836020000,
+        5
+       ],
+       [
+        1793836080000,
+        5
+       ],
+       [
+        1793836140000,
+        5
+       ],
+       [
+        1793836200000,
+        5
+       ],
+       [
+        1793836260000,
+        5
+       ],
+       [
+        1793836320000,
+        5
+       ],
+       [
+        1793836380000,
+        5
+       ],
+       [
+        1793836440000,
+        5
+       ],
+       [
+        1793836500000,
+        5
+       ],
+       [
+        1793836560000,
+        5
+       ],
+       [
+        1793836620000,
+        5
+       ],
+       [
+        1793836680000,
+        5
+       ]
+      ]
+     }
+    ],
+    "total_series": 1,
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-http-p99",
+   "group": "Metrics: from instrumentation",
+   "signal": "metrics",
+   "title": "Server latency P99 by service",
+   "why": "Emitted by FastAPIInstrumentor. Older attribute names: it has `http.target`, not `http.route`.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "service.name"
+   ],
+   "metric": {
+    "metricName": "http.server.duration.bucket",
+    "spaceAggregation": "p99"
+   },
+   "step": 120,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "http.server.duration.bucket",
+      "spaceAggregation": "p99"
+     }
+    ],
+    "stepInterval": 120,
+    "groupBy": [
+     {
+      "name": "service.name"
+     }
+    ]
+   },
+   "requestType": "time_series",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "service.name": "backend"
+      },
+      "points": 25,
+      "last": 4489.286,
+      "peak": 4581.618,
+      "peak_at": "23:18 UTC",
+      "values": [
+       [
+        1793833800000,
+        4512.5
+       ],
+       [
+        1793833920000,
+        4553.448
+       ],
+       [
+        1793834040000,
+        4355.435
+       ],
+       [
+        1793834160000,
+        4474.038
+       ],
+       [
+        1793834280000,
+        4581.618
+       ],
+       [
+        1793834400000,
+        4395.833
+       ],
+       [
+        1793834520000,
+        4378.261
+       ],
+       [
+        1793834640000,
+        4401.042
+       ],
+       [
+        1793834760000,
+        4379.348
+       ],
+       [
+        1793834880000,
+        4378.261
+       ],
+       [
+        1793835000000,
+        4423
+       ],
+       [
+        1793835120000,
+        4381.522
+       ],
+       [
+        1793835240000,
+        4492.857
+       ],
+       [
+        1793835360000,
+        4394.792
+       ],
+       [
+        1793835480000,
+        4455.769
+       ],
+       [
+        1793835600000,
+        4451.923
+       ],
+       [
+        1793835720000,
+        4558.594
+       ],
+       [
+        1793835840000,
+        4533.065
+       ],
+       [
+        1793835960000,
+        4114.062
+       ],
+       [
+        1793836080000,
+        4223.611
+       ],
+       [
+        1793836200000,
+        4291.25
+       ],
+       [
+        1793836320000,
+        4426
+       ],
+       [
+        1793836440000,
+        4345.238
+       ],
+       [
+        1793836560000,
+        4276.25
+       ],
+       [
+        1793836680000,
+        4489.286
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "service.name": "frontend"
+      },
+      "points": 25,
+      "last": 3510,
+      "peak": 4216.176,
+      "peak_at": "23:12 UTC",
+      "values": [
+       [
+        1793833800000,
+        3998.214
+       ],
+       [
+        1793833920000,
+        4216.176
+       ],
+       [
+        1793834040000,
+        3230.556
+       ],
+       [
+        1793834160000,
+        3602.5
+       ],
+       [
+        1793834280000,
+        4175
+       ],
+       [
+        1793834400000,
+        3933.929
+       ],
+       [
+        1793834520000,
+        3512.5
+       ],
+       [
+        1793834640000,
+        3937.5
+       ],
+       [
+        1793834760000,
+        3140.625
+       ],
+       [
+        1793834880000,
+        3344.444
+       ],
+       [
+        1793835000000,
+        4177.778
+       ],
+       [
+        1793835120000,
+        3347.222
+       ],
+       [
+        1793835240000,
+        4073.438
+       ],
+       [
+        1793835360000,
+        4075
+       ],
+       [
+        1793835480000,
+        3525
+       ],
+       [
+        1793835600000,
+        3756.25
+       ],
+       [
+        1793835720000,
+        4173.611
+       ],
+       [
+        1793835840000,
+        4127.941
+       ],
+       [
+        1793835960000,
+        2875
+       ],
+       [
+        1793836080000,
+        4130.882
+       ],
+       [
+        1793836200000,
+        2889.286
+       ],
+       [
+        1793836320000,
+        3652.273
+       ],
+       [
+        1793836440000,
+        4111.667
+       ],
+       [
+        1793836560000,
+        3341.667
+       ],
+       [
+        1793836680000,
+        3510
+       ]
+      ]
+     }
+    ],
+    "total_series": 2,
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-http-target",
+   "group": "Metrics: from instrumentation",
+   "signal": "metrics",
+   "title": "Server latency P99 for one path",
+   "why": "Filter with `http.target`. A filter on `http.route` returns nothing for this metric.",
+   "expr": "http.target = '/orders'",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "service.name"
+   ],
+   "metric": {
+    "metricName": "http.server.duration.bucket",
+    "spaceAggregation": "p99"
+   },
+   "step": 120,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "filter": {
+     "expression": "http.target = '/orders'"
+    },
+    "aggregations": [
+     {
+      "metricName": "http.server.duration.bucket",
+      "spaceAggregation": "p99"
+     }
+    ],
+    "stepInterval": 120,
+    "groupBy": [
+     {
+      "name": "service.name"
+     }
+    ]
+   },
+   "requestType": "time_series",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "service.name": "backend"
+      },
+      "points": 25,
+      "last": 49.907,
+      "peak": 423.333,
+      "peak_at": "23:48 UTC",
+      "values": [
+       [
+        1793833800000,
+        245.057
+       ],
+       [
+        1793833920000,
+        244.427
+       ],
+       [
+        1793834040000,
+        218.375
+       ],
+       [
+        1793834160000,
+        247.406
+       ],
+       [
+        1793834280000,
+        49.671
+       ],
+       [
+        1793834400000,
+        71.75
+       ],
+       [
+        1793834520000,
+        127
+       ],
+       [
+        1793834640000,
+        75.062
+       ],
+       [
+        1793834760000,
+        131.2
+       ],
+       [
+        1793834880000,
+        55.083
+       ],
+       [
+        1793835000000,
+        58.417
+       ],
+       [
+        1793835120000,
+        51.125
+       ],
+       [
+        1793835240000,
+        106.75
+       ],
+       [
+        1793835360000,
+        161.5
+       ],
+       [
+        1793835480000,
+        362.5
+       ],
+       [
+        1793835600000,
+        67.389
+       ],
+       [
+        1793835720000,
+        64.361
+       ],
+       [
+        1793835840000,
+        65.425
+       ],
+       [
+        1793835960000,
+        215
+       ],
+       [
+        1793836080000,
+        423.333
+       ],
+       [
+        1793836200000,
+        259.167
+       ],
+       [
+        1793836320000,
+        76.375
+       ],
+       [
+        1793836440000,
+        412
+       ],
+       [
+        1793836560000,
+        205.231
+       ],
+       [
+        1793836680000,
+        49.907
+       ]
+      ]
+     }
+    ],
+    "total_series": 1,
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-calls",
+   "group": "Metrics: derived from spans",
+   "signal": "metrics",
+   "title": "Calls per second by service",
+   "why": "SigNoz's collector derives this from spans, and it covers `backend` even when Services hides it. The app sends no such metric.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "service.name"
+   ],
+   "metric": {
+    "metricName": "signoz_calls_total",
+    "timeAggregation": "rate",
+    "spaceAggregation": "sum"
+   },
+   "step": 120,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "signoz_calls_total",
+      "timeAggregation": "rate",
+      "spaceAggregation": "sum"
+     }
+    ],
+    "stepInterval": 120,
+    "groupBy": [
+     {
+      "name": "service.name"
+     }
+    ]
+   },
+   "requestType": "time_series",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "service.name": "frontend"
+      },
+      "points": 25,
+      "last": 12.275,
+      "peak": 27.2,
+      "peak_at": "23:16 UTC",
+      "values": [
+       [
+        1793833800000,
+        23.867
+       ],
+       [
+        1793833920000,
+        26
+       ],
+       [
+        1793834040000,
+        26.383
+       ],
+       [
+        1793834160000,
+        27.2
+       ],
+       [
+        1793834280000,
+        24.583
+       ],
+       [
+        1793834400000,
+        24.65
+       ],
+       [
+        1793834520000,
+        24.567
+       ],
+       [
+        1793834640000,
+        24.625
+       ],
+       [
+        1793834760000,
+        24.608
+       ],
+       [
+        1793834880000,
+        24.567
+       ],
+       [
+        1793835000000,
+        24.6
+       ],
+       [
+        1793835120000,
+        24.508
+       ],
+       [
+        1793835240000,
+        24.508
+       ],
+       [
+        1793835360000,
+        24.508
+       ],
+       [
+        1793835480000,
+        24.358
+       ],
+       [
+        1793835600000,
+        24.583
+       ],
+       [
+        1793835720000,
+        24.508
+       ],
+       [
+        1793835840000,
+        24.558
+       ],
+       [
+        1793835960000,
+        24.567
+       ],
+       [
+        1793836080000,
+        24.358
+       ],
+       [
+        1793836200000,
+        24.417
+       ],
+       [
+        1793836320000,
+        24.45
+       ],
+       [
+        1793836440000,
+        23.925
+       ],
+       [
+        1793836560000,
+        24.742
+       ],
+       [
+        1793836680000,
+        12.275
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "service.name": "backend"
+      },
+      "points": 25,
+      "last": 11.825,
+      "peak": 25.575,
+      "peak_at": "23:16 UTC",
+      "values": [
+       [
+        1793833800000,
+        22.317
+       ],
+       [
+        1793833920000,
+        24.508
+       ],
+       [
+        1793834040000,
+        25.2
+       ],
+       [
+        1793834160000,
+        25.575
+       ],
+       [
+        1793834280000,
+        23.433
+       ],
+       [
+        1793834400000,
+        23.75
+       ],
+       [
+        1793834520000,
+        23.742
+       ],
+       [
+        1793834640000,
+        23.892
+       ],
+       [
+        1793834760000,
+        24.408
+       ],
+       [
+        1793834880000,
+        23.825
+       ],
+       [
+        1793835000000,
+        23.867
+       ],
+       [
+        1793835120000,
+        23.658
+       ],
+       [
+        1793835240000,
+        23.433
+       ],
+       [
+        1793835360000,
+        24.275
+       ],
+       [
+        1793835480000,
+        23.825
+       ],
+       [
+        1793835600000,
+        23.517
+       ],
+       [
+        1793835720000,
+        23.75
+       ],
+       [
+        1793835840000,
+        23.75
+       ],
+       [
+        1793835960000,
+        23.75
+       ],
+       [
+        1793836080000,
+        23.592
+       ],
+       [
+        1793836200000,
+        23.883
+       ],
+       [
+        1793836320000,
+        23.8
+       ],
+       [
+        1793836440000,
+        23.025
+       ],
+       [
+        1793836560000,
+        24.083
+       ],
+       [
+        1793836680000,
+        11.825
+       ]
+      ]
+     }
+    ],
+    "total_series": 2,
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-calls-error",
+   "group": "Metrics: derived from spans",
+   "signal": "metrics",
+   "title": "Error calls per second by service",
+   "why": "Filter on `status.code` for an error rate. A natural alert source.",
+   "expr": "status.code = 'STATUS_CODE_ERROR'",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "service.name"
+   ],
+   "metric": {
+    "metricName": "signoz_calls_total",
+    "timeAggregation": "rate",
+    "spaceAggregation": "sum"
+   },
+   "step": 120,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "filter": {
+     "expression": "status.code = 'STATUS_CODE_ERROR'"
+    },
+    "aggregations": [
+     {
+      "metricName": "signoz_calls_total",
+      "timeAggregation": "rate",
+      "spaceAggregation": "sum"
+     }
+    ],
+    "stepInterval": 120,
+    "groupBy": [
+     {
+      "name": "service.name"
+     }
+    ]
+   },
+   "requestType": "time_series",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "service.name": "frontend"
+      },
+      "points": 25,
+      "last": 0.575,
+      "peak": 1.475,
+      "peak_at": "23:38 UTC",
+      "values": [
+       [
+        1793833800000,
+        1.025
+       ],
+       [
+        1793833920000,
+        1.292
+       ],
+       [
+        1793834040000,
+        1.058
+       ],
+       [
+        1793834160000,
+        1.25
+       ],
+       [
+        1793834280000,
+        0.825
+       ],
+       [
+        1793834400000,
+        1.017
+       ],
+       [
+        1793834520000,
+        1.033
+       ],
+       [
+        1793834640000,
+        1.05
+       ],
+       [
+        1793834760000,
+        1
+       ],
+       [
+        1793834880000,
+        1.117
+       ],
+       [
+        1793835000000,
+        0.892
+       ],
+       [
+        1793835120000,
+        1.133
+       ],
+       [
+        1793835240000,
+        1.033
+       ],
+       [
+        1793835360000,
+        0.733
+       ],
+       [
+        1793835480000,
+        1.475
+       ],
+       [
+        1793835600000,
+        1.442
+       ],
+       [
+        1793835720000,
+        0.983
+       ],
+       [
+        1793835840000,
+        1.158
+       ],
+       [
+        1793835960000,
+        1.125
+       ],
+       [
+        1793836080000,
+        0.925
+       ],
+       [
+        1793836200000,
+        1.05
+       ],
+       [
+        1793836320000,
+        1.042
+       ],
+       [
+        1793836440000,
+        0.85
+       ],
+       [
+        1793836560000,
+        1.192
+       ],
+       [
+        1793836680000,
+        0.575
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "service.name": "backend"
+      },
+      "points": 25,
+      "last": 0.225,
+      "peak": 0.683,
+      "peak_at": "23:40 UTC",
+      "values": [
+       [
+        1793833800000,
+        0.4
+       ],
+       [
+        1793833920000,
+        0.675
+       ],
+       [
+        1793834040000,
+        0.425
+       ],
+       [
+        1793834160000,
+        0.408
+       ],
+       [
+        1793834280000,
+        0.267
+       ],
+       [
+        1793834400000,
+        0.567
+       ],
+       [
+        1793834520000,
+        0.483
+       ],
+       [
+        1793834640000,
+        0.467
+       ],
+       [
+        1793834760000,
+        0.383
+       ],
+       [
+        1793834880000,
+        0.5
+       ],
+       [
+        1793835000000,
+        0.467
+       ],
+       [
+        1793835120000,
+        0.467
+       ],
+       [
+        1793835240000,
+        0.383
+       ],
+       [
+        1793835360000,
+        0.458
+       ],
+       [
+        1793835480000,
+        0.65
+       ],
+       [
+        1793835600000,
+        0.683
+       ],
+       [
+        1793835720000,
+        0.367
+       ],
+       [
+        1793835840000,
+        0.517
+       ],
+       [
+        1793835960000,
+        0.583
+       ],
+       [
+        1793836080000,
+        0.458
+       ],
+       [
+        1793836200000,
+        0.517
+       ],
+       [
+        1793836320000,
+        0.433
+       ],
+       [
+        1793836440000,
+        0.433
+       ],
+       [
+        1793836560000,
+        0.575
+       ],
+       [
+        1793836680000,
+        0.225
+       ]
+      ]
+     }
+    ],
+    "total_series": 2,
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-latency",
+   "group": "Metrics: derived from spans",
+   "signal": "metrics",
+   "title": "P99 latency by service, from spans",
+   "why": "Span-derived histogram, so it needs no app metrics.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "service.name"
+   ],
+   "metric": {
+    "metricName": "signoz_latency.bucket",
+    "spaceAggregation": "p99"
+   },
+   "step": 120,
+   "liveMinutes": 60,
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "signoz_latency.bucket",
+      "spaceAggregation": "p99"
+     }
+    ],
+    "stepInterval": 120,
+    "groupBy": [
+     {
+      "name": "service.name"
+     }
+    ]
+   },
+   "requestType": "time_series",
+   "savedWindow": {
+    "start": "2026-11-04T23:08:00Z",
+    "end": "2026-11-04T23:59:00Z"
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "service.name": "frontend"
+      },
+      "points": 25,
+      "last": 3300.385,
+      "peak": 4016.667,
+      "peak_at": "23:18 UTC",
+      "values": [
+       [
+        1793833800000,
+        3622.069
+       ],
+       [
+        1793833920000,
+        3386.207
+       ],
+       [
+        1793834040000,
+        3065.652
+       ],
+       [
+        1793834160000,
+        3251.429
+       ],
+       [
+        1793834280000,
+        4016.667
+       ],
+       [
+        1793834400000,
+        3470
+       ],
+       [
+        1793834520000,
+        3299.231
+       ],
+       [
+        1793834640000,
+        3113.83
+       ],
+       [
+        1793834760000,
+        2890.714
+       ],
+       [
+        1793834880000,
+        3660
+       ],
+       [
+        1793835000000,
+        3524
+       ],
+       [
+        1793835120000,
+        2994.773
+       ],
+       [
+        1793835240000,
+        3366.111
+       ],
+       [
+        1793835360000,
+        3424.464
+       ],
+       [
+        1793835480000,
+        2342.727
+       ],
+       [
+        1793835600000,
+        3076.087
+       ],
+       [
+        1793835720000,
+        3478.793
+       ],
+       [
+        1793835840000,
+        3299.808
+       ],
+       [
+        1793835960000,
+        2543.333
+       ],
+       [
+        1793836080000,
+        3376.111
+       ],
+       [
+        1793836200000,
+        2802.5
+       ],
+       [
+        1793836320000,
+        2555
+       ],
+       [
+        1793836440000,
+        3277.4
+       ],
+       [
+        1793836560000,
+        2975.682
+       ],
+       [
+        1793836680000,
+        3300.385
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "service.name": "backend"
+      },
+      "points": 25,
+      "last": 3065,
+      "peak": 3520,
+      "peak_at": "23:18 UTC",
+      "values": [
+       [
+        1793833800000,
+        3310.455
+       ],
+       [
+        1793833920000,
+        2848.049
+       ],
+       [
+        1793834040000,
+        2579.429
+       ],
+       [
+        1793834160000,
+        3121.02
+       ],
+       [
+        1793834280000,
+        3520
+       ],
+       [
+        1793834400000,
+        2807.692
+       ],
+       [
+        1793834520000,
+        2808.462
+       ],
+       [
+        1793834640000,
+        2542.571
+       ],
+       [
+        1793834760000,
+        2559.167
+       ],
+       [
+        1793834880000,
+        3094
+       ],
+       [
+        1793835000000,
+        2796.923
+       ],
+       [
+        1793835120000,
+        2566.571
+       ],
+       [
+        1793835240000,
+        2991.429
+       ],
+       [
+        1793835360000,
+        2351.818
+       ],
+       [
+        1793835480000,
+        2549.429
+       ],
+       [
+        1793835600000,
+        2711.892
+       ],
+       [
+        1793835720000,
+        2862.5
+       ],
+       [
+        1793835840000,
+        2807.692
+       ],
+       [
+        1793835960000,
+        1983.333
+       ],
+       [
+        1793836080000,
+        2345.937
+       ],
+       [
+        1793836200000,
+        2313.125
+       ],
+       [
+        1793836320000,
+        2144
+       ],
+       [
+        1793836440000,
+        2237
+       ],
+       [
+        1793836560000,
+        2591.667
+       ],
+       [
+        1793836680000,
+        3065
+       ]
+      ]
+     }
+    ],
+    "total_series": 2,
+    "warnings": []
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-cpu",
+   "group": "Metrics: infrastructure",
+   "signal": "metrics",
+   "title": "Pod CPU in the lab namespace",
+   "why": "From k8s-infra. Values are cores, averaged within each step.",
+   "expr": "k8s.namespace.name = 'lab'",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "k8s.pod.name"
+   ],
+   "metric": {
+    "metricName": "k8s.pod.cpu.usage",
+    "timeAggregation": "avg",
+    "spaceAggregation": "max"
+   },
+   "step": 60,
+   "liveMinutes": 30,
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "filter": {
+     "expression": "k8s.namespace.name = 'lab'"
+    },
+    "aggregations": [
+     {
+      "metricName": "k8s.pod.cpu.usage",
+      "timeAggregation": "avg",
+      "spaceAggregation": "max"
+     }
+    ],
+    "stepInterval": 60,
+    "groupBy": [
+     {
+      "name": "k8s.pod.name"
+     }
+    ]
+   },
+   "requestType": "time_series",
+   "savedWindow": {
+    "start": "2026-11-04T23:10:00Z",
+    "end": "2026-11-04T23:24:00Z"
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "k8s.pod.name": "backend-6c766fbdb5-qnnmb"
+      },
+      "points": 14,
+      "last": 0.0397,
+      "peak": 0.955,
+      "peak_at": "23:16 UTC",
+      "values": [
+       [
+        1793833800000,
+        0.0315
+       ],
+       [
+        1793833860000,
+        0.661
+       ],
+       [
+        1793833920000,
+        0.837
+       ],
+       [
+        1793833980000,
+        0.0362
+       ],
+       [
+        1793834040000,
+        0.037
+       ],
+       [
+        1793834100000,
+        0.0446
+       ],
+       [
+        1793834160000,
+        0.955
+       ],
+       [
+        1793834220000,
+        0.204
+       ],
+       [
+        1793834280000,
+        0.0312
+       ],
+       [
+        1793834340000,
+        0.0344
+       ],
+       [
+        1793834400000,
+        0.0347
+       ],
+       [
+        1793834460000,
+        0.0362
+       ],
+       [
+        1793834520000,
+        0.0384
+       ],
+       [
+        1793834580000,
+        0.0397
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "k8s.pod.name": "postgres-8444bc6bb-24pzn"
+      },
+      "points": 14,
+      "last": 0.0398,
+      "peak": 0.045,
+      "peak_at": "23:16 UTC",
+      "values": [
+       [
+        1793833800000,
+        0.0201
+       ],
+       [
+        1793833860000,
+        0.0357
+       ],
+       [
+        1793833920000,
+        0.0286
+       ],
+       [
+        1793833980000,
+        0.0314
+       ],
+       [
+        1793834040000,
+        0.0309
+       ],
+       [
+        1793834100000,
+        0.0394
+       ],
+       [
+        1793834160000,
+        0.045
+       ],
+       [
+        1793834220000,
+        0.0317
+       ],
+       [
+        1793834280000,
+        0.0188
+       ],
+       [
+        1793834340000,
+        0.0257
+       ],
+       [
+        1793834400000,
+        0.0301
+       ],
+       [
+        1793834460000,
+        0.0265
+       ],
+       [
+        1793834520000,
+        0.0345
+       ],
+       [
+        1793834580000,
+        0.0398
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "k8s.pod.name": "frontend-5945df9855-tx4rf"
+      },
+      "points": 14,
+      "last": 0.0365,
+      "peak": 0.0419,
+      "peak_at": "23:15 UTC",
+      "values": [
+       [
+        1793833800000,
+        0.0216
+       ],
+       [
+        1793833860000,
+        0.0348
+       ],
+       [
+        1793833920000,
+        0.0326
+       ],
+       [
+        1793833980000,
+        0.0321
+       ],
+       [
+        1793834040000,
+        0.0335
+       ],
+       [
+        1793834100000,
+        0.0419
+       ],
+       [
+        1793834160000,
+        0.0411
+       ],
+       [
+        1793834220000,
+        0.0337
+       ],
+       [
+        1793834280000,
+        0.0299
+       ],
+       [
+        1793834340000,
+        0.0303
+       ],
+       [
+        1793834400000,
+        0.0341
+       ],
+       [
+        1793834460000,
+        0.0317
+       ],
+       [
+        1793834520000,
+        0.0318
+       ],
+       [
+        1793834580000,
+        0.0365
+       ]
+      ]
+     }
+    ],
+    "total_series": 3,
+    "warnings": []
+   },
+   "verified": "ui"
+  },
+  {
+   "id": "m-mem",
+   "group": "Metrics: infrastructure",
+   "signal": "metrics",
+   "title": "Pod memory in the lab namespace",
+   "why": "Working set in bytes.",
+   "expr": "k8s.namespace.name = 'lab'",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "k8s.pod.name"
+   ],
+   "metric": {
+    "metricName": "k8s.pod.memory.working_set",
+    "timeAggregation": "avg",
+    "spaceAggregation": "max"
+   },
+   "step": 60,
+   "liveMinutes": 30,
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "filter": {
+     "expression": "k8s.namespace.name = 'lab'"
+    },
+    "aggregations": [
+     {
+      "metricName": "k8s.pod.memory.working_set",
+      "timeAggregation": "avg",
+      "spaceAggregation": "max"
+     }
+    ],
+    "stepInterval": 60,
+    "groupBy": [
+     {
+      "name": "k8s.pod.name"
+     }
+    ]
+   },
+   "requestType": "time_series",
+   "savedWindow": {
+    "start": "2026-11-04T23:10:00Z",
+    "end": "2026-11-04T23:24:00Z"
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "k8s.pod.name": "backend-6c766fbdb5-qnnmb"
+      },
+      "points": 14,
+      "last": 62580736,
+      "peak": 62689280,
+      "peak_at": "23:17 UTC",
+      "values": [
+       [
+        1793833800000,
+        62236672
+       ],
+       [
+        1793833860000,
+        62267392
+       ],
+       [
+        1793833920000,
+        62611456
+       ],
+       [
+        1793833980000,
+        62603264
+       ],
+       [
+        1793834040000,
+        62593024
+       ],
+       [
+        1793834100000,
+        62535680
+       ],
+       [
+        1793834160000,
+        62683136
+       ],
+       [
+        1793834220000,
+        62689280
+       ],
+       [
+        1793834280000,
+        62646272
+       ],
+       [
+        1793834340000,
+        62570496
+       ],
+       [
+        1793834400000,
+        62363648
+       ],
+       [
+        1793834460000,
+        62394368
+       ],
+       [
+        1793834520000,
+        62633984
+       ],
+       [
+        1793834580000,
+        62580736
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "k8s.pod.name": "frontend-5945df9855-tx4rf"
+      },
+      "points": 14,
+      "last": 58685440,
+      "peak": 58793984,
+      "peak_at": "23:21 UTC",
+      "values": [
+       [
+        1793833800000,
+        58261504
+       ],
+       [
+        1793833860000,
+        58613760
+       ],
+       [
+        1793833920000,
+        58585088
+       ],
+       [
+        1793833980000,
+        58703872
+       ],
+       [
+        1793834040000,
+        58589184
+       ],
+       [
+        1793834100000,
+        58642432
+       ],
+       [
+        1793834160000,
+        58728448
+       ],
+       [
+        1793834220000,
+        58775552
+       ],
+       [
+        1793834280000,
+        58730496
+       ],
+       [
+        1793834340000,
+        58669056
+       ],
+       [
+        1793834400000,
+        58695680
+       ],
+       [
+        1793834460000,
+        58793984
+       ],
+       [
+        1793834520000,
+        58767360
+       ],
+       [
+        1793834580000,
+        58685440
+       ]
+      ]
+     },
+     {
+      "labels": {
+       "k8s.pod.name": "postgres-8444bc6bb-24pzn"
+      },
+      "points": 14,
+      "last": 26771456,
+      "peak": 27754496,
+      "peak_at": "23:16 UTC",
+      "values": [
+       [
+        1793833800000,
+        26644480
+       ],
+       [
+        1793833860000,
+        27357184
+       ],
+       [
+        1793833920000,
+        26675200
+       ],
+       [
+        1793833980000,
+        26763264
+       ],
+       [
+        1793834040000,
+        26710016
+       ],
+       [
+        1793834100000,
+        26716160
+       ],
+       [
+        1793834160000,
+        27754496
+       ],
+       [
+        1793834220000,
+        26750976
+       ],
+       [
+        1793834280000,
+        26759168
+       ],
+       [
+        1793834340000,
+        26802176
+       ],
+       [
+        1793834400000,
+        26796032
+       ],
+       [
+        1793834460000,
+        26828800
+       ],
+       [
+        1793834520000,
+        26806272
+       ],
+       [
+        1793834580000,
+        26771456
+       ]
+      ]
+     }
+    ],
+    "total_series": 3,
+    "warnings": []
+   },
+   "verified": "api"
+  }
+ ]
+}

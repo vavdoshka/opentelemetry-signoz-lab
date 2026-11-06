@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What is missing, and how to fix it | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="gaps">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Reference</p>
+<h1>What is missing, and how to fix it</h1>
+<p class="lead">Plain OpenTelemetry plus a simple SigNoz install gives you a lot, as the incidents showed. It also leaves real gaps, and one of them can mislead you. Nothing on this page has been applied. Fixes marked <span class="badge untested">Untested</span> are proposals only.</p>
+<p>The source for this page is <code>docs/FINDINGS.md</code>. Where testing for this tutorial found more, it says so.</p>
+
+<h2 id="signup">Gap 1: a new install rejects telemetry until someone signs up</h2>
+<p>The collector pod shows Ready, but ports 4317 and 4318 stay closed until an organization exists. Apps get <code>Connection refused</code>, and their telemetry is lost. <code>kubectl get pods</code> will not warn you.</p>
+<p><strong>Do this:</strong> complete signup right after install, and include it in any automated setup.</p>
+
+<h2 id="services">Gap 2: backend can vanish from Services and the Service Map</h2>
+<p><strong>Update, 2026-11-05:</strong> this gap is now mostly fixed in the lab by one env var. Everything in this section up to <a href="#fix-2">Fixes</a> describes the default 5-second flush, so the live pages no longer behave the way these screenshots show.</p>
+<p><code>docs/FINDINGS.md</code> reports that <code>backend</code> is missing from Services, and that the <code>frontend → backend</code> link is missing from the Service Map. That was true when written, and it is still what you will usually see. Testing for this tutorial showed the picture is more subtle: <strong>the gap is intermittent, and it depends on your time range.</strong></p>
+
+<h3>See it for yourself</h3>
+<figure class="shot"><img src="screenshots/services-30m-frontend-only.png" alt="SigNoz Services page in a 30 minute range listing only frontend" width="1440" height="900" loading="lazy"><figcaption>Last 30 minutes: 1 service. <span class="badge ui">Seen in SigNoz UI</span> Backend was handling about 5 requests per second at the time.</figcaption></figure>
+<figure class="shot"><img src="screenshots/services-wide-window.png" alt="SigNoz Services page in a 6 hour range listing backend and frontend" width="1440" height="900" loading="lazy"><figcaption>Same session, minutes later, last 6 hours: 2 services. <span class="badge ui">Seen in SigNoz UI</span></figcaption></figure>
+<figure class="shot"><img src="screenshots/service-map-30m.png" alt="SigNoz Service Map with only backend and postgresql" width="1440" height="900" loading="lazy"><figcaption>Service Map, last 30 minutes: only <code>backend → postgresql</code>. <span class="badge ui">Seen in SigNoz UI</span></figcaption></figure>
+<figure class="shot"><img src="screenshots/service-map-wide-window.png" alt="SigNoz Service Map showing frontend linked to backend linked to postgresql" width="1440" height="900" loading="lazy"><figcaption>Service Map, last 6 hours: the full chain appears. <span class="badge ui">Seen in SigNoz UI</span> This is the first time the map page was seen working in this lab.</figcaption></figure>
+<p>The picture that <code>docs/FINDINGS.md</code> recorded looked just like the first one above:</p>
+<figure class="shot"><img src="screenshots/01-services-frontend-only.png" alt="SigNoz Services page listing only frontend" width="1440" height="900" loading="lazy"><figcaption>The original capture from <code>docs/screenshots/01-services.png</code>, taken before any matching rows existed. <span class="badge ui">Seen in SigNoz UI</span></figcaption></figure>
+<p>For a while, a 30-minute view did show both, as this shot from later the same evening shows:</p>
+<figure class="shot"><img src="screenshots/services-30m-both.png" alt="SigNoz Services page in a 30 minute range listing backend and frontend" width="1440" height="900" loading="lazy"><figcaption>Last 30 minutes, taken while the rows described below were less than 30 minutes old. <span class="badge ui">Seen in SigNoz UI</span></figcaption></figure>
+
+<h3>Why it happens</h3>
+<p>Both pages depend on ClickHouse materialized views that join a parent span to its child: <code>sub_root_operations</code> and <code>dependency_graph_minutes_service_calls_mv_v2</code>. <code>docs/FINDINGS.md</code> showed that these views only match a parent and child that arrive <strong>in the same insert</strong>. Each service flushes on its own 5-second timer, so they usually land in different inserts, and the view writes nothing.</p>
+<p>That explanation predicted "occasional matches" for busy services, and that is exactly what happened. Between 23:10:29 and 23:11:14 UTC on 2026-11-04, for about 45 seconds, some inserts matched. There was no config change and no restart. Why the timing lined up then is unknown.</p>
+<div data-ch="c-view-runs,c-top-level,c-dep-graph">Loading saved SQL...</div>
+<p>Only 11 of 1,903 view runs wrote anything. Those few rows now decide what Services shows.</p>
+<p><strong>Update, 02:04 UTC on 2026-11-05:</strong> more matches appeared during later testing, the last at 01:55:32, making 19 of 1,931 runs. Each match moves a row's <code>time</code> forward, so the exact times in the table below no longer reproduce. The rule held when retested: a range starting at 01:50 listed <code>backend</code>, and one starting at 01:56 did not. The map count grew to 262 calls, against about 22,800 served.</p>
+
+<h3>The rule, as tested</h3>
+<p>A service is listed when it has a <code>top_level_operations</code> row with a <code>time</code> at or after the <strong>start</strong> of your range. The end of the range does not seem to matter. This is an inference from these API results, not from reading the source:</p>
+<table>
+  <thead><tr><th>Range (UTC)</th><th>Why this range</th><th>Listed on Services</th></tr></thead>
+  <tbody>
+    <tr><td>23:10:20 to 23:11:30</td><td>Covers the rows</td><td><code>backend</code> (392 calls), <code>frontend</code></td></tr>
+    <tr><td>23:11:10 to 23:20:00</td><td>Starts just before the last row</td><td><code>backend</code> (2,598 calls), <code>frontend</code></td></tr>
+    <tr><td>23:11:20 to 23:20:00</td><td>Starts just after the last row</td><td><code>frontend</code> only</td></tr>
+    <tr><td>22:30:00 to 23:00:00</td><td>Ends before any row existed</td><td><code>backend</code> (7,896 calls), <code>frontend</code></td></tr>
+  </tbody>
+</table>
+<p>The last row is the surprising one, because the past can change. At about 23:03 UTC, before any row existed, a 60-minute query covering most of this range returned only <code>frontend</code>. This range lists <code>backend</code> now, because rows were written later.</p>
+<p>Two more results complete the picture. The call counts on Services are real, because they come from stored spans. The row only controls whether the service gets listed at all. The <strong>Service Map's counts are not reliable</strong>, because they come from the view itself: it shows 246 calls for <code>frontend → backend</code>, when the backend served over 13,000 in the same hour.</p>
+
+<h3>Working around it today</h3>
+<ul>
+  <li>Open <code>/services/backend</code> by direct URL. Key Operations returned real data even in a range with no row <span class="badge api">API</span>. The Entrypoint Spans toggle stays empty: its API returned <code>null</code> in that range.</li>
+  <li>Use the Traces Explorer, which reads spans directly.</li>
+  <li>Use the span-derived metric below for real call rates per service.</li>
+</ul>
+<div data-query="m-calls">Loading saved query...</div>
+
+<h3 id="fix-2">Fixes</h3>
+<p>Option 1, applied on 2026-11-05: flush spans more often, so that parents and children share an insert.</p>
+<figure class="code"><figcaption><span>Fix for gap 2 in k8s/app.yaml, both services, applied <span class="badge api">Tested</span></span></figcaption><pre><code>             - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
+<span class="add">+            - { name: OTEL_BSP_SCHEDULE_DELAY, value: &quot;500&quot; }</span></code></pre></figure>
+<p>Measured over 5 minutes at 5 requests/s with 10% errors:</p>
+<table>
+  <thead><tr><th></th><th>5-second flush (default)</th><th>500 ms flush</th></tr></thead>
+  <tbody>
+    <tr><td>View runs that wrote rows</td><td>19 of 1,931 (1%)</td><td>302 of 302 (100%)</td></tr>
+    <tr><td><code>frontend → backend</code> calls on the map, against real calls</td><td>262 of about 22,800 (1%)</td><td>1,207 of 1,415 (85%)</td></tr>
+    <tr><td><code>backend</code> listed in a last-60-seconds range</td><td>Rarely</td><td>10 of 10 checks</td></tr>
+  </tbody>
+</table>
+<p>Map counts were still about 15% low, so treat them as approximate. That was a short test on one node with one collector.</p>
+<p><strong>Update, two nodes:</strong> <code>backend</code> stayed listed in every setup, but map accuracy changed: 84% through the agents with one collector, and 41% with spans split across two collectors, because a parent and child on different collectors can never share an insert. <code>docs/FINDINGS.md</code> has every run. The likely fix is a <code>loadbalancing</code> exporter keyed on trace ID <span class="badge untested">Untested</span>.</p>
+<p>Option 2: add a <code>groupbytrace</code> processor in a collector ahead of SigNoz, so that a trace's spans are sent together. It is another option if you need accurate map counts. <span class="badge untested">Untested</span></p>
+<p>Option 3: report it to SigNoz with the reproduction in <code>docs/FINDINGS.md</code> and the time-range table above.</p>
+
+<h2 id="k8s">Gap 3: app telemetry has no Kubernetes context</h2>
+<p><strong>Update, 2026-11-05:</strong> fixed in the lab. Apps now send through the agent, and all 5,767 spans in a test window had pod and node names that matched <code>kubectl</code>. The rest of this section shows the gap as it was.</p>
+<p>You could not go from a slow trace to the pod that served it. The app sent straight to SigNoz's collector, which skips the agent that adds these attributes.</p>
+<div data-query="t-neg-k8s">Loading saved query...</div>
+<div data-ch="c-k8s-coverage">Loading saved SQL...</div>
+<p>0 of 142,872 spans in the load run have a pod name. Point the app at the agent instead, which has <code>k8sattributes</code> on all three pipelines:</p>
+<figure class="code"><figcaption><span>Fix for gap 3 in k8s/app.yaml, all services, applied <span class="badge api">Tested</span></span></figcaption><pre><code><span class="del">-            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: &quot;http://signoz-otel-collector.signoz.svc.cluster.local:4318&quot; }</span><span class="add">+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: &quot;http://k8s-infra-otel-agent.signoz.svc.cluster.local:4318&quot; }</span></code></pre></figure>
+
+<h2 id="logs">Gap 4: k8s-infra duplicates every app log</h2>
+<p>The app sends logs over OTLP, and k8s-infra also reads the same lines from stdout. Each copy has a different half of the information:</p>
+<table>
+  <thead><tr><th></th><th>OTLP copy</th><th>stdout copy</th></tr></thead>
+  <tbody>
+    <tr><td><code>service.name</code></td><td>Yes</td><td>Blank</td></tr>
+    <tr><td>Kubernetes attributes</td><td>No</td><td>Yes</td></tr>
+    <tr><td>Severity</td><td>Yes</td><td>Blank</td></tr>
+    <tr><td>Link to trace</td><td>Yes</td><td>No, the ID is only text in the message</td></tr>
+  </tbody>
+</table>
+<figure class="shot"><img src="screenshots/logs-both-copies.png" alt="SigNoz Logs Explorer showing a stdout line with trace_id in its text, next to the clean OTLP line" width="1440" height="900" loading="lazy"><figcaption>Both copies in one search. <span class="badge ui">Seen in SigNoz UI</span> The longer line is the stdout copy, with <code>trace_id=</code> only as text.</figcaption></figure>
+<div data-ch="c-log-copies">Loading saved SQL...</div>
+<p>This is why log searches can return mixed results that filter differently: a search on <code>severity_text</code> finds only OTLP copies, and a search on Kubernetes attributes finds only stdout copies. Neither search finds both.</p>
+<p>The stdout count is far higher than a simple duplicate would give, so testing for this tutorial sorted those lines by type:</p>
+<div data-ch="c-stdout-kinds">Loading saved SQL...</div>
+<ul>
+  <li>The twins match the OTLP count exactly, at 39,328 each. So every app log really is stored twice.</li>
+  <li><strong>Stack traces are the largest group.</strong> On the stdout path, each line of a traceback becomes its own log record, so one exception turns into dozens of unrelated rows. OTLP keeps a traceback together on a single record.</li>
+  <li>The rest never go through OTLP at all: uvicorn's access log and the health probe lines. OTel excludes those probes from spans, but uvicorn still prints them.</li>
+</ul>
+<figure class="shot"><img src="screenshots/logs-stdout-copies.png" alt="SigNoz Logs Explorer with service.name NOT EXISTS AND k8s.namespace.name = lab, showing a page of GET /healthz access lines" width="1440" height="900" loading="lazy"><figcaption>The stdout path with the app idle. <span class="badge ui">Seen in SigNoz UI</span> Only health probes remain. The warning triangle by the time range is about the ambiguous key below.</figcaption></figure>
+<div data-query="l-stdout-copies">Loading saved query...</div>
+<div data-query="l-otlp-k8s">Loading saved query...</div>
+<p><strong>Possible fix</strong> <span class="badge untested">Untested</span>: keep OTLP logs, route them through the agent (gap 3), and exclude the <code>lab</code> namespace from <code>filelog</code> collection. Alternatively, drop OTLP logs, print JSON to stdout, and parse it with a SigNoz log pipeline.</p>
+
+<h2 id="setup">Gap 5: nothing is set up for you</h2>
+<p>A fresh install has 0 dashboards, 0 alert rules, 0 notification channels, 0 log pipelines and 0 saved views <span class="badge api">API</span>. You should plan to:</p>
+<ul>
+  <li><strong>Import dashboards.</strong> <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a> has folders such as <code>apm/</code>, <code>k8s-infra-metrics/</code> and <code>postgresql/</code>. None were imported, so whether they suit this data is <span class="badge untested">Untested</span>.</li>
+  <li><strong>Write alerts.</strong> That repo has no alert definitions. Good first rules from this tutorial: error rate from <code>signoz_calls_total</code>, P99 latency, pod CPU, and a separate 4xx rule.</li>
+  <li><strong>Add a notification channel</strong>, or alerts will have nowhere to go.</li>
+</ul>
+
+<h2 id="noise">Gap 6: smaller issues</h2>
+<h3>Span noise</h3>
+<p>56% of spans in the load run are zero-length ASGI <code>http send</code> and <code>http receive</code> spans. They crowd traces and inflate error counts.</p>
+<div data-ch="c-noise">Loading saved SQL...</div>
+<p><code>exclude_spans</code> exists in the installed version, confirmed by reading its signature in the running pod, and accepts <code>send</code> and <code>receive</code>. Using it here is still untested:</p>
+<figure class="code"><figcaption><span>Possible fix for span noise in app/frontend.py and app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code><span class="del">-FastAPIInstrumentor.instrument_app(app)</span><span class="add">+FastAPIInstrumentor.instrument_app(app, exclude_spans=[&quot;send&quot;, &quot;receive&quot;])</span></code></pre></figure>
+<p>Until then, filter them out in searches:</p>
+<div data-query="t-no-noise">Loading saved query...</div>
+<h3>Other things to know</h3>
+<ul>
+  <li><strong>Vague span names.</strong> Client spans are named just <code>GET</code> or <code>POST</code>, and every scenario shares one operation. That is why <code>lab.scenario</code> exists.</li>
+  <li><strong>4xx is not an error.</strong> <code>bad_input</code> has span status Unset, so it does not affect the error rate. See the <a href="incident-error.html">error incident</a>.</li>
+  <li><strong>SDK exporter logs ship as app logs.</strong> The exporter's own failures reached SigNoz as <code>WARN</code> and <code>ERROR</code> logs, through the root logger.</li>
+  <li><strong>Older attribute names.</strong> The instrumentation emits <code>http.server.duration</code>, <code>db.statement</code> and <code>net.peer.name</code>. For example, <code>http.server.duration</code> has <code>http.target</code>, not <code>http.route</code>. Check this when importing dashboards.</li>
+  <li><strong>Silent misconfiguration.</strong> A k8s-infra endpoint without <code>http://</code> installs fine, and pods stay Running while every export fails. Check collector logs, not pod status.</li>
+  <li><strong>Outbound call.</strong> The self-hosted UI requests release notes from <code>cms.signoz.cloud</code>.</li>
+</ul>
+
+<h2>What this tutorial could not verify</h2>
+<ul>
+  <li><strong>Infra Monitoring, Kubernetes tab.</strong> It opened, but its data did not finish loading. The Hosts tab was confirmed. See the <a href="incident-cpu.html">CPU incident</a>.</li>
+  <li><strong>Queries marked Query API only.</strong> The browser timed out, or was not tried. They ran through the same endpoint the UI calls.</li>
+  <li><strong>How often gap 2 hits real deployments.</strong> Unknown. This is one small lab, with 45 seconds of matches.</li>
+  <li><strong>All proposed fixes.</strong> None have been tried.</li>
+</ul>
+
+<div class="quiz" data-quiz="g1"><p class="q">Check yourself: Services lists backend in one time range and not in another, with no config change. Why?</p><button type="button" data-right="false" data-why="It follows a rule that held in all six windows tested.">SigNoz is randomly failing.</button><button type="button" data-right="true" data-why="Rows for backend were only written for about 45 seconds. Windows starting after that hide it. Numbers shown are still real, from stored spans.">Listing depends on a top_level_operations row with a time at or after the window start.</button><button type="button" data-right="false" data-why="Pods had zero restarts.">The backend restarted.</button></div>
+<div class="quiz" data-quiz="g2"><p class="q">Check yourself: The map shows 246 calls for frontend to backend. Should you trust that count?</p><button type="button" data-right="false" data-why="It only counts the few inserts that happened to match. The backend served over 13,000 calls in the same hour.">Yes, it comes from stored data.</button><button type="button" data-right="true" data-why="Use spans or signoz_calls_total for real volumes.">No. The edge is real but the count is far too low.</button><button type="button" data-right="false" data-why="It is a call count, not an error count.">It means 246 calls failed.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

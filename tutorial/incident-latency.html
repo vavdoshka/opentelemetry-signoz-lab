@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incident: a latency spike | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="latency">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Incident 2 of 6</p>
+<h1>A latency spike</h1>
+<p class="lead">Nothing is failing, and yet the app feels slow. Errors are easy to spot. Slowness needs percentiles and a trace.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#search">4. Search</a></li><li><a href="#evidence">5. Evidence</a></li><li><a href="#cause">6. Root cause</a></li><li><a href="#fix">7. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p>The <code>slow</code> scenario makes the backend take 1 to 3 seconds. The load generator also includes it, in about 10% of healthy requests.</p>
+<div data-fire="slow"></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>The call succeeds, but slowly. A saved run returned HTTP 200 after 2,683 ms, with no error anywhere. Averages hide this, so look at percentiles. The frontend's key operation in the 30-minute view:</p>
+<table>
+  <thead><tr><th>Operation</th><th>P50</th><th>P95</th><th>P99</th><th>Calls</th></tr></thead>
+  <tbody><tr><td><code>POST /api/scenario/{name}</code></td><td>29.45 ms</td><td>1,756.22 ms</td><td>2,772.21 ms</td><td>8,897</td></tr></tbody>
+</table>
+<p>Half of the requests finish in under 30 ms, and the slowest 1% take nearly 3 seconds. That gap is your symptom.</p>
+
+<h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
+<ol>
+  <li><a href="http://signoz.localhost:8080/services/frontend" target="_blank" rel="noopener">Services, then frontend</a>: the Latency chart and Key Operations table. Compare P50 with P99.</li>
+  <li>Traces Explorer: find slow requests, then open one.</li>
+  <li>The trace itself: find the span where the time went.</li>
+</ol>
+<figure class="shot"><img src="screenshots/service-frontend.png" alt="SigNoz frontend service page with p50, p90 and p99 latency lines" width="1440" height="900" loading="lazy"><figcaption>The Latency chart. <span class="badge ui">Seen in SigNoz UI</span> P99 sits near 2.5 to 3 s, P90 swings between low values and about 1 s, and P50 stays near zero on this scale.</figcaption></figure>
+
+<h2 class="step" id="search"><span class="n">4</span>Search</h2>
+<p>Find anything over a second. Remember that <code>duration_nano</code> is in nanoseconds.</p>
+<div data-query="t-slow">Loading saved query...</div>
+<p>That counts child spans too. Limit it to Server spans to count requests instead:</p>
+<div data-query="t-slow-server">Loading saved query...</div>
+<p>To see which route is responsible, aggregate. In the Traces Explorer, use the Table view with an aggregation and a group-by:</p>
+<div data-query="a-route-latency">Loading saved query...</div>
+<p><code>/work/slow</code> stands out. Now narrow to that route:</p>
+<div data-query="t-route">Loading saved query...</div>
+
+<h2 class="step" id="evidence"><span class="n">5</span>Evidence</h2>
+<div data-evidence="slow">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/slow-trace.png" alt="SigNoz trace page showing a 2.68 second trace with frontend and backend spans almost the same length" width="1440" height="900" loading="lazy"><figcaption>The slow trace. <span class="badge ui">Seen in SigNoz UI</span> Each span is about as long as its parent, down to <code>GET /work/slow</code>.</figcaption></figure>
+<p>Read it from the top down:</p>
+<ul>
+  <li>Frontend Server span: 2,678.8 ms. Frontend Client span: 2,677.5 ms. So the frontend spends its time waiting.</li>
+  <li>Backend Server span: 2,676.4 ms. So the time is in the backend.</li>
+  <li><code>GET /work/slow</code> has no real child spans: no database call, and no outgoing call.</li>
+  <li>A log with the same trace ID says <code>slow work for 2.67s</code>.</li>
+</ul>
+<div class="finding"><p><strong>The rule:</strong> follow the time downward until a span is long but its children are not. That span's own code is where the time went. Here, no children means the time is inside the handler, or in something not instrumented.</p></div>
+
+<h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
+<figure class="code"><figcaption><span><code>app/backend.py</code> lines 128–133</span></figcaption><pre><code><span class="ln">128</span>@app.get(&quot;/work/slow&quot;)
+<span class="ln">129</span>def slow(ms: int = 0) -&gt; dict:
+<span class="ln">130</span>    delay = ms / 1000 if ms else random.uniform(1.0, 3.0)
+<span class="ln">131</span>    log.info(&quot;slow work for %.2fs&quot;, delay)
+<span class="ln">132</span>    time.sleep(delay)
+<span class="ln">133</span>    return {&quot;slept_s&quot;: round(delay, 3)}</code></pre></figure>
+<p>The handler sleeps. In a real app this could be a slow library call, a lock, or a loop. The point of the trace is that it takes you to this function without any guessing.</p>
+
+<h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
+<p>The real fix depends on what the code is doing. In this lab it is a deliberate sleep, so removing it is the fix. The reusable step is to make the blind spot visible with a child span, so the next person can see where the time goes:</p>
+<figure class="code"><figcaption><span>Proposed change for app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> def slow(ms: int = 0) -&gt; dict:
+     delay = ms / 1000 if ms else random.uniform(1.0, 3.0)
+     log.info(&quot;slow work for %.2fs&quot;, delay)
+<span class="del">-    time.sleep(delay)</span><span class="add">+    with tracer.start_as_current_span(&quot;slow_work&quot;) as span:</span><span class="add">+        span.set_attribute(&quot;work.delay_s&quot;, delay)</span><span class="add">+        time.sleep(delay)</span>     return {&quot;slept_s&quot;: round(delay, 3)}
+</code></pre></figure>
+<p>Then re-run the search, and compare P99 before and after. Alert on a high percentile rather than the median: in this view P50 was only 29 ms, while P99 was nearly 3 seconds.</p>
+
+<div class="quiz" data-quiz="l1"><p class="q">Check yourself: A backend span takes 2.67 s and has no child spans. What does that suggest?</p><button type="button" data-right="false" data-why="A database call would appear as a child SELECT or INSERT span.">The database is slow.</button><button type="button" data-right="true" data-why="Empty space under a span is untraced time. Here it is time.sleep at backend.py line 129.">The time went in the service&#x27;s own code, or in something not instrumented.</button><button type="button" data-right="false" data-why="Nothing suggests loss: the parent and logs are all there.">Spans were lost.</button></div>
+<div class="quiz" data-quiz="l2"><p class="q">Check yourself: The frontend shows P50 around 29 ms and P99 around 2.8 s. What does that tell you?</p><button type="button" data-right="false" data-why="P50 says half are faster than 29 ms.">Most requests are slow.</button><button type="button" data-right="true" data-why="This is why averages mislead. Look at the tail and then find which operation it belongs to.">Most requests are fast, and a small share are very slow.</button><button type="button" data-right="false" data-why="This is what a mixed workload looks like.">The numbers must be wrong.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

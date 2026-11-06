@@ -1,0 +1,20 @@
+# Exposes the SigNoz UI at http://signoz.localhost:8080 through k3s's Traefik.
+# Kept outside the Helm release so the SigNoz install itself has zero overrides.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: signoz-ui
+  namespace: signoz
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: signoz.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: signoz
+                port:
+                  number: 8080

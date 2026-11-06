@@ -1,0 +1,11 @@
+# Phase 2: overrides for the signoz/k8s-infra chart. Everything else is default.
+#
+# Required: the chart has no default destination. The default exporter is
+# OTLP/HTTP, hence port 4318 on SigNoz's collector. The http:// scheme is
+# mandatory: without it pods stay Running while every export fails with
+# `unsupported protocol scheme`.
+otelCollectorEndpoint: http://signoz-otel-collector.signoz.svc.cluster.local:4318
+
+# Recommended: labels all data with a cluster name (blank by default).
+global:
+  clusterName: signoz-lab

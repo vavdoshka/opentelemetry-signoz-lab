@@ -1,0 +1,202 @@
+# Telemetry lab app: frontend -> backend -> postgres, in namespace "lab".
+#
+# OpenTelemetry is configured ONLY through the standard OTEL_* env vars below.
+# Apps export OTLP/HTTP to the k8s-infra agent on their own node. The agent's
+# Service has internalTrafficPolicy: Local, so traffic stays on the node, and the
+# agent adds pod and node attributes before forwarding to SigNoz.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: lab
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: postgres } }
+  template:
+    metadata: { labels: { app: postgres } }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - { name: POSTGRES_USER, value: lab }
+            - { name: POSTGRES_PASSWORD, value: lab }
+            - { name: POSTGRES_DB, value: lab }
+          ports: [{ containerPort: 5432 }]
+          resources: { requests: { cpu: 50m, memory: 64Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: postgres, namespace: lab }
+spec:
+  selector: { app: postgres }
+  ports: [{ port: 5432 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: lab
+spec:
+  replicas: 2
+  # Spread is only checked at scheduling and counts old pods, so the default
+  # rollout can end with every replica on one node. Removing the old pod first
+  # keeps one per node. On Kubernetes 1.27+, matchLabelKeys: [pod-template-hash]
+  # on the spread constraint is the cleaner fix.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }
+  selector: { matchLabels: { app: backend } }
+  template:
+    metadata: { labels: { app: backend } }
+    spec:
+      # HA: force one replica per node. ScheduleAnyway is not enough: the scheduler
+      # put every replica on the emptier node. nodeTaintsPolicy: Honor leaves dead
+      # (tainted) nodes out of the count, so a replacement can start on the survivor.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          labelSelector: { matchLabels: { app: backend } }
+      containers:
+        - name: backend
+          image: telemetry-lab:dev
+          imagePullPolicy: IfNotPresent
+          command: ["uvicorn", "backend:app", "--host", "0.0.0.0", "--port", "8000"]
+          env:
+            - { name: DATABASE_URL, value: "postgresql://lab:lab@postgres:5432/lab" }
+            # --- OpenTelemetry (standard SDK env vars) ---
+            - { name: OTEL_SERVICE_NAME, value: backend }
+            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "service.version=0.1.0,deployment.environment=lab" }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://k8s-infra-otel-agent.signoz.svc.cluster.local:4318" }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
+            # Don't create spans for kubelet probe calls.
+            - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
+            # Flush spans inside the collector's 1 s batch window (SDK default 5000 ms).
+            # Fix for gap 2 in docs/FINDINGS.md. See docs/CONFIG.md.
+            - { name: OTEL_BSP_SCHEDULE_DELAY, value: "500" }
+          ports: [{ containerPort: 8000 }]
+          readinessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5 }
+          resources: { requests: { cpu: 50m, memory: 96Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: backend, namespace: lab }
+spec:
+  selector: { app: backend }
+  ports: [{ port: 8000 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: lab
+spec:
+  replicas: 2
+  # Spread is only checked at scheduling and counts old pods, so the default
+  # rollout can end with every replica on one node. Removing the old pod first
+  # keeps one per node. On Kubernetes 1.27+, matchLabelKeys: [pod-template-hash]
+  # on the spread constraint is the cleaner fix.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }
+  selector: { matchLabels: { app: frontend } }
+  template:
+    metadata: { labels: { app: frontend } }
+    spec:
+      # HA: force one replica per node. ScheduleAnyway is not enough: the scheduler
+      # put every replica on the emptier node. nodeTaintsPolicy: Honor leaves dead
+      # (tainted) nodes out of the count, so a replacement can start on the survivor.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          labelSelector: { matchLabels: { app: frontend } }
+      containers:
+        - name: frontend
+          image: telemetry-lab:dev
+          imagePullPolicy: IfNotPresent
+          command: ["uvicorn", "frontend:app", "--host", "0.0.0.0", "--port", "8000"]
+          env:
+            - { name: BACKEND_URL, value: "http://backend:8000" }
+            - { name: SIGNOZ_URL, value: "http://signoz.localhost:8080" }
+            # --- OpenTelemetry (standard SDK env vars) ---
+            - { name: OTEL_SERVICE_NAME, value: frontend }
+            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "service.version=0.1.0,deployment.environment=lab" }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://k8s-infra-otel-agent.signoz.svc.cluster.local:4318" }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
+            - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
+            # Flush spans inside the collector's 1 s batch window (SDK default 5000 ms).
+            # Fix for gap 2 in docs/FINDINGS.md. See docs/CONFIG.md.
+            - { name: OTEL_BSP_SCHEDULE_DELAY, value: "500" }
+          ports: [{ containerPort: 8000 }]
+          readinessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5 }
+          resources: { requests: { cpu: 50m, memory: 96Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: frontend, namespace: lab }
+spec:
+  selector: { app: frontend }
+  ports: [{ port: 8000 }]
+---
+# Load generator: same image, one replica. Its state lives in the process, so it
+# must not sit behind the replicated frontend Service. The Ingress sends /api/load
+# here, and it sends traffic through the frontend Service to reach both replicas.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+  namespace: lab
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: loadgen } }
+  template:
+    metadata: { labels: { app: loadgen } }
+    spec:
+      containers:
+        - name: loadgen
+          image: telemetry-lab:dev
+          imagePullPolicy: IfNotPresent
+          command: ["uvicorn", "frontend:app", "--host", "0.0.0.0", "--port", "8000"]
+          env:
+            - { name: LOADGEN_TARGET, value: "http://frontend:8000" }
+            - { name: BACKEND_URL, value: "http://backend:8000" }
+            - { name: OTEL_SERVICE_NAME, value: loadgen }
+            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "service.version=0.1.0,deployment.environment=lab" }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://k8s-infra-otel-agent.signoz.svc.cluster.local:4318" }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
+            - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
+          ports: [{ containerPort: 8000 }]
+          readinessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5 }
+          resources: { requests: { cpu: 50m, memory: 96Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: loadgen, namespace: lab }
+spec:
+  selector: { app: loadgen }
+  ports: [{ port: 8000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: { name: frontend, namespace: lab }
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: app.localhost
+      http:
+        paths:
+          - path: /api/load
+            pathType: Prefix
+            backend: { service: { name: loadgen, port: { number: 8000 } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: frontend, port: { number: 8000 } } }

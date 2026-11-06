@@ -1,0 +1,70 @@
+# Boots the whole lab from nothing on a clean x86 Linux machine, for each
+# supported cluster provider. `make up` ends with a smoke test that proves
+# traces, logs and metrics reach SigNoz.
+name: e2e
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  boot:
+    name: make up (${{ matrix.provider }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [k3d, kind]
+    env:
+      PROVIDER: ${{ matrix.provider }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k3d
+        if: matrix.provider == 'k3d'
+        run: curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.9.0 bash
+
+      - name: Install kind
+        if: matrix.provider == 'kind'
+        run: |
+          curl -fsSLo kind https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64
+          sudo install kind /usr/local/bin/kind
+
+      - name: Show tool versions
+        run: |
+          docker version --format 'docker {{.Server.Version}}'
+          kubectl version --client
+          helm version --short
+          python3 --version
+
+      - name: Make *.localhost resolve
+        run: echo '127.0.0.1 app.localhost signoz.localhost' | sudo tee -a /etc/hosts
+
+      - name: Check prerequisites
+        run: make check
+
+      - name: Boot the lab
+        run: make up
+
+      - name: Show status
+        run: make status
+
+      - name: Check the tutorial starts
+        run: |
+          python3 tutorial/server.py &
+          sleep 3
+          curl -fsS http://127.0.0.1:8765/ -o /dev/null
+          curl -fsS http://127.0.0.1:8765/live/status
+
+      - name: Show diagnostics
+        if: failure()
+        run: |
+          context="${{ matrix.provider }}-signoz-lab"
+          kubectl --context "$context" get pods -A -o wide || true
+          kubectl --context "$context" get events -A --sort-by=.lastTimestamp | tail -40 || true

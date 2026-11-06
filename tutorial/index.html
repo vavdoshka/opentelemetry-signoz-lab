@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learn telemetry by breaking a real app | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="start">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Hands-on tutorial</p>
+<h1>Learn telemetry by breaking a real app</h1>
+<p class="lead">This tutorial teaches you how to add telemetry to an app with OpenTelemetry, and how to use SigNoz to find out what went wrong. You work on this repo's running lab: a small Python app that fails on demand.</p>
+
+<div class="flow" aria-label="The lab app">
+  <span class="box">Your browser</span><span class="arrow">→</span>
+  <span class="box"><code>frontend</code> (FastAPI)</span><span class="arrow">→</span>
+  <span class="box"><code>backend</code> (FastAPI)</span><span class="arrow">→</span>
+  <span class="box">Postgres</span>
+</div>
+
+<h2>What you will be able to do</h2>
+<ul>
+  <li>Explain traces, metrics and logs, and how they connect.</li>
+  <li>Read real instrumentation code, and add your own spans, metrics and logs.</li>
+  <li>Work through six incidents, from symptom to root cause to fix.</li>
+  <li>Write SigNoz searches for traces, logs and metrics.</li>
+  <li>Spot what a plain install leaves out, including the places where SigNoz can mislead you.</li>
+</ul>
+
+<h2>Before you start</h2>
+<ol>
+  <li>Log in to <a href="http://signoz.localhost:8080" target="_blank" rel="noopener">SigNoz</a> in another tab. The login is in <code>.lab-credentials</code>. Links in this tutorial land on the login page if you skip this.</li>
+  <li>Start some background traffic, so that charts have data. Stop it when you finish.</li>
+</ol>
+<div data-load-panel></div>
+
+<h2>Your path</h2>
+<p>Go in order if this is new to you. Each incident stands alone, so you can also jump straight to one. Mark a page complete at the bottom of it. Your progress stays in this browser.</p>
+<div id="path"></div>
+
+<h2>How far to trust what you read</h2>
+<p>Everything shown as real came from this lab. Each claim says how it was checked, using the same labels as <code>docs/FINDINGS.md</code>:</p>
+<table>
+  <thead><tr><th>Label</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><span class="badge ui">Seen in SigNoz UI</span></td><td>Run in the SigNoz web app, and the result was seen on the page.</td></tr>
+    <tr><td><span class="badge api">Query API only</span></td><td>Run through <code>POST /api/v5/query_range</code>, the endpoint the UI calls, with the same expression. The browser was too slow to confirm it on the page.</td></tr>
+    <tr><td><span class="badge data">ClickHouse SQL</span></td><td>Run directly against the database. This is not a SigNoz UI query.</td></tr>
+    <tr><td><span class="badge untested">Untested</span></td><td>A proposed fix. It has not been applied or tried in this lab.</td></tr>
+  </tbody>
+</table>
+
+<h2>About the saved examples</h2>
+<ul>
+  <li>Saved trace IDs, numbers and screenshots come from runs on 2026-11-04, mostly during a load run from 23:10 to 00:00 UTC at 5 requests/s with 10% errors. Your live numbers will differ.</li>
+  <li>Screenshots show UTC+1, so 23:10 UTC appears as 00:10. Saved trace IDs exist only in that original lab, so their SigNoz links will not open in yours. Use the live buttons to create your own.</li>
+  <li>SigNoz keeps traces and logs for 15 days, so saved trace links stop working after about 2026-11-19. The pages still show the saved copy.</li>
+  <li>The scenarios fail on purpose, so each root cause is a known line of code. The method is what carries over to real incidents.</li>
+</ul>
+
+<p><button class="alt" id="reset-progress" type="button">Reset my progress</button></p>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>
