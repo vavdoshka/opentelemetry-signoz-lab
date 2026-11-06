@@ -1,9 +1,13 @@
-# SigNoz telemetry lab
+# OpenTelemetry Lab with SigNoz
 
-[![e2e](https://github.com/vavdoshka/signoz-poc/actions/workflows/e2e.yml/badge.svg)](https://github.com/vavdoshka/signoz-poc/actions/workflows/e2e.yml)
+[![e2e](https://github.com/vavdoshka/opentelemetry-signoz-lab/actions/workflows/e2e.yml/badge.svg)](https://github.com/vavdoshka/opentelemetry-signoz-lab/actions/workflows/e2e.yml)
 
-What do you get from plain OpenTelemetry and a simple SigNoz install on Kubernetes, and what's
-missing? This lab lets you find out hands-on.
+A hands-on lab for learning OpenTelemetry on Kubernetes with SigNoz, the open source observability
+platform. Get traces, metrics and logs from an app with no code changes, then add the OpenTelemetry
+SDK and debug real incidents. One command, on k3d or kind.
+
+What do you get from plain OpenTelemetry and a simple SigNoz install, and what's missing? This lab
+lets you find out.
 
 It has two labs, in order:
 
@@ -39,8 +43,8 @@ some Linux machines it will ask you to add one line to `/etc/hosts`.
 ## Quick start
 
 ```bash
-git clone https://github.com/vavdoshka/signoz-poc.git
-cd signoz-poc
+git clone https://github.com/vavdoshka/opentelemetry-signoz-lab.git
+cd opentelemetry-signoz-lab
 make up
 ```
 
@@ -106,11 +110,16 @@ UI has a button for each scenario:
 
 ## Tested on
 
-| Platform | Provider | Result |
-|---|---|---|
-| macOS, Apple Silicon | k3d 5.5.0 | Both labs boot from nothing |
+Both labs boot from nothing, and `make compare` gives the same results, on all of these:
 
-Linux results come from the e2e workflow above.
+| Platform | Provider |
+|---|---|
+| macOS, Apple Silicon | k3d 5.5.0 |
+| macOS, Apple Silicon | kind 0.22.0 |
+| Ubuntu, x86 (the e2e workflow) | k3d 5.9.0 |
+| Ubuntu, x86 (the e2e workflow) | kind 0.33.0 |
+
+Other platforms, including Windows and Linux on ARM, are untested.
 
 ## Troubleshooting
 
