@@ -7,16 +7,34 @@ from signoz_client import LABS, count, fire, login, metric_exists, read_credenti
 
 SCENARIOS = ["order"] * 5 + ["list", "slow_query", "bad_input", "crash", "backend_500", "db_error", "timeout"]
 WINDOW_MINUTES = 3
+# On a fresh boot, a new metric takes a while to become queryable, so a quick
+# "no" can be wrong. Keep asking until this many seconds after the spans check.
+METRIC_WAIT_SECONDS = 90
 
 
 def spans(token, expression):
     return count(token, "traces", expression, WINDOW_MINUTES)
 
 
-def checks(token, lab):
+def eventually(check, deadline):
+    """True if check() succeeds before the deadline. After it, asks just once."""
+    while True:
+        if check():
+            return True
+        if time.monotonic() > deadline:
+            return False
+        time.sleep(10)
+
+
+def checks(token, lab, deadline):
     """Each check returns a count, or a true/false value."""
     frontend, backend = LABS[lab]["frontend"], LABS[lab]["backend"]
     both = f"service.name IN ('{frontend}', '{backend}')"
+
+    def metric(name, service):
+        expression = f"service.name = '{service}'"
+        return eventually(lambda: metric_exists(token, name, expression, WINDOW_MINUTES), deadline)
+
     return [
         ("Spans", spans(token, both)),
         ("Traces crossing both services", spans(token, f"service.name = '{backend}' AND kind_string = 'Server' AND is_remote = 'yes'")),
@@ -24,12 +42,12 @@ def checks(token, lab):
         ("Spans marked as errors", spans(token, f"{both} AND has_error = true")),
         ("Pod names on spans", spans(token, f"{both} AND k8s.pod.name EXISTS")),
         ("Logs linked to traces", count(token, "logs", f"{both} AND trace_id != ''", WINDOW_MINUTES)),
-        ("HTTP metrics", metric_exists(token, "http.server.duration.count", f"service.name = '{backend}'", WINDOW_MINUTES)),
-        ("Python runtime metrics", metric_exists(token, "cpython.gc.collections", f"service.name = '{backend}'", WINDOW_MINUTES)),
+        ("HTTP metrics", metric("http.server.duration.count", backend)),
+        ("Python runtime metrics", metric("cpython.gc.collections", backend)),
         ("Custom span (price_order)", spans(token, f"service.name = '{backend}' AND name = 'price_order'")),
         ("Business attribute on spans (order.item)", spans(token, f"service.name = '{backend}' AND order.item EXISTS")),
         ("Scenario name on spans (lab.scenario)", spans(token, f"service.name = '{frontend}' AND lab.scenario EXISTS")),
-        ("Business metric (orders.created)", metric_exists(token, "orders.created", f"service.name = '{backend}'", WINDOW_MINUTES)),
+        ("Business metric (orders.created)", metric("orders.created", backend)),
     ]
 
 
@@ -61,7 +79,9 @@ def main():
     print("Waiting for telemetry to arrive...", flush=True)
     time.sleep(25)
 
-    results = {lab: checks(token, lab) for lab in LABS}
+    print("Checking what arrived. Metrics can take up to 90 seconds on a fresh boot...", flush=True)
+    deadline = time.monotonic() + METRIC_WAIT_SECONDS
+    results = {lab: checks(token, lab, deadline) for lab in LABS}
     rows = [(name, show(value), show(results["2"][index][1])) for index, (name, value) in enumerate(results["1"])]
     rows.append(("Trace ID in the API response", show(trace_ids["1"]), show(trace_ids["2"])))
 
