@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lab 1: hands-off telemetry</title>
+<style>
+  :root { --bg:#f7f7f5; --card:#fff; --ink:#1d1d1b; --muted:#6b6b66; --line:#e3e2dc; --ok:#1f7a4d; --err:#b3261e; --warn:#9a6700; --accent:#2f5bd3; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:20px 28px 8px; }
+  header h1 { margin:0 0 4px; font-size:20px; }
+  header p { margin:0; color:var(--muted); }
+  main { display:grid; grid-template-columns: minmax(380px, 1fr) minmax(380px, 1fr); gap:20px; padding:16px 28px 28px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; }
+  h2 { font-size:15px; margin:0 0 12px; }
+  .scenario { display:flex; gap:12px; align-items:flex-start; padding:8px 0; border-top:1px solid var(--line); }
+  .scenario:first-of-type { border-top:none; }
+  .scenario button { min-width:120px; }
+  .scenario .desc { color:var(--muted); }
+  button { font:inherit; padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  input, select { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px; width:80px; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:8px 0; }
+  #results { font:12px/1.5 ui-monospace, Menlo, monospace; max-height:560px; overflow:auto; }
+  .res { padding:6px 0; border-top:1px solid var(--line); }
+  .res .code { display:inline-block; min-width:36px; font-weight:600; }
+  .c2 { color:var(--ok); } .c4 { color:var(--warn); } .c5 { color:var(--err); }
+  a { color:var(--accent); }
+  #load-status { color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Lab 1: hands-off telemetry</h1>
+  <p>This app contains no OpenTelemetry code. The OpenTelemetry Operator adds telemetry when each pod starts. Without the SDK in the code it can't show you trace IDs, so find these requests in <a href="__SIGNOZ_URL__" target="_blank">SigNoz</a> under <code>lab1-frontend</code>.</p>
+</header>
+<main>
+  <div>
+    <section>
+      <h2>Scenarios</h2>
+      <div id="scenarios"></div>
+      <div class="row">
+        <label>log_burst count <input id="burst-count" type="number" value="20"></label>
+        <label>level <select id="burst-level"><option>DEBUG</option><option selected>INFO</option><option>WARNING</option><option>ERROR</option><option>CRITICAL</option></select></label>
+        <label>cpu_burn seconds <input id="cpu-seconds" type="number" value="10"></label>
+      </div>
+    </section>
+    <section style="margin-top:20px">
+      <h2>Load generator</h2>
+      <div class="row">
+        <label>requests/s <input id="rps" type="number" value="5" step="0.5"></label>
+        <label>error % <input id="errpct" type="number" value="10"></label>
+        <button class="primary" onclick="startLoad()">Start</button>
+        <button onclick="stopLoad()">Stop</button>
+      </div>
+      <div id="load-status">stopped</div>
+    </section>
+  </div>
+  <section>
+    <h2>Results</h2>
+    <div id="results"></div>
+  </section>
+</main>
+<script>
+const SIGNOZ = "__SIGNOZ_URL__";
+const params = name => name === "log_burst"
+  ? { count: +document.getElementById("burst-count").value, level: document.getElementById("burst-level").value }
+  : name === "cpu_burn" ? { seconds: +document.getElementById("cpu-seconds").value } : {};
+
+async function run(name) {
+  const t0 = performance.now();
+  let status = 0, body = {};
+  try {
+    const r = await fetch(`/api/scenario/${name}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(params(name)) });
+    status = r.status;
+    body = await r.json().catch(() => ({}));
+  } catch (e) { body = { error: String(e) }; }
+  const ms = Math.round(performance.now() - t0);
+  const div = document.createElement("div");
+  div.className = "res";
+  const tid = body.trace_id;
+  const link = tid ? ` <a href="${SIGNOZ}/trace/${tid}" target="_blank">trace ${tid.slice(0, 8)}…</a>` : "";
+  const detail = body.error ?? JSON.stringify(body.result ?? "");
+  div.innerHTML = `<span class="code c${String(status)[0]}">${status}</span> ${name} · ${ms} ms${link}<br><span style="color:#6b6b66">${detail}</span>`;
+  document.getElementById("results").prepend(div);
+}
+
+async function loadScenarios() {
+  const list = await (await fetch("/api/scenarios")).json();
+  const box = document.getElementById("scenarios");
+  for (const s of list) {
+    const row = document.createElement("div");
+    row.className = "scenario";
+    row.innerHTML = `<button onclick="run('${s.name}')">${s.name}</button><span class="desc">${s.description}</span>`;
+    box.appendChild(row);
+  }
+}
+
+let poll = null;
+function showLoad(s) {
+  document.getElementById("load-status").textContent = s.running
+    ? `running: ${s.rps} req/s, ${s.error_pct}% errors, ${s.sent} sent, ${s.uptime_s}s`
+    : "stopped";
+  if (s.running && !poll) poll = setInterval(async () => showLoad(await (await fetch("/api/load")).json()), 3000);
+  if (!s.running && poll) { clearInterval(poll); poll = null; }
+}
+async function startLoad() {
+  const body = { rps: +document.getElementById("rps").value, error_pct: +document.getElementById("errpct").value };
+  showLoad(await (await fetch("/api/load", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })).json());
+}
+async function stopLoad() { showLoad(await (await fetch("/api/load", { method: "DELETE" })).json()); }
+
+loadScenarios();
+fetch("/api/load").then(r => r.json()).then(showLoad);
+</script>
+</body>
+</html>

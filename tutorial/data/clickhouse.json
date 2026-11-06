@@ -233,7 +233,7 @@
    "id": "c-log-copies",
    "title": "OTLP copies versus stdout copies",
    "why": "Gap 4 in numbers, over the 51-minute load run.",
-   "sql": "SELECT if(resources_string['service.name']='', 'stdout copy (k8s-infra)', 'OTLP copy') AS copy, count() AS n, countIf(trace_id!='') AS with_trace_id, countIf(severity_text!='') AS with_severity FROM signoz_logs.distributed_logs_v2 WHERE timestamp BETWEEN toUnixTimestamp64Nano(toDateTime64('2026-11-04 23:08:00',9)) AND toUnixTimestamp64Nano(toDateTime64('2026-11-04 23:59:00',9)) AND (resources_string['service.name'] IN ('frontend','backend') OR resources_string['k8s.namespace.name']='lab') GROUP BY copy ORDER BY copy",
+   "sql": "SELECT if(resources_string['service.name']='', 'stdout copy (k8s-infra)', 'OTLP copy') AS copy, count() AS n, countIf(trace_id!='') AS with_trace_id, countIf(severity_text!='') AS with_severity FROM signoz_logs.distributed_logs_v2 WHERE timestamp BETWEEN toUnixTimestamp64Nano(toDateTime64('2026-11-04 23:08:00',9)) AND toUnixTimestamp64Nano(toDateTime64('2026-11-04 23:59:00',9)) AND (resources_string['service.name'] IN ('frontend','backend') OR resources_string['k8s.namespace.name']='lab2') GROUP BY copy ORDER BY copy",
    "result": {
     "columns": [
      "copy",
@@ -262,7 +262,7 @@
    "id": "c-stdout-kinds",
    "title": "What the stdout log lines actually are",
    "why": "Sorts the stdout copies from the load run by what each line is. The twins match the OTLP count exactly.",
-   "sql": "SELECT multiIf(resources_string['k8s.container.name']='postgres','Postgres', body LIKE '%trace_id=%','Twin of an OTLP log (trace_id only as text)', body LIKE 'INFO:%/healthz%','Health probe access line', body LIKE 'INFO:%','uvicorn access line', body LIKE '%File \"%' OR body LIKE ' %' OR body LIKE '%Traceback (most recent%','Stack trace line, one record per line','Other') AS kind, count() AS n FROM signoz_logs.distributed_logs_v2 WHERE timestamp BETWEEN toUnixTimestamp64Nano(toDateTime64('2026-11-04 23:08:00',9)) AND toUnixTimestamp64Nano(toDateTime64('2026-11-04 23:59:00',9)) AND resources_string['service.name']='' AND resources_string['k8s.namespace.name']='lab' GROUP BY kind ORDER BY n DESC",
+   "sql": "SELECT multiIf(resources_string['k8s.container.name']='postgres','Postgres', body LIKE '%trace_id=%','Twin of an OTLP log (trace_id only as text)', body LIKE 'INFO:%/healthz%','Health probe access line', body LIKE 'INFO:%','uvicorn access line', body LIKE '%File \"%' OR body LIKE ' %' OR body LIKE '%Traceback (most recent%','Stack trace line, one record per line','Other') AS kind, count() AS n FROM signoz_logs.distributed_logs_v2 WHERE timestamp BETWEEN toUnixTimestamp64Nano(toDateTime64('2026-11-04 23:08:00',9)) AND toUnixTimestamp64Nano(toDateTime64('2026-11-04 23:59:00',9)) AND resources_string['service.name']='' AND resources_string['k8s.namespace.name']='lab2' GROUP BY kind ORDER BY n DESC",
    "result": {
     "columns": [
      "kind",

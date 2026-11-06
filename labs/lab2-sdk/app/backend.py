@@ -171,5 +171,5 @@ def cpu(seconds: float = 10.0) -> dict:
 
 
 # Server spans for every route, except the k8s probe endpoint (see
-# OTEL_PYTHON_FASTAPI_EXCLUDED_URLS in k8s/app.yaml).
+# OTEL_PYTHON_FASTAPI_EXCLUDED_URLS in labs/lab2-sdk/k8s/app.yaml).
 FastAPIInstrumentor.instrument_app(app)

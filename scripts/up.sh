@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Creates the cluster and deploys SigNoz, the node agents and the test app.
+# Creates the cluster and deploys SigNoz, the node agents, the OpenTelemetry
+# Operator and Lab 1.
 # Safe to rerun: it also recovers a lab after Docker or the machine restarts.
 source "$(dirname "$0")/lib.sh"
 cd "$ROOT"
@@ -46,24 +47,28 @@ helm repo add signoz https://charts.signoz.io --force-update >/dev/null
 helm repo update signoz >/dev/null
 h upgrade --install signoz signoz/signoz --version "$SIGNOZ_CHART_VERSION" \
   --namespace signoz --create-namespace -f signoz/signoz-values.yaml
-k apply -f k8s/signoz-ingress.yaml
+k apply -f signoz/ingress.yaml
 python3 scripts/bootstrap_signoz.py
 
 step "Node agents"
 h upgrade --install k8s-infra signoz/k8s-infra --version "$K8S_INFRA_CHART_VERSION" \
   --namespace signoz -f signoz/k8s-infra-values.yaml
 
-step "Test app"
-scripts/deploy-app.sh
+step "OpenTelemetry Operator"
+helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts --force-update >/dev/null
+helm repo update open-telemetry >/dev/null
+h upgrade --install opentelemetry-operator open-telemetry/opentelemetry-operator \
+  --version "$OTEL_OPERATOR_CHART_VERSION" --namespace opentelemetry-operator-system \
+  --create-namespace -f cluster/otel-operator-values.yaml --wait --timeout 5m
 
-step "Smoke test"
-python3 scripts/smoke_test.py
+scripts/deploy-lab.sh 1
 
 cat <<DONE
 
-Lab is ready.
+Lab 1 is ready.
 
-  Test app  $APP_URL
+  Lab 1     $LAB1_URL
   SigNoz    $SIGNOZ_URL  (login in .lab-credentials)
   Tutorial  run: make tutorial
+  Lab 2     run: make lab2
 DONE

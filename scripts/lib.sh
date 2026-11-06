@@ -4,12 +4,13 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLUSTER_NAME="signoz-lab"
-IMAGE="telemetry-lab:dev"
 SIGNOZ_CHART_VERSION="0.149.0"
 K8S_INFRA_CHART_VERSION="0.17.1"
+OTEL_OPERATOR_CHART_VERSION="0.129.0"
 TRAEFIK_CHART_VERSION="41.7.1"
 SIGNOZ_URL="http://signoz.localhost:8080"
-APP_URL="http://app.localhost:8080"
+LAB1_URL="http://lab1.localhost:8080"
+LAB2_URL="http://lab2.localhost:8080"
 
 kind_cluster_exists() {
   command -v kind >/dev/null 2>&1 && kind get clusters 2>/dev/null | grep -qx "$CLUSTER_NAME"
@@ -33,5 +34,12 @@ esac
 # Always name the context, so these scripts can never touch another cluster.
 k() { kubectl --context "$CONTEXT" "$@"; }
 h() { helm --kube-context "$CONTEXT" "$@"; }
+
+load_image() {
+  case "$PROVIDER" in
+    k3d)  k3d image import "$1" --cluster "$CLUSTER_NAME" ;;
+    kind) kind load docker-image "$1" --name "$CLUSTER_NAME" ;;
+  esac
+}
 
 step() { printf '\n==> %s\n' "$*"; }

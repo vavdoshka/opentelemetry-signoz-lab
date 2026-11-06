@@ -2710,7 +2710,7 @@
    "signal": "logs",
    "title": "The stdout copies of app logs",
    "why": "Gap 4: k8s-infra collects stdout too. These copies have no service.name.",
-   "expr": "service.name NOT EXISTS AND k8s.namespace.name = 'lab'",
+   "expr": "service.name NOT EXISTS AND k8s.namespace.name = 'lab2'",
    "neg": false,
    "aggs": null,
    "by": null,
@@ -2721,7 +2721,7 @@
     "name": "A",
     "signal": "logs",
     "filter": {
-     "expression": "service.name NOT EXISTS AND k8s.namespace.name = 'lab'"
+     "expression": "service.name NOT EXISTS AND k8s.namespace.name = 'lab2'"
     },
     "limit": 5,
     "order": [
@@ -2790,7 +2790,7 @@
    "signal": "logs",
    "title": "OTLP logs with Kubernetes context",
    "why": "Zero rows: OTLP copies have service.name but no Kubernetes attributes, which is gap 3 again.",
-   "expr": "service.name EXISTS AND k8s.namespace.name = 'lab'",
+   "expr": "service.name EXISTS AND k8s.namespace.name = 'lab2'",
    "neg": true,
    "aggs": null,
    "by": null,
@@ -2801,7 +2801,7 @@
     "name": "A",
     "signal": "logs",
     "filter": {
-     "expression": "service.name EXISTS AND k8s.namespace.name = 'lab'"
+     "expression": "service.name EXISTS AND k8s.namespace.name = 'lab2'"
     },
     "limit": 5,
     "order": [
@@ -7093,7 +7093,7 @@
    "signal": "metrics",
    "title": "Pod CPU in the lab namespace",
    "why": "From k8s-infra. Values are cores, averaged within each step.",
-   "expr": "k8s.namespace.name = 'lab'",
+   "expr": "k8s.namespace.name = 'lab2'",
    "neg": false,
    "aggs": null,
    "by": [
@@ -7110,7 +7110,7 @@
     "name": "A",
     "signal": "metrics",
     "filter": {
-     "expression": "k8s.namespace.name = 'lab'"
+     "expression": "k8s.namespace.name = 'lab2'"
     },
     "aggregations": [
      {
@@ -7347,7 +7347,7 @@
    "signal": "metrics",
    "title": "Pod memory in the lab namespace",
    "why": "Working set in bytes.",
-   "expr": "k8s.namespace.name = 'lab'",
+   "expr": "k8s.namespace.name = 'lab2'",
    "neg": false,
    "aggs": null,
    "by": [
@@ -7364,7 +7364,7 @@
     "name": "A",
     "signal": "metrics",
     "filter": {
-     "expression": "k8s.namespace.name = 'lab'"
+     "expression": "k8s.namespace.name = 'lab2'"
     },
     "aggregations": [
      {

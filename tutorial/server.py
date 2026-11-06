@@ -37,7 +37,7 @@ HERE = Path(__file__).resolve().parent
 CREDENTIALS = HERE.parent / ".lab-credentials"
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("TUTORIAL_PORT", "8765"))
-APP_URL = os.environ.get("TUTORIAL_APP_URL", "http://app.localhost:8080").rstrip("/")
+APP_URL = os.environ.get("TUTORIAL_APP_URL", "http://lab2.localhost:8080").rstrip("/")
 SIGNOZ_URL = os.environ.get("TUTORIAL_SIGNOZ_URL", "http://signoz.localhost:8080").rstrip("/")
 
 SCENARIOS = {
@@ -395,7 +395,7 @@ def main():
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"Telemetry tutorial: http://{HOST}:{PORT}", flush=True)
     status = lab_status()
-    print(f"  Test app: {'up' if status['app']['up'] else 'not reachable'} ({APP_URL})", flush=True)
+    print(f"  Lab 2:    {'up' if status['app']['up'] else 'not reachable, start it with: make lab2'} ({APP_URL})", flush=True)
     print(f"  SigNoz:   {'up' if status['signoz']['up'] else 'not reachable'} ({SIGNOZ_URL})", flush=True)
     if not (status["app"]["up"] and status["signoz"]["up"]):
         print("  Live buttons will be off. Saved examples still work.", flush=True)

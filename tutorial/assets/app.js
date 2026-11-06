@@ -9,13 +9,14 @@
   const PAGES = [
     { id: 'start', href: 'index.html', title: 'Start here', group: 'Start' },
     { id: 'concepts', href: 'concepts.html', title: 'Traces, metrics and logs', group: 'Learn' },
-    { id: 'code', href: 'instrumentation.html', title: 'The instrumentation code', group: 'Learn' },
-    { id: 'error', href: 'incident-error.html', title: 'An unhandled error', group: 'Incidents' },
-    { id: 'latency', href: 'incident-latency.html', title: 'A latency spike', group: 'Incidents' },
-    { id: 'cross', href: 'incident-cross-service.html', title: 'A cross-service failure', group: 'Incidents' },
-    { id: 'sql', href: 'incident-slow-sql.html', title: 'A slow SQL query', group: 'Incidents' },
-    { id: 'timeout', href: 'incident-timeout.html', title: 'A timeout', group: 'Incidents' },
-    { id: 'cpu', href: 'incident-cpu.html', title: 'CPU saturation', group: 'Incidents' },
+    { id: 'lab1', href: 'lab1.html', title: 'Telemetry with no code', group: 'Lab 1: hands-off' },
+    { id: 'code', href: 'instrumentation.html', title: 'The instrumentation code', group: 'Lab 2: SDK' },
+    { id: 'error', href: 'incident-error.html', title: 'An unhandled error', group: 'Lab 2: incidents' },
+    { id: 'latency', href: 'incident-latency.html', title: 'A latency spike', group: 'Lab 2: incidents' },
+    { id: 'cross', href: 'incident-cross-service.html', title: 'A cross-service failure', group: 'Lab 2: incidents' },
+    { id: 'sql', href: 'incident-slow-sql.html', title: 'A slow SQL query', group: 'Lab 2: incidents' },
+    { id: 'timeout', href: 'incident-timeout.html', title: 'A timeout', group: 'Lab 2: incidents' },
+    { id: 'cpu', href: 'incident-cpu.html', title: 'CPU saturation', group: 'Lab 2: incidents' },
     { id: 'queries', href: 'queries.html', title: 'Search query reference', group: 'Reference' },
     { id: 'gaps', href: 'gaps.html', title: 'What is missing, and fixes', group: 'Reference' },
   ];
@@ -151,7 +152,7 @@
 
   /* Confirmed in the UI for k8s.pod.cpu.usage. Other metrics open the plain Explorer. */
   function cpuMetricLink() {
-    const query = compositeQuery('metrics', "k8s.namespace.name = 'lab'");
+    const query = compositeQuery('metrics', "k8s.namespace.name = 'lab2'");
     Object.assign(query.builder.queryData[0], {
       aggregateOperator: 'avg',
       aggregateAttribute: { id: 'k8s.pod.cpu.usage--float64--Gauge--true', dataType: 'float64', key: 'k8s.pod.cpu.usage', type: 'Gauge', isColumn: true, isJSON: false },
@@ -257,11 +258,11 @@
       return;
     }
     if (lab.bridge === false) {
-      host.append(el('strong', { text: 'Tutorial server not running' }), 'Start it with: python3 tutorial/server.py');
+      host.append(el('strong', { text: 'Tutorial server not running' }), 'Start it with: make tutorial');
       return;
     }
     add(host,
-      el('strong', { text: 'Test app: ' + (lab.app.up ? 'up' : 'not reachable') }),
+      el('strong', { text: 'Lab 2: ' + (lab.app.up ? 'up' : 'not running. Start it with: make lab2') }),
       el('strong', { text: 'SigNoz: ' + (lab.signoz.up ? 'up' : 'not reachable') }),
       lab.app.load && lab.app.load.running ? 'Load generator is running. Stop it when you finish.' : null,
     );
@@ -280,8 +281,8 @@
       main.prepend(banner);
     }
     banner.textContent = lab.bridge === false
-      ? 'The tutorial server is not running, so live buttons and saved examples are unavailable. Start it with: python3 tutorial/server.py'
-      : 'The lab is not reachable, so live buttons are off. Saved examples from real runs are still shown below.';
+      ? 'The tutorial server is not running, so live buttons and saved examples are unavailable. Start it with: make tutoriaerver.py'
+      : 'Lab 2 or SigNoz is not reachable, so live buttons are off. Start them with: make up, then make lab2. Saved examples from real runs are still shown below.';
   }
 
   async function refreshLab() {

@@ -60,12 +60,12 @@
 </ul>
 
 <h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
-<figure class="code"><figcaption><span><code>app/frontend.py</code> lines 82–84</span></figcaption><pre><code><span class="ln">82</span>async def s_crash(_p: dict) -&gt; dict:
+<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/frontend.py</code> lines 82–84</span></figcaption><pre><code><span class="ln">82</span>async def s_crash(_p: dict) -&gt; dict:
 <span class="ln">83</span>    basket = {&quot;items&quot;: 0}
 <span class="ln">84</span>    return {&quot;avg&quot;: 100 / basket[&quot;items&quot;]}  # ZeroDivisionError -&gt; unhandled 500</code></pre></figure>
 <p>The basket has zero items and the code divides by that count. Nothing catches the exception, so it escapes as a 500.</p>
 <p>The exception reaches telemetry in two ways: the FastAPI instrumentation records it on the span, and this handler logs it through <code>logging</code>:</p>
-<figure class="code"><figcaption><span><code>app/frontend.py</code> lines 230–236</span></figcaption><pre><code><span class="ln">230</span>@app.exception_handler(Exception)
+<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/frontend.py</code> lines 230–236</span></figcaption><pre><code><span class="ln">230</span>@app.exception_handler(Exception)
 <span class="ln">231</span>async def unhandled(request: Request, exc: Exception) -&gt; JSONResponse:
 <span class="ln">232</span>    # Common app pattern: log unhandled errors through `logging` (so they reach
 <span class="ln">233</span>    # OTLP logs too) and return JSON. Starlette re-raises afterwards, so the
@@ -75,7 +75,7 @@
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>Handle the empty basket, and return a clear client error instead of crashing.</p>
-<figure class="code"><figcaption><span>Proposed fix for app/frontend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> async def s_crash(_p: dict) -&gt; dict:
+<figure class="code"><figcaption><span>Proposed fix for labs/lab2-sdk/app/frontend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> async def s_crash(_p: dict) -&gt; dict:
      basket = {&quot;items&quot;: 0}
 <span class="del">-    return {&quot;avg&quot;: 100 / basket[&quot;items&quot;]}  # ZeroDivisionError -&gt; unhandled 500</span><span class="add">+    if not basket[&quot;items&quot;]:</span><span class="add">+        raise HTTPException(status_code=422, detail=&quot;basket is empty&quot;)</span><span class="add">+    return {&quot;avg&quot;: 100 / basket[&quot;items&quot;]}</span></code></pre></figure>
 <p>To confirm a fix in real life: deploy it, fire the same request, and check that <code>ZeroDivisionError</code> stops growing on the Exceptions page.</p>

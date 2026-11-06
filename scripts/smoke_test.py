@@ -1,43 +1,20 @@
 #!/usr/bin/env python3
-"""Proves telemetry really reaches SigNoz. Healthy pods do not prove that."""
+"""Proves a lab's telemetry really reaches SigNoz. Healthy pods do not prove that.
 
-import time
+Usage: smoke_test.py 1|2
+"""
 
-from signoz_client import APP_URL, SIGNOZ_URL, login, read_credentials, request, wait_for
+import sys
 
-
-def query(token, signal, spec, request_type, minutes=10):
-    end = int(time.time() * 1000)
-    body = {
-        "schemaVersion": "v1",
-        "start": end - minutes * 60_000,
-        "end": end,
-        "requestType": request_type,
-        "compositeQuery": {"queries": [{"type": "builder_query", "spec": {"name": "A", "signal": signal, **spec}}]},
-        "formatOptions": {"formatTableResultForUI": False, "fillGaps": False},
-        "variables": {},
-    }
-    status, result = request(f"{SIGNOZ_URL}/api/v5/query_range", body, token, timeout=30)
-    if status != 200 or not result:
-        return None
-    return result["data"]["data"]["results"][0]
-
-
-def count(token, signal, expression):
-    spec = {"aggregations": [{"expression": "count()"}], "filter": {"expression": expression}}
-    result = query(token, signal, spec, "scalar")
-    try:
-        return result["data"][0][-1]
-    except (KeyError, IndexError, TypeError):
-        return 0
-
-
-def place_order():
-    status, body = request(f"{APP_URL}/api/scenario/order", {})
-    return body.get("trace_id") if status == 200 and body else None
+from signoz_client import LABS, count, fire, login, metric_exists, read_credentials, wait_for
 
 
 def main():
+    lab = sys.argv[1] if len(sys.argv) > 1 else ""
+    if lab not in LABS:
+        raise SystemExit("Usage: smoke_test.py 1|2")
+    backend = LABS[lab]["backend"]
+
     credentials = read_credentials()
     if not credentials:
         raise SystemExit("No .lab-credentials, so the smoke test cannot query SigNoz.")
@@ -45,27 +22,32 @@ def main():
     if not token:
         raise SystemExit("Could not log in to SigNoz.")
 
-    wait_for("the test app", place_order, timeout=300)
+    def order_succeeds():
+        return fire(lab, "order")[0] == 200
 
-    def trace_arrives():
-        trace_id = place_order()
-        time.sleep(8)
-        return trace_id if count(token, "traces", f"trace_id = '{trace_id}'") >= 5 else None
+    def spans_arrive():
+        fire(lab, "order")
+        return count(token, "traces", f"service.name = '{backend}'", minutes=2)
 
-    trace_id = wait_for("a trace across both services", trace_arrives, timeout=300, interval=2)
-    wait_for("logs linked to that trace", lambda: count(token, "logs", f"trace_id = '{trace_id}'"), timeout=60)
-    wait_for("pod names on spans", lambda: count(token, "traces", "k8s.pod.name EXISTS"), timeout=120)
+    def cross_service_span():
+        fire(lab, "order")
+        return count(token, "traces", f"service.name = '{backend}' AND kind_string = 'Server' AND is_remote = 'yes'", minutes=2)
 
-    def infrastructure_metrics():
-        spec = {
-            "aggregations": [{"metricName": "k8s.pod.cpu.usage", "timeAggregation": "avg", "spaceAggregation": "max"}],
-            "stepInterval": 60,
-        }
-        result = query(token, "metrics", spec, "time_series")
-        return result and any(aggregation.get("series") for aggregation in result.get("aggregations") or [])
-
-    wait_for("pod metrics from the node agents", infrastructure_metrics, timeout=180)
-    print("Smoke test passed: traces, logs and metrics are reaching SigNoz.")
+    wait_for("the app", order_succeeds, timeout=300)
+    wait_for("spans in SigNoz", spans_arrive, timeout=300, interval=8)
+    wait_for("a trace crossing both services", cross_service_span, timeout=120)
+    wait_for(
+        "logs linked to traces",
+        lambda: count(token, "logs", f"service.name = '{backend}' AND trace_id != ''", minutes=2),
+        timeout=60,
+    )
+    wait_for(
+        "pod names on spans",
+        lambda: count(token, "traces", f"service.name = '{backend}' AND k8s.pod.name EXISTS", minutes=2),
+        timeout=120,
+    )
+    wait_for("pod metrics from the node agents", lambda: metric_exists(token, "k8s.pod.cpu.usage"), timeout=180)
+    print(f"Smoke test passed: traces, logs and metrics from Lab {lab} are reaching SigNoz.")
 
 
 if __name__ == "__main__":

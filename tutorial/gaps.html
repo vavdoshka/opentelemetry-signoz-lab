@@ -66,7 +66,7 @@
 
 <h3 id="fix-2">Fixes</h3>
 <p>Option 1, applied on 2026-11-05: flush spans more often, so that parents and children share an insert.</p>
-<figure class="code"><figcaption><span>Fix for gap 2 in k8s/app.yaml, both services, applied <span class="badge api">Tested</span></span></figcaption><pre><code>             - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
+<figure class="code"><figcaption><span>Fix for gap 2 in labs/lab2-sdk/k8s/app.yaml, both services, applied <span class="badge api">Tested</span></span></figcaption><pre><code>             - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
 <span class="add">+            - { name: OTEL_BSP_SCHEDULE_DELAY, value: &quot;500&quot; }</span></code></pre></figure>
 <p>Measured over 5 minutes at 5 requests/s with 10% errors:</p>
 <table>
@@ -88,7 +88,7 @@
 <div data-query="t-neg-k8s">Loading saved query...</div>
 <div data-ch="c-k8s-coverage">Loading saved SQL...</div>
 <p>0 of 142,872 spans in the load run have a pod name. Point the app at the agent instead, which has <code>k8sattributes</code> on all three pipelines:</p>
-<figure class="code"><figcaption><span>Fix for gap 3 in k8s/app.yaml, all services, applied <span class="badge api">Tested</span></span></figcaption><pre><code><span class="del">-            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: &quot;http://signoz-otel-collector.signoz.svc.cluster.local:4318&quot; }</span><span class="add">+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: &quot;http://k8s-infra-otel-agent.signoz.svc.cluster.local:4318&quot; }</span></code></pre></figure>
+<figure class="code"><figcaption><span>Fix for gap 3 in labs/lab2-sdk/k8s/app.yaml, all services, applied <span class="badge api">Tested</span></span></figcaption><pre><code><span class="del">-            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: &quot;http://signoz-otel-collector.signoz.svc.cluster.local:4318&quot; }</span><span class="add">+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: &quot;http://k8s-infra-otel-agent.signoz.svc.cluster.local:4318&quot; }</span></code></pre></figure>
 
 <h2 id="logs">Gap 4: k8s-infra duplicates every app log</h2>
 <p>The app sends logs over OTLP, and k8s-infra also reads the same lines from stdout. Each copy has a different half of the information:</p>
@@ -114,7 +114,7 @@
 <figure class="shot"><img src="screenshots/logs-stdout-copies.png" alt="SigNoz Logs Explorer with service.name NOT EXISTS AND k8s.namespace.name = lab, showing a page of GET /healthz access lines" width="1440" height="900" loading="lazy"><figcaption>The stdout path with the app idle. <span class="badge ui">Seen in SigNoz UI</span> Only health probes remain. The warning triangle by the time range is about the ambiguous key below.</figcaption></figure>
 <div data-query="l-stdout-copies">Loading saved query...</div>
 <div data-query="l-otlp-k8s">Loading saved query...</div>
-<p><strong>Possible fix</strong> <span class="badge untested">Untested</span>: keep OTLP logs, route them through the agent (gap 3), and exclude the <code>lab</code> namespace from <code>filelog</code> collection. Alternatively, drop OTLP logs, print JSON to stdout, and parse it with a SigNoz log pipeline.</p>
+<p><strong>Possible fix</strong> <span class="badge untested">Untested</span>: keep OTLP logs, route them through the agent (gap 3), and exclude the <code>lab2</code> namespace from <code>filelog</code> collection. Alternatively, drop OTLP logs, print JSON to stdout, and parse it with a SigNoz log pipeline.</p>
 
 <h2 id="setup">Gap 5: nothing is set up for you</h2>
 <p>A fresh install has 0 dashboards, 0 alert rules, 0 notification channels, 0 log pipelines and 0 saved views <span class="badge api">API</span>. You should plan to:</p>
@@ -129,7 +129,7 @@
 <p>56% of spans in the load run are zero-length ASGI <code>http send</code> and <code>http receive</code> spans. They crowd traces and inflate error counts.</p>
 <div data-ch="c-noise">Loading saved SQL...</div>
 <p><code>exclude_spans</code> exists in the installed version, confirmed by reading its signature in the running pod, and accepts <code>send</code> and <code>receive</code>. Using it here is still untested:</p>
-<figure class="code"><figcaption><span>Possible fix for span noise in app/frontend.py and app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code><span class="del">-FastAPIInstrumentor.instrument_app(app)</span><span class="add">+FastAPIInstrumentor.instrument_app(app, exclude_spans=[&quot;send&quot;, &quot;receive&quot;])</span></code></pre></figure>
+<figure class="code"><figcaption><span>Possible fix for span noise in labs/lab2-sdk/app/frontend.py and labs/lab2-sdk/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code><span class="del">-FastAPIInstrumentor.instrument_app(app)</span><span class="add">+FastAPIInstrumentor.instrument_app(app, exclude_spans=[&quot;send&quot;, &quot;receive&quot;])</span></code></pre></figure>
 <p>Until then, filter them out in searches:</p>
 <div data-query="t-no-noise">Loading saved query...</div>
 <h3>Other things to know</h3>

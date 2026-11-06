@@ -63,7 +63,7 @@
 <div data-ch="c-sql-slowest">Loading saved SQL...</div>
 
 <h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
-<figure class="code"><figcaption><span><code>app/backend.py</code> lines 142–146</span></figcaption><pre><code><span class="ln">142</span>@app.get(&quot;/work/slow-query&quot;)
+<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/backend.py</code> lines 142–146</span></figcaption><pre><code><span class="ln">142</span>@app.get(&quot;/work/slow-query&quot;)
 <span class="ln">143</span>def slow_query(seconds: float = 2.0) -&gt; dict:
 <span class="ln">144</span>    with db() as conn:
 <span class="ln">145</span>        conn.execute(&quot;SELECT pg_sleep(%s)&quot;, (seconds,))
@@ -72,7 +72,7 @@
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>Fix the query itself first. Then add a safety net, so that one bad query cannot hold a request open:</p>
-<figure class="code"><figcaption><span>Proposed safety net for app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> def db() -&gt; psycopg.Connection:
+<figure class="code"><figcaption><span>Proposed safety net for labs/lab2-sdk/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> def db() -&gt; psycopg.Connection:
 <span class="del">-    return psycopg.connect(DSN, autocommit=True)</span><span class="add">+    return psycopg.connect(DSN, autocommit=True, options=&quot;-c statement_timeout=1000&quot;)</span></code></pre></figure>
 <p>With this in place the statement would fail after one second. You would see a failed <code>SELECT</code> span instead of a slow one, which you can find with the failed database calls search.</p>
 

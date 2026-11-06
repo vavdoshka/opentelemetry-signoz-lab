@@ -1,5 +1,8 @@
 # SigNoz evaluation: what a dev gets from plain OpenTelemetry + a simple install
 
+These findings were measured on the hand-instrumented app, now called Lab 2, in the namespace `lab`.
+The section "Hands-off versus SDK" covers Lab 1.
+
 Tested 2026-11-04 with SigNoz chart 0.149.0, k8s-infra chart 0.17.1, ClickHouse 25.12.5,
 k3s v1.26.4 on k3d, OTel Python SDK 1.45.2 (instrumentation 0.66b2), Python 3.13.
 
@@ -153,8 +156,8 @@ end of this section. Everything before them describes the default 5-second flush
 - **Worse than a plain copy:** of about 166,000 stdout records, roughly 46% are stack-trace
   fragments, because each line of a traceback becomes its own record. About 29% are app lines and
   24% are access-log lines (**Data**, classified by pattern, so approximate).
-- **Fix (Untested):** keep OTLP logs, which now go through the agent (gap 3), and exclude the `lab`
-  namespace from `filelog` collection. Alternatively drop OTLP logs, print JSON to stdout and parse
+- **Fix (Untested):** keep OTLP logs, which now go through the agent (gap 3), and exclude the lab
+  namespaces from `filelog` collection. Alternatively drop OTLP logs, print JSON to stdout and parse
   it with a SigNoz log pipeline.
 
 ### 5. Nothing is set up for you: dashboards, alerts, pipelines
@@ -199,6 +202,39 @@ A fresh install has 0 dashboards, 0 alert rules, 0 notification channels, 0 log 
 | Kubernetes attributes on app traces | No | Yes, once apps send through the agent (gap 3) |
 | Duplicate app logs | No | Yes (gap 4) |
 | Infra Monitoring UI | Not checked | Hosts tab works (**UI**). Kubernetes tab **not verified:** its data never finished loading |
+
+## Hands-off versus SDK
+
+Tested 2026-11-06 with `make compare`, which sends both labs the same requests. Lab 1's app has no
+OpenTelemetry code, and the OpenTelemetry Operator injects the Python agent at pod start.
+
+| What SigNoz received | Lab 1 (hands-off) | Lab 2 (SDK) |
+|---|---|---|
+| Traces crossing both services | Yes | Yes |
+| SQL text on spans | Yes | Yes |
+| Spans marked as errors | Yes | Yes |
+| Pod names on spans | Yes | Yes |
+| Logs linked to traces | Yes | Yes |
+| HTTP metrics | Yes | Yes |
+| Python runtime metrics | **Yes** | No |
+| Custom span (`price_order`) | No | **Yes** |
+| Business attribute on spans (`order.item`) | No | **Yes** |
+| Scenario name on spans (`lab.scenario`) | No | **Yes** |
+| Business metric (`orders.created`) | No | **Yes** |
+| Trace ID in the API response | No | **Yes** |
+
+- **Hands-off covers the plumbing.** It sees everything that passes through instrumented libraries,
+  including SQL text and exceptions, for one annotation.
+- **Only code knows your business.** Custom spans, business attributes and metrics need the SDK.
+- **More metrics by default.** The agent also sends process, runtime and system metrics. In one run,
+  Lab 1 sent 2,355 metric series from 2 pods, and Lab 2 sent 1,314 from 4. Check the cost at scale.
+- **The platform gaps remain.** Lab 1 has the same duplicate stdout logs, and the same Service Map
+  limit, so it uses the same flush setting.
+- **Python 3.13 worked,** although the Operator's agent image is built with a newer Python.
+
+**Recommendation:** start hands-off, then add SDK code only where you need business context.
+
+eBPF instrumentation (OBI) and Odigos were not tested.
 
 ## Two nodes and HA
 

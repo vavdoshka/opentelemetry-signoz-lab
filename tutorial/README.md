@@ -20,8 +20,9 @@ the HTML files directly, because the pages load their saved examples through it.
 | Page | Covers |
 |---|---|
 | `concepts.html` | Traces, metrics and logs, and how they connect here |
-| `instrumentation.html` | The real setup code, quoted with file and line numbers |
-| `incident-*.html` | Six walkthroughs: error, latency, cross-service, slow SQL, timeout, CPU |
+| `lab1.html` | Lab 1: telemetry with no code, using the OpenTelemetry Operator |
+| `instrumentation.html` | Lab 2: the real setup code, quoted with file and line numbers |
+| `incident-*.html` | Lab 2: six walkthroughs: error, latency, cross-service, slow SQL, timeout, CPU |
 | `queries.html` | Working searches for traces, logs and metrics, plus ClickHouse SQL |
 | `gaps.html` | What a plain install leaves out, and possible fixes |
 

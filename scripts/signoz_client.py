@@ -9,7 +9,10 @@ from pathlib import Path
 
 CREDENTIALS = Path(__file__).resolve().parent.parent / ".lab-credentials"
 SIGNOZ_URL = "http://signoz.localhost:8080"
-APP_URL = "http://app.localhost:8080"
+LABS = {
+    "1": {"url": "http://lab1.localhost:8080", "frontend": "lab1-frontend", "backend": "lab1-backend"},
+    "2": {"url": "http://lab2.localhost:8080", "frontend": "frontend", "backend": "backend"},
+}
 
 # Ignore any HTTP proxy settings: everything here is on this machine.
 _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -57,6 +60,52 @@ def login(credentials):
         },
     )
     return session["data"]["accessToken"] if status == 200 else None
+
+
+def query(token, signal, spec, request_type, minutes=10):
+    """Runs one SigNoz query and returns its first result, or None."""
+    end = int(time.time() * 1000)
+    body = {
+        "schemaVersion": "v1",
+        "start": end - minutes * 60_000,
+        "end": end,
+        "requestType": request_type,
+        "compositeQuery": {"queries": [{"type": "builder_query", "spec": {"name": "A", "signal": signal, **spec}}]},
+        "formatOptions": {"formatTableResultForUI": False, "fillGaps": False},
+        "variables": {},
+    }
+    status, result = request(f"{SIGNOZ_URL}/api/v5/query_range", body, token, timeout=30)
+    if status != 200 or not result:
+        return None
+    return result["data"]["data"]["results"][0]
+
+
+def count(token, signal, expression, minutes=10):
+    """Counts matching spans or logs."""
+    spec = {"aggregations": [{"expression": "count()"}], "filter": {"expression": expression}}
+    result = query(token, signal, spec, "scalar", minutes)
+    try:
+        return result["data"][0][-1]
+    except (KeyError, IndexError, TypeError):
+        return 0
+
+
+def metric_exists(token, name, expression="", minutes=10):
+    """True if the metric has data points, optionally filtered."""
+    spec = {
+        # "latest" works for gauges and counters. "rate" returns nothing for an idle counter.
+        "aggregations": [{"metricName": name, "timeAggregation": "latest", "spaceAggregation": "sum"}],
+        "stepInterval": 60,
+    }
+    if expression:
+        spec["filter"] = {"expression": expression}
+    result = query(token, "metrics", spec, "time_series", minutes)
+    return bool(result and any(item.get("series") for item in result.get("aggregations") or []))
+
+
+def fire(lab, scenario):
+    """Runs a scenario. Returns the response status and body."""
+    return request(f"{LABS[lab]['url']}/api/scenario/{scenario}", {}, timeout=30)
 
 
 def wait_for(description, check, timeout, interval=5):

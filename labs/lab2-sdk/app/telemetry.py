@@ -5,7 +5,7 @@ Nothing here is SigNoz-specific: the app speaks plain OTLP/HTTP and could send
 to any OTLP backend.
 
 Configuration comes from the standard OTel environment variables
-(set in k8s/app.yaml), not from code:
+(set in labs/lab2-sdk/k8s/app.yaml), not from code:
 
   OTEL_SERVICE_NAME             -> resource attribute service.name
   OTEL_RESOURCE_ATTRIBUTES      -> extra resource attributes (version, env)

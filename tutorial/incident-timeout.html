@@ -61,7 +61,7 @@
 
 <h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
 <p>The two sides disagree on how long the work should take:</p>
-<figure class="code"><figcaption><span><code>app/frontend.py</code> lines 97–103</span></figcaption><pre><code><span class="ln">97</span>async def s_timeout(_p: dict) -&gt; dict:
+<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/frontend.py</code> lines 97–103</span></figcaption><pre><code><span class="ln">97</span>async def s_timeout(_p: dict) -&gt; dict:
 <span class="ln">98</span>    try:
 <span class="ln">99</span>        r = await backend.get(&quot;/work/slow&quot;, params={&quot;ms&quot;: 3000}, timeout=1.0)
 <span class="ln">100</span>    except httpx.ReadTimeout as exc:
@@ -76,7 +76,7 @@
   <li><strong>Make the backend faster</strong>, so it fits the budget. Usually best.</li>
   <li><strong>Raise the timeout</strong>, if waiting 3 seconds is acceptable to users:</li>
 </ol>
-<figure class="code"><figcaption><span>Proposed change for app/frontend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> async def s_timeout(_p: dict) -&gt; dict:
+<figure class="code"><figcaption><span>Proposed change for labs/lab2-sdk/app/frontend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> async def s_timeout(_p: dict) -&gt; dict:
      try:
 <span class="del">-        r = await backend.get(&quot;/work/slow&quot;, params={&quot;ms&quot;: 3000}, timeout=1.0)</span><span class="add">+        r = await backend.get(&quot;/work/slow&quot;, params={&quot;ms&quot;: 3000}, timeout=4.0)</span>     except httpx.ReadTimeout as exc:
 <span class="del">-        log.error(&quot;backend timed out after 1s&quot;)</span><span class="add">+        log.error(&quot;backend timed out after 4s&quot;)</span>         raise HTTPException(status_code=504, detail=&quot;backend timeout&quot;) from exc

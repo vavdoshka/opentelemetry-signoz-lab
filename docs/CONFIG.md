@@ -17,16 +17,35 @@ Every change from a default, with the reason. If it isn't listed here, it's at i
 | What | Where | Why |
 |---|---|---|
 | `otelCollector.replicaCount: 2` | `signoz/signoz-values.yaml` | HA, and **the only chart override.** Ingestion survives losing a node, but Service Map accuracy falls. See `FINDINGS.md` |
-| Ingress for `signoz.localhost` | `k8s/signoz-ingress.yaml` | UI access, kept outside the Helm release |
+| Ingress for `signoz.localhost` | `signoz/ingress.yaml` | UI access, kept outside the Helm release |
 | First admin account | `scripts/bootstrap_signoz.py` | **Required.** The collector opens no OTLP ports until an organization exists |
 
 The admin uses the placeholder `admin@lab.local` and a generated password, stored in
 `.lab-credentials` (mode 600).
 
-## Application
+## Lab 1: hands-off
 
-OpenTelemetry setup is in `app/telemetry.py`. Instrumentation is added in `app/frontend.py` and
-`app/backend.py`. Runtime settings are standard env vars in `k8s/app.yaml`:
+The app has no OpenTelemetry code or settings. All of its configuration is in
+`labs/lab1-hands-off/k8s/instrumentation.yaml`:
+
+| What | Why |
+|---|---|
+| `inject-python: "true"` on the `lab1` namespace | Opts in every pod in the namespace |
+| `inject-python: "false"` on Postgres | Opts it out, because it isn't a Python app |
+| `exporter.endpoint` set to the SigNoz agent | Sends to the agent on the same node |
+| `sampler: parentbased_always_on` | Keeps every trace, and states the default explicitly |
+| `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true` | Python logs are off by default in the Operator |
+| `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS=healthz` | No spans for Kubernetes probes |
+| `OTEL_BSP_SCHEDULE_DELAY=500` | The gap 2 fix, the same as Lab 2 |
+
+The Operator comes from its official Helm chart. `cluster/otel-operator-values.yaml` makes the chart
+generate its own webhook certificate, so the lab doesn't need cert-manager.
+
+## Lab 2: SDK
+
+OpenTelemetry setup is in `labs/lab2-sdk/app/telemetry.py`. Instrumentation is added in
+`frontend.py` and `backend.py` next to it. Runtime settings are standard env vars in
+`labs/lab2-sdk/k8s/app.yaml`:
 
 | Variable | Value | Why |
 |---|---|---|
@@ -42,7 +61,7 @@ responsive.
 
 ### High availability
 
-All in `k8s/app.yaml`:
+All in `labs/lab2-sdk/k8s/app.yaml`. Lab 1 runs one replica of each service:
 
 | What | Why |
 |---|---|

@@ -5,8 +5,16 @@
 What do you get from plain OpenTelemetry and a simple SigNoz install on Kubernetes, and what's
 missing? This lab lets you find out hands-on.
 
-`make up` starts a local two-node cluster with SigNoz and a small instrumented app that can fail on
-demand. An interactive tutorial then walks you through finding and fixing each failure.
+It has two labs, in order:
+
+| | Lab 1: hands-off | Lab 2: SDK |
+|---|---|---|
+| **The app** | Contains no OpenTelemetry code | Set up by hand with the OpenTelemetry SDK |
+| **Telemetry comes from** | The OpenTelemetry Operator, at pod start | Code you write, plus instrumentation libraries |
+| **You learn** | How much you get for free | What code adds, and how to investigate incidents |
+
+Both run side by side on a local two-node cluster and send to the same SigNoz. Both can fail on
+demand, and an interactive tutorial walks you through it.
 
 ## Prerequisites
 
@@ -41,20 +49,29 @@ that proves traces, logs and metrics are reaching SigNoz.
 
 | What | Where |
 |---|---|
-| Test app | http://app.localhost:8080 |
+| Lab 1 | http://lab1.localhost:8080 |
 | SigNoz | http://signoz.localhost:8080 (the generated login is in `.lab-credentials`) |
 | Tutorial | Run `make tutorial`, then open http://127.0.0.1:8765 |
 
-Start the load generator in the test app, so SigNoz has data to show.
+Start the load generator in the lab's page, so SigNoz has data to show.
+
+When you're ready for Lab 2:
+
+```bash
+make lab2      # adds it at http://lab2.localhost:8080
+make compare   # sends both labs the same requests and shows what each captured
+```
 
 ## Commands
 
 | Command | What it does |
 |---|---|
 | `make check` | Checks the prerequisites |
-| `make up` | Creates the cluster and deploys everything. Safe to rerun, and recovers the lab after a restart |
+| `make up` | Creates the cluster and deploys SigNoz and Lab 1. Safe to rerun, and recovers the lab after a restart |
+| `make lab2` | Deploys Lab 2, or redeploys it after you change its code |
+| `make lab1` | Redeploys Lab 1 after you change its code |
+| `make compare` | Shows what SigNoz captures from each lab |
 | `make status` | Shows nodes, pods and URLs |
-| `make app` | Rebuilds and redeploys the test app after you change its code |
 | `make tutorial` | Runs the interactive tutorial |
 | `make down` | Deletes the cluster and all its data |
 
@@ -63,9 +80,9 @@ cluster themselves.
 
 ## The test app
 
-`frontend → backend → Postgres`: two Python FastAPI services with two replicas each, one per node.
-They use only standard OpenTelemetry libraries, and send traces, metrics and logs through the
-SigNoz agent on their node. The UI has a button for each scenario:
+Both labs run the same app: `frontend → backend → Postgres`, two Python FastAPI services that send
+telemetry through the SigNoz agent on their node. Lab 2 runs two replicas of each, one per node. The
+UI has a button for each scenario:
 
 | Scenario | What it does |
 |---|---|
@@ -82,8 +99,8 @@ SigNoz agent on their node. The UI has a button for each scenario:
 
 ## What we found
 
-- **[Findings](docs/FINDINGS.md):** what works with no configuration, what doesn't, and a node crash
-  test.
+- **[Findings](docs/FINDINGS.md):** what works with no configuration, what doesn't, hands-off
+  versus SDK, and a node crash test.
 - **[Benchmark](docs/BENCHMARK.md):** the lab scored against OpenTelemetry and SigNoz guidance.
 - **[Configuration log](docs/CONFIG.md):** every non-default setting, and why.
 
@@ -91,7 +108,7 @@ SigNoz agent on their node. The UI has a button for each scenario:
 
 | Platform | Provider | Result |
 |---|---|---|
-| macOS, Apple Silicon | k3d 5.5.0 | Clean boot passes |
+| macOS, Apple Silicon | k3d 5.5.0 | Both labs boot from nothing |
 
 Linux results come from the e2e workflow above.
 

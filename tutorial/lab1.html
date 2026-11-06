@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telemetry with no code | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="lab1">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 1: hands-off</p>
+<h1>Telemetry with no code</h1>
+<p class="lead">Lab 1's app has no OpenTelemetry in it: no packages, no imports, no settings. One Kubernetes resource and one annotation still give you traces, logs and metrics in SigNoz.</p>
+
+<h2>Start it</h2>
+<p><code>make up</code> already deployed this lab. Open <a href="http://lab1.localhost:8080" target="_blank" rel="noopener">Lab 1</a> and start the load generator, so SigNoz has data to show. Stop it when you finish.</p>
+
+<h2>The whole configuration</h2>
+<p>This is every piece of OpenTelemetry configuration in Lab 1. The app's code and its Kubernetes manifest don't mention OpenTelemetry at all.</p>
+<figure class="code"><figcaption><span><code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> lines 1–38</span></figcaption><pre><code><span class="ln">1</span># This file is all the OpenTelemetry configuration Lab 1 has.
+<span class="ln">2</span>#
+<span class="ln">3</span># The annotation on the Namespace opts in every pod created here. The
+<span class="ln">4</span># Instrumentation resource tells the Operator how to instrument them. It must
+<span class="ln">5</span># exist before the pods start, because injection happens at pod creation.
+<span class="ln">6</span>apiVersion: v1
+<span class="ln">7</span>kind: Namespace
+<span class="ln">8</span>metadata:
+<span class="ln">9</span>  name: lab1
+<span class="ln">10</span>  annotations:
+<span class="ln">11</span>    instrumentation.opentelemetry.io/inject-python: &quot;true&quot;
+<span class="ln">12</span>---
+<span class="ln">13</span>apiVersion: opentelemetry.io/v1alpha1
+<span class="ln">14</span>kind: Instrumentation
+<span class="ln">15</span>metadata:
+<span class="ln">16</span>  name: zero-code
+<span class="ln">17</span>  namespace: lab1
+<span class="ln">18</span>spec:
+<span class="ln">19</span>  exporter:
+<span class="ln">20</span>    # The SigNoz agent on the same node.
+<span class="ln">21</span>    endpoint: http://k8s-infra-otel-agent.signoz.svc.cluster.local:4318
+<span class="ln">22</span>  sampler:
+<span class="ln">23</span>    # Keep every trace, the same as the SDK default.
+<span class="ln">24</span>    type: parentbased_always_on
+<span class="ln">25</span>  propagators:
+<span class="ln">26</span>    - tracecontext
+<span class="ln">27</span>    - baggage
+<span class="ln">28</span>  resource:
+<span class="ln">29</span>    resourceAttributes:
+<span class="ln">30</span>      deployment.environment: lab1
+<span class="ln">31</span>  python:
+<span class="ln">32</span>    env:
+<span class="ln">33</span>      # Python logs are off by default in the Operator.
+<span class="ln">34</span>      - { name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: &quot;true&quot; }
+<span class="ln">35</span>      # Don&#x27;t create spans for kubelet probe calls.
+<span class="ln">36</span>      - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
+<span class="ln">37</span>      # Service Map fix. See gap 2 in docs/FINDINGS.md.
+<span class="ln">38</span>      - { name: OTEL_BSP_SCHEDULE_DELAY, value: &quot;500&quot; }</code></pre></figure>
+
+<h2>What happens when a pod starts</h2>
+<ol>
+  <li>Kubernetes asks the Operator's admission webhook about each new pod.</li>
+  <li>The Operator sees the annotation on the namespace, and adds an init container that copies the Python agent into the pod.</li>
+  <li>It sets <code>PYTHONPATH</code> and the <code>OTEL_*</code> variables, and names the service after its Deployment, such as <code>lab1-backend</code>.</li>
+  <li>Python loads the agent before your app, and the agent patches FastAPI, httpx, psycopg and logging.</li>
+</ol>
+<p>Datadog's Single Step Instrumentation works the same way: a webhook and an init container. Injection happens at pod creation, so the <code>Instrumentation</code> has to exist first. Postgres opts out with <code>inject-python: "false"</code>, because the namespace annotation applies to every pod.</p>
+<p>See it for yourself:</p>
+<figure class="code"><figcaption><span>Look at what the Operator added</span></figcaption><pre><code>kubectl -n lab1 describe pod -l app=backend</code></pre></figure>
+
+<h2>Try it in SigNoz</h2>
+<p>Click <code>order</code>, <code>db_error</code> and <code>crash</code> in Lab 1, then search. Each of these ran successfully through the query API <span class="badge api">Query API only</span>.</p>
+<table>
+  <thead><tr><th>What to look for</th><th>Where</th><th>Search</th></tr></thead>
+  <tbody>
+    <tr><td>SQL statements, with no database code changed</td><td>Traces</td><td><code>service.name = 'lab1-backend' AND db.statement EXISTS</code></td></tr>
+    <tr><td>Failed requests</td><td>Traces</td><td><code>service.name = 'lab1-frontend' AND has_error = true</code></td></tr>
+    <tr><td>Error logs, each linked to its trace</td><td>Logs</td><td><code>service.name = 'lab1-backend' AND severity_text = 'ERROR'</code></td></tr>
+  </tbody>
+</table>
+<p>Open any of those traces. It runs from <code>lab1-frontend</code> through <code>lab1-backend</code> to the SQL statement, with the pod name on every span.</p>
+
+<h2>What you get, and what you don't</h2>
+<p>Run <code>make lab2</code>, then <code>make compare</code>. It sends both labs the same requests and asks SigNoz what arrived. This is a real run from 2026-11-06:</p>
+<table>
+  <thead><tr><th>What SigNoz received</th><th>Lab 1 (hands-off)</th><th>Lab 2 (SDK)</th></tr></thead>
+  <tbody>
+    <tr><td>Traces crossing both services</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td>SQL text on spans</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td>Spans marked as errors</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td>Pod names on spans</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td>Logs linked to traces</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td>HTTP metrics</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td>Python runtime metrics</td><td><strong>Yes</strong></td><td>No</td></tr>
+    <tr><td>Custom span (<code>price_order</code>)</td><td>No</td><td><strong>Yes</strong></td></tr>
+    <tr><td>Business attribute on spans (<code>order.item</code>)</td><td>No</td><td><strong>Yes</strong></td></tr>
+    <tr><td>Scenario name on spans (<code>lab.scenario</code>)</td><td>No</td><td><strong>Yes</strong></td></tr>
+    <tr><td>Business metric (<code>orders.created</code>)</td><td>No</td><td><strong>Yes</strong></td></tr>
+    <tr><td>Trace ID in the API response</td><td>No</td><td><strong>Yes</strong></td></tr>
+  </tbody>
+</table>
+<p>The pattern is simple. Hands-off sees everything that passes through your libraries. It can't see what your code means.</p>
+
+<h2>What hands-off costs</h2>
+<ul>
+  <li><strong>No business context.</strong> You can see a slow <code>POST /orders</code>, but not which item or how much money.</li>
+  <li><strong>No trace IDs in your app.</strong> It can't show one to a user, or put one in a support ticket, because the app doesn't know it is being traced.</li>
+  <li><strong>More metrics than you asked for.</strong> The agent also sends process and system metrics. In one run, Lab 1 sent 2,355 metric series from 2 pods, and Lab 2 sent 1,314 from 4.</li>
+  <li><strong>The platform gaps remain.</strong> Stdout logs are still duplicated, and Service Map counts stay unreliable. See <a href="gaps.html">What is missing</a>.</li>
+</ul>
+
+<h2>When to use it</h2>
+<p>Start here. It costs one annotation and gives you most of what you need to debug. Then add SDK code only where you need business context, which is what Lab 2 does.</p>
+
+<div class="quiz" data-quiz="l1a"><p class="q">Check yourself: You add the annotation to a namespace, but running pods send nothing. Why?</p><button type="button" data-right="true" data-why="The agent is added when a pod is created, so existing pods must be restarted.">Injection happens at pod creation, so they need a restart.</button><button type="button" data-right="false" data-why="The namespace annotation covers every pod in it, unless a pod opts out.">The annotation only works on individual pods.</button><button type="button" data-right="false" data-why="Lab 1's app has no SDK at all, and works.">The app needs the OpenTelemetry SDK installed first.</button></div>
+<div class="quiz" data-quiz="l1b"><p class="q">Check yourself: A manager asks which product sells most, from telemetry. Which lab can answer?</p><button type="button" data-right="false" data-why="Lab 1 sees requests and SQL, but it has no idea what an item is.">Lab 1, because it captures every request.</button><button type="button" data-right="true" data-why="Only code can add a business attribute like order.item or a metric like orders.created.">Lab 2, because its code adds business data.</button><button type="button" data-right="false" data-why="Lab 2 has order.item and orders.created.">Neither, because telemetry can't show that.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

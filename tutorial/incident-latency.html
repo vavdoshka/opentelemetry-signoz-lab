@@ -60,7 +60,7 @@
 <div class="finding"><p><strong>The rule:</strong> follow the time downward until a span is long but its children are not. That span's own code is where the time went. Here, no children means the time is inside the handler, or in something not instrumented.</p></div>
 
 <h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
-<figure class="code"><figcaption><span><code>app/backend.py</code> lines 128–133</span></figcaption><pre><code><span class="ln">128</span>@app.get(&quot;/work/slow&quot;)
+<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/backend.py</code> lines 128–133</span></figcaption><pre><code><span class="ln">128</span>@app.get(&quot;/work/slow&quot;)
 <span class="ln">129</span>def slow(ms: int = 0) -&gt; dict:
 <span class="ln">130</span>    delay = ms / 1000 if ms else random.uniform(1.0, 3.0)
 <span class="ln">131</span>    log.info(&quot;slow work for %.2fs&quot;, delay)
@@ -70,7 +70,7 @@
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>The real fix depends on what the code is doing. In this lab it is a deliberate sleep, so removing it is the fix. The reusable step is to make the blind spot visible with a child span, so the next person can see where the time goes:</p>
-<figure class="code"><figcaption><span>Proposed change for app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> def slow(ms: int = 0) -&gt; dict:
+<figure class="code"><figcaption><span>Proposed change for labs/lab2-sdk/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> def slow(ms: int = 0) -&gt; dict:
      delay = ms / 1000 if ms else random.uniform(1.0, 3.0)
      log.info(&quot;slow work for %.2fs&quot;, delay)
 <span class="del">-    time.sleep(delay)</span><span class="add">+    with tracer.start_as_current_span(&quot;slow_work&quot;) as span:</span><span class="add">+        span.set_attribute(&quot;work.delay_s&quot;, delay)</span><span class="add">+        time.sleep(delay)</span>     return {&quot;slept_s&quot;: round(delay, 3)}

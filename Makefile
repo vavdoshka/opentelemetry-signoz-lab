@@ -2,22 +2,28 @@
 # The other commands find the running cluster themselves.
 
 .DEFAULT_GOAL := help
-.PHONY: help check up status app tutorial down
+.PHONY: help check up lab1 lab2 compare status tutorial down
 
 help: ## Show the available commands
-	@awk 'BEGIN {FS = ":.*## "} /^[a-z]+:.*## / {printf "  make %-10s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "} /^[a-z0-9]+:.*## / {printf "  make %-10s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 check: ## Check the prerequisites
 	@scripts/check-prereqs.sh
 
-up: ## Create the cluster and deploy everything (safe to rerun)
+up: ## Create the cluster and deploy SigNoz and Lab 1 (safe to rerun)
 	@scripts/up.sh
+
+lab1: ## Rebuild and redeploy Lab 1
+	@scripts/deploy-lab.sh 1
+
+lab2: ## Deploy Lab 2, or redeploy it after a code change
+	@scripts/deploy-lab.sh 2
+
+compare: ## Show what SigNoz captures from each lab
+	@python3 scripts/compare_labs.py
 
 status: ## Show nodes, pods and URLs
 	@scripts/status.sh
-
-app: ## Rebuild and redeploy the test app after a code change
-	@scripts/deploy-app.sh
 
 tutorial: ## Run the interactive tutorial
 	@python3 tutorial/server.py

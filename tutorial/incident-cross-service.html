@@ -55,12 +55,12 @@
 <div class="finding"><p><strong>The rule:</strong> errors bubble up through a trace. Walk down to the deepest failing span, and that is where to start. The exception event confirms it.</p></div>
 
 <h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
-<figure class="code"><figcaption><span><code>app/backend.py</code> lines 136–139</span></figcaption><pre><code><span class="ln">136</span>@app.get(&quot;/work/fail&quot;)
+<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/backend.py</code> lines 136–139</span></figcaption><pre><code><span class="ln">136</span>@app.get(&quot;/work/fail&quot;)
 <span class="ln">137</span>def fail() -&gt; dict:
 <span class="ln">138</span>    # Unhandled exception -&gt; 500. FastAPI instrumentation records it on the span.
 <span class="ln">139</span>    raise RuntimeError(&quot;backend exploded on purpose&quot;)</code></pre></figure>
 <p>The stack trace on the span points straight here: <code>/app/backend.py</code>, line 136, in <code>fail</code>. The frontend's job was to translate that into a 502:</p>
-<figure class="code"><figcaption><span><code>app/frontend.py</code> lines 87–94</span></figcaption><pre><code><span class="ln">87</span>async def s_backend_500(_p: dict) -&gt; dict:
+<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/frontend.py</code> lines 87–94</span></figcaption><pre><code><span class="ln">87</span>async def s_backend_500(_p: dict) -&gt; dict:
 <span class="ln">88</span>    r = await backend.get(&quot;/work/fail&quot;)
 <span class="ln">89</span>    try:
 <span class="ln">90</span>        r.raise_for_status()
@@ -71,7 +71,7 @@
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>In this lab the exception is deliberate, so the fix is simply to remove it.</p>
-<figure class="code"><figcaption><span>Proposed fix for app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> @app.get(&quot;/work/fail&quot;)
+<figure class="code"><figcaption><span>Proposed fix for labs/lab2-sdk/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> @app.get(&quot;/work/fail&quot;)
  def fail() -&gt; dict:
 <span class="del">-    # Unhandled exception -&gt; 500. FastAPI instrumentation records it on the span.</span><span class="del">-    raise RuntimeError(&quot;backend exploded on purpose&quot;)</span><span class="add">+    return {&quot;ok&quot;: True}</span></code></pre></figure>
 <p>What carries over: the fix belongs in the backend, even though the alert would fire on the frontend's 502s. A trace stops you from debugging the wrong service.</p>

@@ -14,7 +14,7 @@
 <main id="main">
 <p class="eyebrow">Hands-on tutorial</p>
 <h1>Learn telemetry by breaking a real app</h1>
-<p class="lead">This tutorial teaches you how to add telemetry to an app with OpenTelemetry, and how to use SigNoz to find out what went wrong. You work on this repo's running lab: a small Python app that fails on demand.</p>
+<p class="lead">This tutorial teaches you what OpenTelemetry can do for an app with no code at all, what it takes to go further, and how to use SigNoz to find out what went wrong. You work on a small Python app that fails on demand.</p>
 
 <div class="flow" aria-label="The lab app">
   <span class="box">Your browser</span><span class="arrow">→</span>
@@ -23,9 +23,22 @@
   <span class="box">Postgres</span>
 </div>
 
+<h2>Two labs, in order</h2>
+<table>
+  <thead><tr><th></th><th>Lab 1: hands-off</th><th>Lab 2: SDK</th></tr></thead>
+  <tbody>
+    <tr><td><strong>The app</strong></td><td>Contains no OpenTelemetry code</td><td>Set up by hand with the OpenTelemetry SDK</td></tr>
+    <tr><td><strong>Telemetry comes from</strong></td><td>The OpenTelemetry Operator, at pod start</td><td>Code you write, plus instrumentation libraries</td></tr>
+    <tr><td><strong>You learn</strong></td><td>How much you get for free</td><td>What code adds, and how to investigate real incidents</td></tr>
+    <tr><td><strong>Start it with</strong></td><td><code>make up</code></td><td><code>make lab2</code></td></tr>
+  </tbody>
+</table>
+<p>Both labs run side by side and send to the same SigNoz, so you can compare them. <code>make compare</code> sends both the same requests and shows what each one captured.</p>
+
 <h2>What you will be able to do</h2>
 <ul>
   <li>Explain traces, metrics and logs, and how they connect.</li>
+  <li>Get traces, logs and metrics from an app without touching its code.</li>
   <li>Read real instrumentation code, and add your own spans, metrics and logs.</li>
   <li>Work through six incidents, from symptom to root cause to fix.</li>
   <li>Write SigNoz searches for traces, logs and metrics.</li>
@@ -34,6 +47,7 @@
 
 <h2>Before you start</h2>
 <ol>
+  <li>Run <code>make up</code>, then <code>make lab2</code>. The live buttons in this tutorial use Lab 2.</li>
   <li>Log in to <a href="http://signoz.localhost:8080" target="_blank" rel="noopener">SigNoz</a> in another tab. The login is in <code>.lab-credentials</code>. Links in this tutorial land on the login page if you skip this.</li>
   <li>Start some background traffic, so that charts have data. Stop it when you finish.</li>
 </ol>
@@ -57,8 +71,8 @@
 
 <h2>About the saved examples</h2>
 <ul>
-  <li>Saved trace IDs, numbers and screenshots come from runs on 2026-11-04, mostly during a load run from 23:10 to 00:00 UTC at 5 requests/s with 10% errors. Your live numbers will differ.</li>
-  <li>Screenshots show UTC+1, so 23:10 UTC appears as 00:10. Saved trace IDs exist only in that original lab, so their SigNoz links will not open in yours. Use the live buttons to create your own.</li>
+  <li>Saved trace IDs, numbers and screenshots come from Lab 2 runs on 2026-11-04, mostly during a load run from 23:10 to 00:00 UTC at 5 requests/s with 10% errors. Your live numbers will differ.</li>
+  <li>Screenshots show UTC+1, so 23:10 UTC appears as 00:10. Saved trace IDs exist only in that original lab, so their SigNoz links will not open in yours. Use the live buttons to create your own. Lab 2's namespace was called <code>lab</code> then, so older screenshots and saved results show that name.</li>
   <li>SigNoz keeps traces and logs for 15 days, so saved trace links stop working after about 2026-11-19. The pages still show the saved copy.</li>
   <li>The scenarios fail on purpose, so each root cause is a known line of code. The method is what carries over to real incidents.</li>
 </ul>
