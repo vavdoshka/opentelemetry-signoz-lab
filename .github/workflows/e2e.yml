@@ -24,7 +24,7 @@ jobs:
     env:
       PROVIDER: ${{ matrix.provider }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install k3d
         if: matrix.provider == 'k3d'

@@ -5,7 +5,8 @@ ingressClass:
   isDefaultClass: true
   name: traefik
 service:
-  type: ClusterIP
+  spec:
+    type: ClusterIP
 ports:
   web:
     hostPort: 80

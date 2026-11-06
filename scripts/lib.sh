@@ -7,7 +7,7 @@ CLUSTER_NAME="signoz-lab"
 IMAGE="telemetry-lab:dev"
 SIGNOZ_CHART_VERSION="0.149.0"
 K8S_INFRA_CHART_VERSION="0.17.1"
-TRAEFIK_CHART_VERSION="42.3.1"
+TRAEFIK_CHART_VERSION="41.7.1"
 SIGNOZ_URL="http://signoz.localhost:8080"
 APP_URL="http://app.localhost:8080"
 
