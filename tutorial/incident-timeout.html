@@ -12,19 +12,19 @@
 <a class="skip" href="#main">Skip to content</a>
 <nav id="sidebar" aria-label="Tutorial pages"></nav>
 <main id="main">
-<p class="eyebrow">Incident 5 of 6</p>
+<p class="eyebrow">Lab 1: incident 5 of 6</p>
 <h1>A timeout</h1>
 <p class="lead">The frontend gives up after one second, and the user gets a 504. But the backend carries on working for two more seconds. This wasted work is very hard to see in logs, and obvious in a trace.</p>
 <ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#search">4. Search</a></li><li><a href="#evidence">5. Evidence</a></li><li><a href="#cause">6. Root cause</a></li><li><a href="#fix">7. Resolution</a></li></ul>
 
 <h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
 <p>The <code>timeout</code> scenario calls the backend with a 1-second limit, on a route that takes 3 seconds.</p>
-<div data-fire="timeout"></div>
+<div data-fire="timeout" data-lab="lab1"></div>
 
 <h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
-<p>The user gets a 504 after about a second. A saved run took 1,029 ms. The frontend logged one line:</p>
+<p>The user gets a 504 after about a second. A saved run took 1,012 ms. The frontend logged one line:</p>
 <figure class="code"><figcaption><span>Real log from the frontend</span></figcaption><pre><code>backend timed out after 1s</code></pre></figure>
-<p>The backend's own charts look fine, because from its point of view it succeeded.</p>
+<p>The backend's own span looks fine, because from its point of view it succeeded.</p>
 
 <h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
 <ol>
@@ -34,22 +34,22 @@
 </ol>
 
 <h2 class="step" id="search"><span class="n">4</span>Search</h2>
-<p>Use the scenario attribute, or look for outgoing calls that failed. The second search works in any app, because it needs no custom attribute:</p>
-<div data-query="t-scenario">Loading saved query...</div>
-<figure class="shot"><img src="screenshots/search-scenario.png" alt="SigNoz Traces Explorer with the search lab.scenario = timeout, listing frontend spans of about 1010 ms with status 504" width="1440" height="900" loading="lazy"><figcaption>The scenario search. <span class="badge ui">Seen in SigNoz UI</span> Every request gives up just after 1 second.</figcaption></figure>
+<p>Use the URL path, or look for outgoing calls that failed and took about as long as the timeout. The second search works in any app, because it doesn't depend on knowing the route:</p>
+<div data-query="t-target">Loading saved query...</div>
+<figure class="shot"><img src="screenshots/lab1-search-timeout.png" alt="SigNoz Traces Explorer searching http.target for the timeout scenario, listing lab1-frontend spans of about 1005 ms with status 504" width="1440" height="900" loading="lazy"><figcaption>The search by URL path. <span class="badge ui">Seen in SigNoz UI</span> Every request gives up just after 1 second.</figcaption></figure>
 <div data-query="t-client-fail">Loading saved query...</div>
-<figure class="shot"><img src="screenshots/search-client-fail.png" alt="SigNoz Traces Explorer with a search for failed client spans in the frontend" width="1440" height="900" loading="lazy"><figcaption>Failed outgoing calls. <span class="badge ui">Seen in SigNoz UI</span> Timeouts appear here alongside calls that got a 500, so check the duration and status columns.</figcaption></figure>
+<figure class="shot"><img src="screenshots/lab1-search-client-fail.png" alt="SigNoz Traces Explorer listing failed client spans in lab1-frontend of about 1004 ms" width="1440" height="900" loading="lazy"><figcaption>Failed outgoing calls that lasted about a second. <span class="badge ui">Seen in SigNoz UI</span> The duration filter leaves out calls that failed quickly with a 500.</figcaption></figure>
 <div data-query="l-timeout">Loading saved query...</div>
 
 <h2 class="step" id="evidence"><span class="n">5</span>Evidence</h2>
-<div data-evidence="timeout">Loading saved run...</div>
-<figure class="shot"><img src="screenshots/timeout-trace.png" alt="SigNoz trace page where the red frontend spans end at about 1 second while the backend span continues to 3 seconds" width="1440" height="900" loading="lazy"><figcaption>The key picture. <span class="badge ui">Seen in SigNoz UI</span> The frontend's spans end at 1.02 s. The backend span runs on to 3.00 s, well past the end of its parent.</figcaption></figure>
+<div data-evidence="lab1/timeout">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/lab1-timeout-trace.png" alt="SigNoz trace page where the red frontend spans end at about 1 second while the backend span continues to 3 seconds" width="1440" height="900" loading="lazy"><figcaption>The key picture. <span class="badge ui">Seen in SigNoz UI</span> The frontend spans end at 1.01 s. <code>GET /work/slow</code> runs on to 3.00 s, well past the end of its parent.</figcaption></figure>
 <table>
   <thead><tr><th>Span</th><th>Duration</th><th>Status</th><th>What it shows</th></tr></thead>
   <tbody>
-    <tr><td>frontend Server</td><td>1,024.4 ms</td><td>Error, 504</td><td>The user's experience</td></tr>
-    <tr><td>frontend Client <code>GET</code></td><td>1,020.7 ms</td><td>Error, <code>httpx.ReadTimeout</code></td><td>Where the frontend gave up</td></tr>
-    <tr><td>backend Server <code>GET /work/slow</code></td><td>3,001.6 ms</td><td>Unset, 200</td><td>Kept working, then "succeeded"</td></tr>
+    <tr><td><code>lab1-frontend</code> Server</td><td>1,006.7 ms</td><td>Error, 504</td><td>The user's experience</td></tr>
+    <tr><td><code>lab1-frontend</code> Client <code>GET</code></td><td>1,005.5 ms</td><td>Error, <code>httpx.ReadTimeout</code></td><td>Where the frontend gave up</td></tr>
+    <tr><td><code>lab1-backend</code> Server <code>GET /work/slow</code></td><td>3,001.8 ms</td><td>Unset, 200</td><td>Kept working, then "succeeded"</td></tr>
   </tbody>
 </table>
 <ul>
@@ -61,13 +61,13 @@
 
 <h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
 <p>The two sides disagree on how long the work should take:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/frontend.py</code> lines 97–103</span></figcaption><pre><code><span class="ln">97</span>async def s_timeout(_p: dict) -&gt; dict:
-<span class="ln">98</span>    try:
-<span class="ln">99</span>        r = await backend.get(&quot;/work/slow&quot;, params={&quot;ms&quot;: 3000}, timeout=1.0)
-<span class="ln">100</span>    except httpx.ReadTimeout as exc:
-<span class="ln">101</span>        log.error(&quot;backend timed out after 1s&quot;)
-<span class="ln">102</span>        raise HTTPException(status_code=504, detail=&quot;backend timeout&quot;) from exc
-<span class="ln">103</span>    return r.json()</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab1-hands-off/app/frontend.py</code> lines 77–83</span></figcaption><pre><code><span class="ln">77</span>async def s_timeout(_p: dict) -&gt; dict:
+<span class="ln">78</span>    try:
+<span class="ln">79</span>        r = await backend.get(&quot;/work/slow&quot;, params={&quot;ms&quot;: 3000}, timeout=1.0)
+<span class="ln">80</span>    except httpx.ReadTimeout as exc:
+<span class="ln">81</span>        log.error(&quot;backend timed out after 1s&quot;)
+<span class="ln">82</span>        raise HTTPException(status_code=504, detail=&quot;backend timeout&quot;) from exc
+<span class="ln">83</span>    return r.json()</code></pre></figure>
 <p>The frontend allows 1 second, and the backend takes 3. The backend has no idea the caller has gone: the handler is a plain sleep, and nothing cancels it.</p>
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
@@ -76,7 +76,7 @@
   <li><strong>Make the backend faster</strong>, so it fits the budget. Usually best.</li>
   <li><strong>Raise the timeout</strong>, if waiting 3 seconds is acceptable to users:</li>
 </ol>
-<figure class="code"><figcaption><span>Proposed change for labs/lab2-sdk/app/frontend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> async def s_timeout(_p: dict) -&gt; dict:
+<figure class="code"><figcaption><span>Proposed change for labs/lab1-hands-off/app/frontend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> async def s_timeout(_p: dict) -&gt; dict:
      try:
 <span class="del">-        r = await backend.get(&quot;/work/slow&quot;, params={&quot;ms&quot;: 3000}, timeout=1.0)</span><span class="add">+        r = await backend.get(&quot;/work/slow&quot;, params={&quot;ms&quot;: 3000}, timeout=4.0)</span>     except httpx.ReadTimeout as exc:
 <span class="del">-        log.error(&quot;backend timed out after 1s&quot;)</span><span class="add">+        log.error(&quot;backend timed out after 4s&quot;)</span>         raise HTTPException(status_code=504, detail=&quot;backend timeout&quot;) from exc

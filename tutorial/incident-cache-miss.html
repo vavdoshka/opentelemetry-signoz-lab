@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incident: slow for no visible reason | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="cachemiss">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 2: incident 3 of 4</p>
+<h1>Slow for no visible reason</h1>
+<p class="lead">The same request is sometimes instant and sometimes takes 800 ms, with nothing to tell the two apart. This dimension isn't about the business. It's technical, and it's something only your code can know: whether the cache had the answer.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#search">4. Search</a></li><li><a href="#evidence">5. Evidence</a></li><li><a href="#cause">6. Root cause</a></li><li><a href="#fix">7. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p>The <code>cache_miss</code> scenario makes six catalogue lookups. Each one has about a one in three chance of taking the slow path, so every run is different. Fire it in both labs a few times.</p>
+<div data-fire="cache_miss" data-lab="lab1"></div>
+<div data-fire="cache_miss" data-lab="lab2"></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>Nothing fails, but the response time jumps around. Saved runs took 2,437 ms in Lab 1 and 1,632 ms in Lab 2, for the same six lookups. Fire it again and you will get a different number.</p>
+
+<h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
+<p>Go to the spans for <code>GET /catalog</code>, and compare a fast one with a slow one.</p>
+
+<h2 class="step" id="search"><span class="n">4</span>Search</h2>
+<h3>Lab 1</h3>
+<div data-query="t-catalog">Loading saved query...</div>
+<div data-query="t-catalog-slow">Loading saved query...</div>
+<div data-query="a-catalog">Loading saved query...</div>
+<p>Over the saved window there were 66 lookups, with a P50 of about 1 ms and a P99 of 803.5 ms. Nothing separates the two groups. They have the same route, the same status and no child spans.</p>
+<div data-query="t-neg-cache">Loading saved query...</div>
+<p>This time the logs can't help either. The <code>order stored</code> line gave you a free dimension in the last two incidents, but this route writes no log at all. No backend log was stored during 20 runs of this scenario across the two labs <span class="badge data">ClickHouse SQL</span>.</p>
+<h3>Lab 2</h3>
+<p><code>cache.hit</code> is on the span the agent already made, so you can filter and group by it:</p>
+<div data-query="t2-cache-miss">Loading saved query...</div>
+<div data-query="a2-cache">Loading saved query...</div>
+<figure class="shot"><img src="screenshots/lab2-cache-by-hit.png" alt="SigNoz Traces Explorer table grouping GET /catalog spans by cache.hit, with two clear groups" width="1440" height="900" loading="lazy"><figcaption>Latency grouped by <code>cache.hit</code>. <span class="badge ui">Seen in SigNoz UI</span> Values are in nanoseconds: about 0.9 ms for a hit, and about 803 ms for a miss.</figcaption></figure>
+<p>It is also a metric, so you can follow the hit rate over time:</p>
+<div data-query="m-cache">Loading saved query...</div>
+
+<h2 class="step" id="evidence"><span class="n">5</span>Evidence</h2>
+<h3>Lab 1</h3>
+<div data-evidence="lab1/cache_miss">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/lab1-cache-trace.png" alt="SigNoz trace page for cache_miss in Lab 1, with three GET /catalog spans of about 802 ms and three near zero" width="1440" height="900" loading="lazy"><figcaption>Lab 1. <span class="badge ui">Seen in SigNoz UI</span> Three lookups took about 802 ms, and the others almost nothing. Nothing on the page says why.</figcaption></figure>
+<h3>Lab 2</h3>
+<div data-evidence="lab2/cache_miss">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/lab2-cache-trace.png" alt="SigNoz trace page for cache_miss in Lab 2, with two GET /catalog spans of about 803 ms" width="1440" height="900" loading="lazy"><figcaption>Lab 2. <span class="badge ui">Seen in SigNoz UI</span> It looks the same from here. The difference is on the span.</figcaption></figure>
+<figure class="shot"><img src="screenshots/lab2-cache-span.png" alt="SigNoz span details for GET /catalog with cache.hit false, on an 803 ms span" width="1440" height="900" loading="lazy"><figcaption>A slow lookup selected. <span class="badge ui">Seen in SigNoz UI</span> <code>cache.hit: false</code> is the first attribute on it.</figcaption></figure>
+<p>Over 10 runs in each lab, measured from stored spans:</p>
+<table>
+  <thead><tr><th>Group</th><th>Lookups</th><th>P50</th><th>Max</th><th>Over 500 ms</th></tr></thead>
+  <tbody>
+    <tr><td>Lab 1: all lookups</td><td>60</td><td>0.9 ms</td><td>803.2 ms</td><td>22</td></tr>
+    <tr><td>Lab 2: <code>cache.hit = true</code></td><td>43</td><td>0.9 ms</td><td>4.4 ms</td><td>0</td></tr>
+    <tr><td>Lab 2: <code>cache.hit = false</code></td><td>17</td><td>802.6 ms</td><td>813.6 ms</td><td>17</td></tr>
+  </tbody>
+</table>
+<p>Lab 1 gives you one blurred group. Lab 2 gives you two clear ones, and the question changes from "why is this slow?" to "why do we miss the cache a third of the time?"</p>
+
+<h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/backend.py</code> lines 132–140</span></figcaption><pre><code><span class="ln">132</span>@app.get(&quot;/catalog&quot;)
+<span class="ln">133</span>def catalog(item: str) -&gt; dict:
+<span class="ln">134</span>    # Deliberate problem: about a third of lookups miss the cache and take the slow path.
+<span class="ln">135</span>    hit = random.random() &gt;= 0.33
+<span class="ln">136</span>    if not hit:
+<span class="ln">137</span>        time.sleep(0.8)
+<span class="ln">138</span>    trace.get_current_span().set_attribute(&quot;cache.hit&quot;, hit)
+<span class="ln">139</span>    cache_lookups.add(1, {&quot;cache.hit&quot;: hit})
+<span class="ln">140</span>    return {&quot;item&quot;: item, &quot;price&quot;: PRICES.get(item, 5.0)}</code></pre></figure>
+<p>About a third of lookups take the slow path. It stands in for a cache that is too small, or that expires too soon. The two new lines that matter are <code>set_attribute</code> and <code>cache_lookups.add</code>. The first puts the answer on the span, and the second makes it a trend.</p>
+
+<h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
+<p>The fix depends on why the cache misses. In a real app you would look at its size, its expiry time, and what fills it. Here it is a random number, so the simplest change is to make misses rarer, then watch the hit rate on the metric:</p>
+<figure class="code"><figcaption><span>Proposed change for labs/lab2-custom-dimensions/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code><span class="del">-    hit = random.random() &gt;= 0.33</span><span class="add">+    hit = random.random() &gt;= 0.05</span></code></pre></figure>
+
+<div class="quiz" data-quiz="cm1"><p class="q">Check yourself: Why is cache.hit a job for your code rather than the agent?</p><button type="button" data-right="false" data-why="There is no rule. It simply has no way to know.">The agent is not allowed to read caches.</button><button type="button" data-right="true" data-why="The agent sees the route, the status and the duration. The hit or miss happens inside your function.">Only your code knows what the cache decided.</button><button type="button" data-right="false" data-why="You can add attributes to any span.">Cache spans are not supported.</button></div>
+<div class="quiz" data-quiz="cm2"><p class="q">Check yourself: Why could the log trick from the last two incidents not solve this one?</p><button type="button" data-right="false" data-why="They can, if something writes them.">Logs cannot hold true or false.</button><button type="button" data-right="true" data-why="Logs only help if a developer already logged the field. You could add one, but it still would not connect to latency.">This route writes no log, so there is no field to find.</button><button type="button" data-right="false" data-why="It is on. This route just never logs.">Lab 1 has logging turned off.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

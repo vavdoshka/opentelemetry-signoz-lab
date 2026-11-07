@@ -12,180 +12,165 @@
 <a class="skip" href="#main">Skip to content</a>
 <nav id="sidebar" aria-label="Tutorial pages"></nav>
 <main id="main">
-<p class="eyebrow">Lab 2</p>
+<p class="eyebrow">Lab 2: custom dimensions</p>
 <h1>The instrumentation code</h1>
-<p class="lead">Lab 1 showed what you get with no code. This is what Lab 2 does by hand, and why. All of its telemetry comes from about 90 lines of setup and a few calls in the services. None of it is SigNoz-specific. It is standard OpenTelemetry, and you could point it at another backend by changing one variable.</p>
+<p class="lead">Lab 2 is Lab 1 plus a few lines of code. You keep the hands-off setup, and you add detail only where you need it. Nothing gets re-instrumented. This page is the whole difference between the two labs.</p>
 
-<h2>1. Packages</h2>
-<p>Five OpenTelemetry packages: the SDK, the OTLP exporter, and one instrumentation library for each thing to trace.</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/requirements.txt</code> lines 7–12</span></figcaption><pre><code><span class="ln">7</span># OpenTelemetry: SDK + OTLP/HTTP exporter + three instrumentation libraries.
-<span class="ln">8</span>opentelemetry-sdk
-<span class="ln">9</span>opentelemetry-exporter-otlp-proto-http
-<span class="ln">10</span>opentelemetry-instrumentation-fastapi
-<span class="ln">11</span>opentelemetry-instrumentation-httpx
-<span class="ln">12</span>opentelemetry-instrumentation-psycopg</code></pre></figure>
-
-<h2>2. Configuration lives in env vars</h2>
-<p>The code never names a service or an endpoint. The SDK reads these standard variables. This is the backend's set:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/k8s/app.yaml</code> lines 74–83</span></figcaption><pre><code><span class="ln">74</span>            # --- OpenTelemetry (standard SDK env vars) ---
-<span class="ln">75</span>            - { name: OTEL_SERVICE_NAME, value: backend }
-<span class="ln">76</span>            - { name: OTEL_RESOURCE_ATTRIBUTES, value: &quot;service.version=0.1.0,deployment.environment=lab2&quot; }
-<span class="ln">77</span>            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: &quot;http://k8s-infra-otel-agent.signoz.svc.cluster.local:4318&quot; }
-<span class="ln">78</span>            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
-<span class="ln">79</span>            # Don&#x27;t create spans for kubelet probe calls.
-<span class="ln">80</span>            - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
-<span class="ln">81</span>            # Flush spans inside the collector&#x27;s 1 s batch window (SDK default 5000 ms).
-<span class="ln">82</span>            # Fix for gap 2 in docs/FINDINGS.md. See docs/CONFIG.md.
-<span class="ln">83</span>            - { name: OTEL_BSP_SCHEDULE_DELAY, value: &quot;500&quot; }</code></pre></figure>
-<table>
-  <thead><tr><th>Variable</th><th>Effect</th></tr></thead>
-  <tbody>
-    <tr><td><code>OTEL_SERVICE_NAME</code></td><td>Becomes <code>service.name</code> on every span, metric and log. It is the most important setting.</td></tr>
-    <tr><td><code>OTEL_RESOURCE_ATTRIBUTES</code></td><td>Extra labels on everything, such as <code>deployment.environment=lab</code>.</td></tr>
-    <tr><td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td><td>Where to send. Port 4318 is OTLP over HTTP.</td></tr>
-    <tr><td><code>OTEL_EXPORTER_OTLP_PROTOCOL</code></td><td><code>http/protobuf</code>, which avoids a gRPC dependency.</td></tr>
-    <tr><td><code>OTEL_PYTHON_FASTAPI_EXCLUDED_URLS</code></td><td>Skips spans for Kubernetes health probes.</td></tr>
-  </tbody>
-</table>
-
-<h2>3. SDK wiring</h2>
-<p>One function, <code>setup_telemetry()</code>, builds a provider for each signal. The pattern repeats: a <strong>provider</strong> holds the config, and a <strong>processor or reader</strong> batches data and hands it to an <strong>exporter</strong>.</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/telemetry.py</code> lines 54–72</span></figcaption><pre><code><span class="ln">54</span>def setup_telemetry() -&gt; None:
-<span class="ln">55</span>    # Resource.create() merges OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES
-<span class="ln">56</span>    # with the SDK&#x27;s own telemetry.sdk.* attributes.
-<span class="ln">57</span>    resource = Resource.create()
-<span class="ln">58</span>
-<span class="ln">59</span>    # --- Traces -------------------------------------------------------------
-<span class="ln">60</span>    tracer_provider = TracerProvider(resource=resource)
-<span class="ln">61</span>    tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
-<span class="ln">62</span>    trace.set_tracer_provider(tracer_provider)
-<span class="ln">63</span>
-<span class="ln">64</span>    # --- Metrics ------------------------------------------------------------
-<span class="ln">65</span>    # Export every 10 s (SDK default is 60 s) so the lab feels responsive.
-<span class="ln">66</span>    reader = PeriodicExportingMetricReader(OTLPMetricExporter(), export_interval_millis=10_000)
-<span class="ln">67</span>    metrics.set_meter_provider(MeterProvider(resource=resource, metric_readers=[reader]))
-<span class="ln">68</span>
-<span class="ln">69</span>    # --- Logs ---------------------------------------------------------------
-<span class="ln">70</span>    logger_provider = LoggerProvider(resource=resource)
-<span class="ln">71</span>    logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter()))
-<span class="ln">72</span>    set_logger_provider(logger_provider)</code></pre></figure>
+<h2>What stays the same</h2>
+<p>The Operator injects the same agent into Lab 2. Its <code>labs/lab2-custom-dimensions/k8s/instrumentation.yaml</code> matches Lab 1's, apart from the namespace and environment names. So everything from Lab 1 still arrives with no code: traces across services, SQL text, exceptions, logs, HTTP metrics and runtime metrics.</p>
+<p>The agent sees your libraries. It can't see what your code means. So Lab 2 adds only what the agent can't know:</p>
 <ul>
-  <li><code>Resource.create()</code> reads the two env vars above. Passing the same resource to all three providers is what puts <code>service.name</code> on every signal.</li>
-  <li><code>BatchSpanProcessor</code> flushes every 5 seconds by default. That is why spans take a few seconds to appear, and the timing also matters for <a href="gaps.html#services">gap 2</a>.</li>
-  <li>Metrics export every 10 seconds here. The SDK default is 60.</li>
+  <li>Which product an order was for, and what it cost.</li>
+  <li>Where the time went inside your own function.</li>
+  <li>Whether a lookup hit the cache.</li>
+  <li>Totals you want on a chart, such as revenue.</li>
+  <li>The trace ID, so you can give it to a user.</li>
 </ul>
-<p>Call this before anything else. Both services run it at import time:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/backend.py</code> lines 22–26</span></figcaption><pre><code><span class="ln">22</span>from telemetry import setup_telemetry
-<span class="ln">23</span>
-<span class="ln">24</span>setup_telemetry()
-<span class="ln">25</span># Patches psycopg.connect so every connection it returns emits spans.
-<span class="ln">26</span>PsycopgInstrumentor().instrument(enable_commenter=False)</code></pre></figure>
+<p>Each of these is a <strong>dimension</strong>: a detail you can filter or group by. Some are business details, like <code>order.item</code>. Others are technical, like <code>cache.hit</code>.</p>
 
-<h2>4. Auto-instrumentation</h2>
-<p>One line per library gives you spans without touching your handlers.</p>
-<h3>Incoming requests</h3>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/frontend.py</code> line 313</span></figcaption><pre><code><span class="ln">313</span>FastAPIInstrumentor.instrument_app(app)</code></pre></figure>
-<p>This creates a Server span for each request, plus <code>http.server.duration</code> metrics. It goes at the end of the file, after the routes.</p>
-<h3>Outgoing calls, and how the trace crosses services</h3>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/frontend.py</code> lines 41–44</span></figcaption><pre><code><span class="ln">41</span># Only this client is instrumented: calls to the backend get CLIENT spans and
-<span class="ln">42</span># a propagated traceparent header.
-<span class="ln">43</span>backend = httpx.AsyncClient(base_url=BACKEND_URL, timeout=5.0)
-<span class="ln">44</span>HTTPXClientInstrumentor.instrument_client(backend)</code></pre></figure>
-<p>This is the line that joins two services into one trace. It adds a Client span and injects a W3C <code>traceparent</code> header. The backend's FastAPI instrumentation reads the header and continues the same trace.</p>
-<p>Only this client is instrumented. The load generator deliberately uses a plain client, so each generated request starts a fresh trace at the frontend, like a real user:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/frontend.py</code> lines 190–193</span></figcaption><pre><code><span class="ln">190</span>    # Plain client, deliberately NOT instrumented: each call starts a new trace
-<span class="ln">191</span>    # at the frontend&#x27;s server span.
-<span class="ln">192</span>    sem = asyncio.Semaphore(30)
-<span class="ln">193</span>    async with httpx.AsyncClient(base_url=os.environ.get(&quot;LOADGEN_TARGET&quot;, &quot;http://127.0.0.1:8000&quot;), timeout=15) as client:</code></pre></figure>
-<h3>Database calls</h3>
-<p>Line 26 above patches <code>psycopg.connect</code>, so every statement gets a Client span with <code>db.statement</code> and <code>db.system</code>. No changes to any query were needed.</p>
+<h2>First, the free option: fields on a log line</h2>
+<p>Before you add any OpenTelemetry code, look at what your logs already say. Lab 1's backend uses plain Python <code>logging</code>, with fields passed in <code>extra=</code>:</p>
+<figure class="code"><figcaption><span><code>labs/lab1-hands-off/app/backend.py</code> line 87</span></figcaption><pre><code><span class="ln">87</span>    log.info(&quot;order stored&quot;, extra={&quot;order.id&quot;: row[0], &quot;order.item&quot;: order.item, &quot;order.total&quot;: total})</code></pre></figure>
+<p>There is no OpenTelemetry code in that line. The agent's log bridge turns each field into a log attribute you can search, and the log keeps the <code>trace_id</code> and <code>span_id</code> of the span it was written in. This needs one setting, and it is already in <code>instrumentation.yaml</code>:</p>
+<figure class="code"><figcaption><span><code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> lines 33–34</span></figcaption><pre><code><span class="ln">33</span>      # Python logs are off by default in the Operator.
+<span class="ln">34</span>      - { name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: &quot;true&quot; }</code></pre></figure>
+<div data-query="l-order-attrs">Loading saved query...</div>
+<p>You can do more with these than read them one at a time. Lab 1 can count, sum and chart whatever the app logged:</p>
+<div data-query="a-log-orders">Loading saved query...</div>
+<div class="warn"><p><strong>A trap:</strong> to sum a log field, write <code>sum(attribute.order.total)</code>. Without the <code>attribute.</code> prefix, <code>sum(order.total)</code> is a parse error. With quotes or backticks, as in <code>sum(`order.total`)</code>, it is worse: SigNoz returns nothing, with no error. All three were tried on this lab <span class="badge api">Query API only</span>.</p></div>
+<p>You can try this now. The <code>log_burst</code> scenario writes 20 log lines, with <code>burst.index</code> and <code>burst.size</code> passed through <code>extra=</code>. Fire it, then search for one exact line:</p>
+<div data-fire="log_burst" data-lab="lab1"></div>
+<div data-query="l-burst">Loading saved query...</div>
+<p>Log fields have two limits, and they are the reason Lab 2 exists:</p>
+<ul>
+  <li><strong>You can't connect them to latency.</strong> The item is on the log, and the duration is on the span. A log has no duration, so no search can give you "P99 by item".</li>
+  <li><strong>You can't see a field nobody logged.</strong> Lab 1 never logs the coupon, so it can't tell you about it. The next pages show both limits in real incidents.</li>
+</ul>
 
-<h2>5. A manual span</h2>
-<p>Auto-instrumentation only sees libraries. For your own logic, write a span by hand. <code>price_order</code> shows the whole pattern:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/backend.py</code> lines 88–96</span></figcaption><pre><code><span class="ln">88</span>def price_order(order: OrderIn) -&gt; float:
-<span class="ln">89</span>    # Manual span: shows up as a child of the request span, with attributes.
-<span class="ln">90</span>    with tracer.start_as_current_span(&quot;price_order&quot;) as span:
-<span class="ln">91</span>        span.set_attribute(&quot;order.item&quot;, order.item)
-<span class="ln">92</span>        span.set_attribute(&quot;order.qty&quot;, order.qty)
-<span class="ln">93</span>        time.sleep(random.uniform(0.005, 0.03))  # pretend work
+<h2>The one new dependency</h2>
+<p>Lab 2 adds a single package: the OpenTelemetry API. It has no SDK and no exporters, because the injected agent provides those.</p>
+<figure class="code"><figcaption><span>Lab 1 to Lab 2: <code>app/requirements.txt</code></span></figcaption><pre><code><span class="del">-# Web stack only. There is deliberately no OpenTelemetry package here.</span><span class="add">+# The same web stack as Lab 1, plus the OpenTelemetry API. There is no SDK here:</span><span class="add">+# the agent the Operator injects provides it. Without the agent, API calls do nothing.</span> fastapi==0.162.0
+ ...
+<span class="add">+opentelemetry-api==1.45.2</span></code></pre></figure>
+<p>That last comment is literally true. With the agent removed from the path in a running Lab 2 pod, a new span was a <code>NonRecordingSpan</code> with an all-zero trace ID. Your code still runs, it just records nothing. So you can leave these calls in place anywhere the agent isn't.</p>
+<p>The code gets a tracer and a meter once, at the top of the file:</p>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/backend.py</code> lines 24–25</span></figcaption><pre><code><span class="ln">24</span>tracer = trace.get_tracer(&quot;lab.backend&quot;)
+<span class="ln">25</span>meter = metrics.get_meter(&quot;lab.backend&quot;)</code></pre></figure>
+
+<h2>A span of your own</h2>
+<p>The agent can't see inside your functions. <code>price_order</code> is plain Python in Lab 1, so a slow price shows up only as unexplained time. Lab 2 wraps it in a span, and adds the dimensions:</p>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/backend.py</code> lines 87–100</span></figcaption><pre><code><span class="ln">87</span>def price_order(order: OrderIn) -&gt; float:
+<span class="ln">88</span>    # Manual span: shows up as a child of the request span, with attributes.
+<span class="ln">89</span>    with tracer.start_as_current_span(&quot;price_order&quot;) as span:
+<span class="ln">90</span>        span.set_attribute(&quot;order.item&quot;, order.item)
+<span class="ln">91</span>        span.set_attribute(&quot;order.qty&quot;, order.qty)
+<span class="ln">92</span>        # Deliberate bug: pricing is very slow for this one item.
+<span class="ln">93</span>        time.sleep(1.5 if order.item == &quot;catering&quot; else random.uniform(0.005, 0.03))
 <span class="ln">94</span>        total = round(PRICES.get(order.item, 5.0) * order.qty, 2)
-<span class="ln">95</span>        span.set_attribute(&quot;order.total&quot;, total)
-<span class="ln">96</span>        return total</code></pre></figure>
-<p><code>start_as_current_span</code> makes this the active span, so it nests under the request span by itself. Attributes make it searchable. You can search for <code>order.total &gt; 20</code> because of line 95.</p>
-<p>You can also add to a span you did not create. All scenarios share the operation name <code>POST /api/scenario/{name}</code>, so the frontend tags the auto-created span with the scenario:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/frontend.py</code> lines 264–265</span></figcaption><pre><code><span class="ln">264</span>    trace_id = current_trace_id()
-<span class="ln">265</span>    trace.get_current_span().set_attribute(&quot;lab.scenario&quot;, name)</code></pre></figure>
+<span class="ln">95</span>        # Deliberate bug: this 10% coupon makes the whole order free.
+<span class="ln">96</span>        if order.coupon == &quot;SAVE10&quot;:
+<span class="ln">97</span>            span.set_attribute(&quot;order.coupon&quot;, order.coupon)
+<span class="ln">98</span>            total = 0.0
+<span class="ln">99</span>        span.set_attribute(&quot;order.total&quot;, total)
+<span class="ln">100</span>        return total</code></pre></figure>
+<p><code>start_as_current_span</code> makes this the active span, so it nests under the request span the agent created. The attributes make it searchable: <code>order.total &gt; 20</code> works because of the <code>set_attribute</code> call.</p>
 <div data-query="t-manual">Loading saved query...</div>
 
-<h2>6. Custom metrics</h2>
-<p>Create instruments once, at module level. Then record at the point where the event happens.</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/backend.py</code> lines 32–38</span></figcaption><pre><code><span class="ln">32</span># Custom business metrics.
-<span class="ln">33</span>orders_created = meter.create_counter(
-<span class="ln">34</span>    &quot;orders.created&quot;, unit=&quot;{order}&quot;, description=&quot;Orders successfully stored&quot;
-<span class="ln">35</span>)
-<span class="ln">36</span>order_value = meter.create_histogram(
-<span class="ln">37</span>    &quot;orders.value&quot;, unit=&quot;USD&quot;, description=&quot;Value of each stored order&quot;
-<span class="ln">38</span>)</code></pre></figure>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/backend.py</code> lines 107–108</span></figcaption><pre><code><span class="ln">107</span>    orders_created.add(1, {&quot;order.item&quot;: order.item})
-<span class="ln">108</span>    order_value.record(total, {&quot;order.item&quot;: order.item})</code></pre></figure>
-<p>Attributes such as <code>order.item</code> become dimensions you can group by. Keep their values to a small set. <code>order.item</code> has four values, which is fine. A per-user value would create a separate time series for each user.</p>
-<p>A gauge is different: instead of recording events, you give the SDK a callback, and it reads the current value at each export.</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/frontend.py</code> lines 179–186</span></figcaption><pre><code><span class="ln">179</span>def _observe_loadgen(_options: CallbackOptions):
-<span class="ln">180</span>    yield Observation(loadgen.rps if loadgen.status()[&quot;running&quot;] else 0.0)
-<span class="ln">181</span>
-<span class="ln">182</span>
-<span class="ln">183</span>meter.create_observable_gauge(
-<span class="ln">184</span>    &quot;loadgen.target_rps&quot;, callbacks=[_observe_loadgen], unit=&quot;{request}/s&quot;,
-<span class="ln">185</span>    description=&quot;Requests per second the load generator aims for&quot;,
-<span class="ln">186</span>)</code></pre></figure>
-<p>Three instrument types are in use here: a <strong>counter</strong> for totals (<code>orders.created</code>, <code>scenario.runs</code>), a <strong>histogram</strong> for distributions (<code>orders.value</code>) and a <strong>gauge</strong> for a current level (<code>loadgen.target_rps</code>).</p>
+<h2>A dimension on a span you didn't create</h2>
+<p>You don't always need a new span. <code>trace.get_current_span()</code> gives you the span the agent already made for this request, and you can add to it. This is how <code>cache.hit</code> gets onto the <code>GET /catalog</code> span:</p>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/backend.py</code> lines 132–140</span></figcaption><pre><code><span class="ln">132</span>@app.get(&quot;/catalog&quot;)
+<span class="ln">133</span>def catalog(item: str) -&gt; dict:
+<span class="ln">134</span>    # Deliberate problem: about a third of lookups miss the cache and take the slow path.
+<span class="ln">135</span>    hit = random.random() &gt;= 0.33
+<span class="ln">136</span>    if not hit:
+<span class="ln">137</span>        time.sleep(0.8)
+<span class="ln">138</span>    trace.get_current_span().set_attribute(&quot;cache.hit&quot;, hit)
+<span class="ln">139</span>    cache_lookups.add(1, {&quot;cache.hit&quot;: hit})
+<span class="ln">140</span>    return {&quot;item&quot;: item, &quot;price&quot;: PRICES.get(item, 5.0)}</code></pre></figure>
+<p>The frontend does the same thing to label each request with its scenario, because all scenarios share one operation name:</p>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 282–283</span></figcaption><pre><code><span class="ln">282</span>    trace_id = current_trace_id()
+<span class="ln">283</span>    trace.get_current_span().set_attribute(&quot;lab.scenario&quot;, name)</code></pre></figure>
 
-<h2>7. Logs linked to traces</h2>
-<p>Your code keeps using Python's standard <code>logging</code>. A handler on the root logger turns each record into an OTel log, and attaches the active trace automatically:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/telemetry.py</code> lines 74–78</span></figcaption><pre><code><span class="ln">74</span>    root = logging.getLogger()
-<span class="ln">75</span>    root.setLevel(os.getenv(&quot;LOG_LEVEL&quot;, &quot;INFO&quot;))
-<span class="ln">76</span>    # 1) OTLP: every stdlib log record becomes an OTel LogRecord, with the
-<span class="ln">77</span>    #    active trace_id/span_id attached automatically.
-<span class="ln">78</span>    root.addHandler(LoggingHandler(level=logging.NOTSET, logger_provider=logger_provider))</code></pre></figure>
-<p>Fields passed in <code>extra=</code> become searchable attributes:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/backend.py</code> line 109</span></figcaption><pre><code><span class="ln">109</span>    log.info(&quot;order stored&quot;, extra={&quot;order.id&quot;: row[0], &quot;order.item&quot;: order.item, &quot;order.total&quot;: total})</code></pre></figure>
-<p>With <code>exc_info=True</code>, the log also carries <code>exception.type</code>, <code>exception.message</code> and <code>exception.stacktrace</code>:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/backend.py</code> line 156</span></figcaption><pre><code><span class="ln">156</span>        log.error(&quot;query failed: %s&quot;, exc.diag.message_primary, exc_info=True)</code></pre></figure>
-<div data-query="l-attr">Loading saved query...</div>
-<p>You can try this now. The <code>log_burst</code> scenario writes 20 log lines, with <code>burst.index</code> and <code>burst.size</code> passed through <code>extra=</code>. Fire it, then search for one exact line:</p>
-<div data-fire="log_burst"></div>
-<div data-query="l-burst">Loading saved query...</div>
+<h2>Metrics of your own</h2>
+<p>Create instruments once, at the top of the file:</p>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/backend.py</code> lines 27–35</span></figcaption><pre><code><span class="ln">27</span># Custom business metrics.
+<span class="ln">28</span>orders_created = meter.create_counter(
+<span class="ln">29</span>    &quot;orders.created&quot;, unit=&quot;{order}&quot;, description=&quot;Orders successfully stored&quot;
+<span class="ln">30</span>)
+<span class="ln">31</span>order_value = meter.create_histogram(
+<span class="ln">32</span>    &quot;orders.value&quot;, unit=&quot;USD&quot;, description=&quot;Value of each stored order&quot;
+<span class="ln">33</span>)
+<span class="ln">34</span>cache_lookups = meter.create_counter(
+<span class="ln">35</span>    &quot;cache.lookups&quot;, unit=&quot;{lookup}&quot;, description=&quot;Catalogue cache lookups, by hit or miss&quot;</code></pre></figure>
+<p>Then record at the point where the event happens:</p>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/backend.py</code> lines 111–112</span></figcaption><pre><code><span class="ln">111</span>    orders_created.add(1, {&quot;order.item&quot;: order.item})
+<span class="ln">112</span>    order_value.record(total, {&quot;order.item&quot;: order.item})</code></pre></figure>
+<p>Attributes such as <code>order.item</code> become dimensions you can group by. Keep their values to a small set. <code>order.item</code> has five values here, which is fine. A per-user value would create a separate time series for each user.</p>
+<p>A gauge is different. Instead of recording events, you give the API a callback, and the agent reads the current value at each export:</p>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 201–207</span></figcaption><pre><code><span class="ln">201</span>def _observe_loadgen(_options: CallbackOptions):
+<span class="ln">202</span>    yield Observation(loadgen.rps if loadgen.status()[&quot;running&quot;] else 0.0)
+<span class="ln">203</span>
+<span class="ln">204</span>
+<span class="ln">205</span>meter.create_observable_gauge(
+<span class="ln">206</span>    &quot;loadgen.target_rps&quot;, callbacks=[_observe_loadgen], unit=&quot;{request}/s&quot;,
+<span class="ln">207</span>    description=&quot;Requests per second the load generator aims for&quot;,</code></pre></figure>
+<p>Three instrument types are in use here: a <strong>counter</strong> for totals (<code>orders.created</code>, <code>cache.lookups</code>, <code>scenario.runs</code>), a <strong>histogram</strong> for distributions (<code>orders.value</code>) and a <strong>gauge</strong> for a current level (<code>loadgen.target_rps</code>).</p>
 
-<h2>8. Giving users a trace ID</h2>
-<p>Each API response includes the trace ID, which is how the buttons in this tutorial can link you to SigNoz. It is a cheap trick worth copying: a support ticket that quotes a trace ID takes you straight to the evidence.</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/frontend.py</code> lines 225–227</span></figcaption><pre><code><span class="ln">225</span>def current_trace_id() -&gt; str | None:
-<span class="ln">226</span>    ctx = trace.get_current_span().get_span_context()
-<span class="ln">227</span>    return format(ctx.trace_id, &quot;032x&quot;) if ctx.is_valid else None</code></pre></figure>
+<h2>Giving users a trace ID</h2>
+<p>Lab 1's app can't return a trace ID, because it doesn't know one exists. With the API, three lines fetch it, and Lab 2 adds it to every response. That is also why this tutorial's Lab 2 buttons link straight to SigNoz with no search.</p>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 245–247</span></figcaption><pre><code><span class="ln">245</span>def current_trace_id() -&gt; str | None:
+<span class="ln">246</span>    ctx = trace.get_current_span().get_span_context()
+<span class="ln">247</span>    return format(ctx.trace_id, &quot;032x&quot;) if ctx.is_valid else None</code></pre></figure>
+<p>This is a cheap trick worth copying: a support ticket that quotes a trace ID takes you straight to the evidence. See <a href="incident-trace-id.html">A customer quotes a trace ID</a>.</p>
+
+<h2>Choosing where to put a dimension</h2>
+<table>
+  <thead><tr><th></th><th>Field on a log</th><th>Attribute on a span</th><th>Metric</th></tr></thead>
+  <tbody>
+    <tr><td><strong>OpenTelemetry code needed</strong></td><td>None</td><td>API call</td><td>API call</td></tr>
+    <tr><td><strong>Find one example</strong></td><td>Yes</td><td>Yes</td><td>No</td></tr>
+    <tr><td><strong>Count or sum it over time</strong></td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td><strong>Latency by that field</strong></td><td>No</td><td>Yes</td><td>Only if you record latency with it</td></tr>
+  </tbody>
+</table>
+<p>Start with logs, because they cost nothing. Move a field to a span when you need to know how it affects latency. Add a metric when you want a cheap, long-lived trend or an alert.</p>
+
+<div class="note"><p><strong>Not covered here:</strong> a full SDK setup, with your own providers and exporters. You need that for apps outside Kubernetes, or where you can't run the Operator. This lab doesn't use one.</p></div>
 
 <h2>Try it: write a manual span</h2>
-<p>Add a span around the database read in <code>list_orders</code>, with the row count as an attribute. Write it down before opening the answer.</p>
-<figure class="code"><figcaption><span><code>list_orders</code> before this exercise</span></figcaption><pre><code>@app.get(&quot;/orders&quot;)
-def list_orders() -&gt; list[dict]:
-    with db() as conn:
-        rows = conn.execute(
-            &quot;SELECT id, item, qty, total, created_at FROM orders ORDER BY id DESC LIMIT 20&quot;
-        ).fetchall()</code></pre></figure>
+<p>Add a span around the database read in Lab 1's <code>list_orders</code>, with the row count as an attribute. Write it down before opening the answer.</p>
+<figure class="code"><figcaption><span><code>labs/lab1-hands-off/app/backend.py</code> lines 91–100</span></figcaption><pre><code><span class="ln">91</span>@app.get(&quot;/orders&quot;)
+<span class="ln">92</span>def list_orders() -&gt; list[dict]:
+<span class="ln">93</span>    with db() as conn:
+<span class="ln">94</span>        rows = conn.execute(
+<span class="ln">95</span>            &quot;SELECT id, item, qty, total, created_at FROM orders ORDER BY id DESC LIMIT 20&quot;
+<span class="ln">96</span>        ).fetchall()
+<span class="ln">97</span>    return [
+<span class="ln">98</span>        {&quot;id&quot;: r[0], &quot;item&quot;: r[1], &quot;qty&quot;: r[2], &quot;total&quot;: float(r[3]), &quot;created_at&quot;: r[4].isoformat()}
+<span class="ln">99</span>        for r in rows
+<span class="ln">100</span>    ]</code></pre></figure>
 <details>
   <summary>Show a model answer</summary>
-  <figure class="code"><figcaption><span>Model answer. <code>labs/lab2-sdk/app/backend.py</code> now has a version of this to compare with</span></figcaption><pre><code>@app.get("/orders")
-def list_orders() -> list[dict]:
-    with tracer.start_as_current_span("list_orders") as span:
-        with db() as conn:
-            rows = conn.execute(
-                "SELECT id, item, qty, total, created_at FROM orders ORDER BY id DESC LIMIT 20"
-            ).fetchall()
-        span.set_attribute("orders.returned", len(rows))</code></pre></figure>
-  <p>The automatic <code>SELECT</code> span now nests under <code>list_orders</code>.</p>
+  <figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/backend.py</code> lines 117–129</span></figcaption><pre><code><span class="ln">117</span>@app.get(&quot;/orders&quot;)
+<span class="ln">118</span>def list_orders() -&gt; list[dict]:
+<span class="ln">119</span>    with tracer.start_as_current_span(&quot;list_orders&quot;) as span:
+<span class="ln">120</span>        with db() as conn:
+<span class="ln">121</span>            rows = conn.execute(
+<span class="ln">122</span>                &quot;SELECT id, item, qty, total, created_at FROM orders ORDER BY id DESC LIMIT 20&quot;
+<span class="ln">123</span>            ).fetchall()
+<span class="ln">124</span>        span.set_attribute(&quot;orders.returned&quot;, len(rows))
+<span class="ln">125</span>        log.info(&quot;list_order&quot;, extra={&quot;total_orders&quot;: len(rows)})
+<span class="ln">126</span>        return [
+<span class="ln">127</span>            {&quot;id&quot;: r[0], &quot;item&quot;: r[1], &quot;qty&quot;: r[2], &quot;total&quot;: float(r[3]), &quot;created_at&quot;: r[4].isoformat()}
+<span class="ln">128</span>            for r in rows
+<span class="ln">129</span>        ]</code></pre></figure>
+  <p>The automatic <code>SELECT</code> span now nests under <code>list_orders</code>. Lab 2 also logs the count, which adds a field you could search.</p>
 </details>
 
-<div class="quiz" data-quiz="i1"><p class="q">Check yourself: Which line makes the frontend join calls to the backend into the same trace?</p><button type="button" data-right="false" data-why="That creates server spans. By itself it would start a new trace on each service.">FastAPIInstrumentor.instrument_app(app)</button><button type="button" data-right="true" data-why="It creates client spans and injects the W3C traceparent header. The backend reads that header and joins the trace.">HTTPXClientInstrumentor.instrument_client(backend)</button><button type="button" data-right="false" data-why="That wires up exporters. It does not touch outgoing requests.">setup_telemetry()</button></div>
-<div class="quiz" data-quiz="i2"><p class="q">Check yourself: You want a value to be searchable on a log line. What do you do?</p><button type="button" data-right="false" data-why="Then you can only substring-search it, and it cannot be compared as a number.">Put it in the message string.</button><button type="button" data-right="true" data-why="backend.py does this with order.item and order.total, so order.total &gt; 10 works as a filter.">Pass it in extra= so it becomes a log attribute.</button><button type="button" data-right="false" data-why="Resource attributes describe the service. They are the same on every record.">Add it to OTEL_RESOURCE_ATTRIBUTES.</button></div>
-<div class="quiz" data-quiz="i3"><p class="q">Check yourself: Why is the load generator client deliberately left uninstrumented?</p><button type="button" data-right="false" data-why="It would work fine.">Instrumenting it would crash the app.</button><button type="button" data-right="true" data-why="An instrumented client would add its own client span and traceparent, so the frontend would no longer be the trace root.">So each generated request starts a new trace, like a real user.</button><button type="button" data-right="false" data-why="The comment in frontend.py gives the reason: each call starts a new trace at the server span.">To save memory.</button></div>
+<div class="quiz" data-quiz="i1"><p class="q">Check yourself: You want to know whether a slow request hit the cache, and the request already has a span from the agent. What is the smallest change?</p><button type="button" data-right="true" data-why="trace.get_current_span().set_attribute() adds it to the span the agent made. Lab 2 does this with cache.hit.">Set an attribute on the current span.</button><button type="button" data-right="false" data-why="The agent already provides the SDK. You only need the API.">Install the full SDK and set up a provider.</button><button type="button" data-right="false" data-why="Nothing gets re-instrumented. You keep the hands-off setup.">Re-instrument the app by hand.</button></div>
+<div class="quiz" data-quiz="i2"><p class="q">Check yourself: You want a value to be searchable on a log line. What do you do?</p><button type="button" data-right="false" data-why="Then you can only substring-search it, and it cannot be compared as a number.">Put it in the message string.</button><button type="button" data-right="true" data-why="The app does this with order.item and order.total, so order.total &gt; 10 works as a filter. It needs no OpenTelemetry code.">Pass it in extra= so it becomes a log attribute.</button><button type="button" data-right="false" data-why="Resource attributes describe the service. They are the same on every record.">Add it to resourceAttributes in the Instrumentation.</button></div>
+<div class="quiz" data-quiz="i3"><p class="q">Check yourself: You run Lab 2 code in a place with no agent. What happens to the API calls?</p><button type="button" data-right="false" data-why="The API package is installed, so the imports work and the calls run.">The app crashes on start.</button><button type="button" data-right="true" data-why="With no SDK behind it, the API returns non-recording spans. A trace ID comes back as all zeros, which current_trace_id() turns into None.">They do nothing, and the app keeps working.</button><button type="button" data-right="false" data-why="The API has no exporter. The agent provides that.">They send telemetry straight to SigNoz.</button></div>
+<div class="quiz" data-quiz="i4"><p class="q">Check yourself: Why can a Lab 1 log search not give you P99 latency by product?</p><button type="button" data-right="false" data-why="They can. Lab 1 can count and sum log fields.">Logs cannot be aggregated.</button><button type="button" data-right="true" data-why="A log has no duration. Putting order.item on a span is what connects the two.">The product is on the log and the duration is on the span.</button><button type="button" data-right="false" data-why="It does, on its spans. They just have no product on them.">Lab 1 has no latency data.</button></div>
 
 <section class="page-end" id="page-end" aria-label="Page navigation"></section>
 </main>

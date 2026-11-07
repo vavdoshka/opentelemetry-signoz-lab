@@ -36,32 +36,25 @@ The app has no OpenTelemetry code or settings. All of its configuration is in
 | `sampler: parentbased_always_on` | Keeps every trace, and states the default explicitly |
 | `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true` | Python logs are off by default in the Operator |
 | `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS=healthz` | No spans for Kubernetes probes |
-| `OTEL_BSP_SCHEDULE_DELAY=500` | The gap 2 fix, the same as Lab 2 |
+| `OTEL_BSP_SCHEDULE_DELAY=500` | The gap 2 fix |
+| `OTEL_METRIC_EXPORT_INTERVAL=10000` | Exports metrics every 10 seconds (default 60), so the lab feels responsive |
 
 The Operator comes from its official Helm chart. `cluster/otel-operator-values.yaml` makes the chart
 generate its own webhook certificate, so the lab doesn't need cert-manager.
 
-## Lab 2: SDK
+## Lab 2: custom dimensions
 
-OpenTelemetry setup is in `labs/lab2-sdk/app/telemetry.py`. Instrumentation is added in
-`frontend.py` and `backend.py` next to it. Runtime settings are standard env vars in
-`labs/lab2-sdk/k8s/app.yaml`:
+Lab 2 uses the same injection as Lab 1, with its own `labs/lab2-custom-dimensions/k8s/instrumentation.yaml`.
+There is no SDK setup, and its manifest has no OpenTelemetry settings. The code in
+`labs/lab2-custom-dimensions/app/` uses only the OpenTelemetry API. Its requirements add
+`opentelemetry-api`, and API calls do nothing if the agent isn't there.
 
-| Variable | Value | Why |
-|---|---|---|
-| `OTEL_SERVICE_NAME` | `frontend`, `backend`, `loadgen` | Names the service |
-| `OTEL_RESOURCE_ATTRIBUTES` | `service.version=0.1.0,deployment.environment=lab` | Version and environment filter |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://k8s-infra-otel-agent.signoz.svc.cluster.local:4318` | Send to the agent on the same node, which adds pod and node attributes (gap 3) |
-| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` | OTLP over HTTP, no gRPC dependency |
-| `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS` | `healthz` | No spans for Kubernetes probes |
-| `OTEL_BSP_SCHEDULE_DELAY` | `500` | Flush spans every 500 ms (default 5000), so parent and child spans reach SigNoz in the same insert (gap 2). Without it, Services and the Service Map are unreliable |
-
-One non-default in code: metrics export every 10 seconds (SDK default 60), so the lab feels
-responsive.
+`labs/lab2-custom-dimensions/dashboard.json` is the SigNoz dashboard `make lab2` creates. It is the
+only dashboard in the lab.
 
 ### High availability
 
-All in `labs/lab2-sdk/k8s/app.yaml`. Lab 1 runs one replica of each service:
+All in `labs/lab2-custom-dimensions/k8s/app.yaml`. Lab 1 runs one replica of each service:
 
 | What | Why |
 |---|---|
@@ -97,7 +90,7 @@ The script marks `/` as shared inside each node container. It is lost when a nod
 
 The gap 2 and gap 3 fixes are applied. The other fixes in `FINDINGS.md` are not:
 
-- No dashboards imported, and no alerts, channels or log pipelines created.
+- No community dashboards imported, and no alerts, channels or log pipelines created.
 - ASGI `send`/`receive` spans still exported.
 - Duplicate logs still present.
 - No trace-ID load balancing between agents and collectors.

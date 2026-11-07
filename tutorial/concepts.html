@@ -19,63 +19,63 @@
 <table>
   <thead><tr><th>Signal</th><th>Question it answers</th><th>Example in this app</th></tr></thead>
   <tbody>
-    <tr><td><strong>Trace</strong></td><td>What happened to this one request, and where did the time go?</td><td>One order, as spans across <code>frontend</code>, <code>backend</code> and Postgres</td></tr>
-    <tr><td><strong>Metric</strong></td><td>How much, and how often, across everything?</td><td><code>orders.created</code>, a running count of stored orders</td></tr>
+    <tr><td><strong>Trace</strong></td><td>What happened to this one request, and where did the time go?</td><td>One order, as spans across <code>lab1-frontend</code>, <code>lab1-backend</code> and Postgres</td></tr>
+    <tr><td><strong>Metric</strong></td><td>How much, and how often, across everything?</td><td><code>signoz_calls_total</code>, a running count of calls to each service</td></tr>
     <tr><td><strong>Log</strong></td><td>What did the code say at that moment?</td><td><code>order stored</code>, with the order ID and total</td></tr>
   </tbody>
 </table>
 
 <h2>One request, end to end</h2>
-<p>Fire an order. The app returns a trace ID, which is your handle on everything that follows. Spans appear about 10 seconds later, because the SDK sends them in batches.</p>
-<div data-fire="order"></div>
+<p>Fire an order in Lab 1. Its app knows nothing about tracing, so the response has no trace ID. This page finds the trace by searching SigNoz, which takes a few seconds.</p>
+<div data-fire="order" data-lab="lab1"></div>
 <p>Here is a saved run of the same scenario:</p>
-<div data-evidence="order">Loading saved run...</div>
+<div data-evidence="lab1/order">Loading saved run...</div>
 
 <h3>Reading a trace</h3>
-<p>A <strong>trace</strong> is one request. A <strong>span</strong> is one timed step in it. Each span records its parent, which is how the tree is built. This order has five useful spans:</p>
+<p>A <strong>trace</strong> is one request. A <strong>span</strong> is one timed step in it. Each span records its parent, which is how the tree is built. This order has four useful spans, and the agent created all of them:</p>
 <table>
-  <thead><tr><th>Span</th><th>Service</th><th>Kind</th><th>Created by</th></tr></thead>
+  <thead><tr><th>Span</th><th>Service</th><th>Kind</th><th>What it measures</th></tr></thead>
   <tbody>
-    <tr><td><code>POST /api/scenario/{name}</code></td><td>frontend</td><td>Server</td><td><code>FastAPIInstrumentor</code></td></tr>
-    <tr><td><code>POST</code></td><td>frontend</td><td>Client</td><td><code>HTTPXClientInstrumentor</code></td></tr>
-    <tr><td><code>POST /orders</code></td><td>backend</td><td>Server</td><td><code>FastAPIInstrumentor</code>, joining the same trace</td></tr>
-    <tr><td><code>price_order</code></td><td>backend</td><td>Internal</td><td>Hand-written code in <code>backend.py</code></td></tr>
-    <tr><td><code>INSERT</code></td><td>backend</td><td>Client</td><td><code>PsycopgInstrumentor</code></td></tr>
+    <tr><td><code>POST /api/scenario/{name}</code></td><td><code>lab1-frontend</code></td><td>Server</td><td>The whole request, as the frontend saw it</td></tr>
+    <tr><td><code>POST</code></td><td><code>lab1-frontend</code></td><td>Client</td><td>The frontend's call to the backend</td></tr>
+    <tr><td><code>POST /orders</code></td><td><code>lab1-backend</code></td><td>Server</td><td>The same call from the backend's side, joining the same trace</td></tr>
+    <tr><td><code>INSERT</code></td><td><code>lab1-backend</code></td><td>Client</td><td>The SQL statement sent to Postgres</td></tr>
   </tbody>
 </table>
 <p><strong>Kind</strong> tells you the span's role: Server handles an incoming request, Client makes an outgoing call, and Internal is work inside a process. Each span also has <strong>attributes</strong> (key-value details such as <code>db.statement</code>) and a <strong>status</strong> (Unset or Error).</p>
-<figure class="shot"><img src="screenshots/order-trace.png" alt="SigNoz trace page for an order, with a flame graph and a waterfall of spans across frontend and backend" width="1440" height="900" loading="lazy"><figcaption>The same order in SigNoz. <span class="badge ui">Seen in SigNoz UI</span> The extra rows are ASGI <code>http send</code> and <code>http receive</code> spans, covered in <a href="gaps.html#noise">gap 6</a>.</figcaption></figure>
+<figure class="shot"><img src="screenshots/lab1-order-trace.png" alt="SigNoz trace page for a Lab 1 order, with a flame graph and a waterfall of spans across lab1-frontend and lab1-backend" width="1440" height="900" loading="lazy"><figcaption>The same kind of order in SigNoz. <span class="badge ui">Seen in SigNoz UI</span> The extra rows are ASGI <code>http send</code> and <code>http receive</code> spans, covered in <a href="gaps.html#noise">gap 6</a>.</figcaption></figure>
 
 <h2>Logs: the same request, in words</h2>
-<p>The saved run above lists two logs with the same trace ID: <code>order stored</code> from the backend, and an <code>HTTP Request</code> line from the frontend. Nobody wrote that second one. It comes from the <code>httpx</code> library's own logger, which reaches SigNoz because the bridge sits on Python's root logger.</p>
+<p>The saved run above lists two logs with the same trace ID: <code>order stored</code> from <code>lab1-backend</code>, and an <code>HTTP Request</code> line from <code>lab1-frontend</code>. Nobody wrote that second one. It comes from the <code>httpx</code> library's own logger, which reaches SigNoz because the log bridge sits on Python's root logger.</p>
+<p>Look at the first one again. The app passes <code>order.item</code> and <code>order.total</code> to Python's <code>logging</code> with <code>extra=</code>, and those become attributes you can search. That is ordinary logging, not OpenTelemetry code. You will see why it matters in Lab 2.</p>
 <p>In a trace you see <em>that</em> a step took 25 ms. In a log, you see what the code decided to say about it.</p>
 
 <h2>Metrics: numbers with no trace ID</h2>
-<p>A metric is a number the app keeps updating, sent every 10 seconds here. It is cheap and good for trends and alerts, but it cannot tell you about one request. So metrics have no trace ID.</p>
-<div data-query="m-orders">Loading saved query...</div>
-<p>There is a second source of metrics here. SigNoz's collector derives <code>signoz_calls_total</code> and <code>signoz_latency</code> from spans, so you get call rates and latency without any metric code in the app.</p>
+<p>A metric is a number that keeps being updated and sent on a schedule. It is cheap and good for trends and alerts, but it cannot tell you about one request. So metrics have no trace ID.</p>
+<div data-query="m-calls">Loading saved query...</div>
+<p>That one comes from SigNoz's collector, which derives <code>signoz_calls_total</code> and <code>signoz_latency</code> from spans, so you get call rates and latency without any metric code in the app.</p>
 
 <h2>How the signals connect</h2>
 <table>
   <thead><tr><th>Link</th><th>How it works here</th></tr></thead>
   <tbody>
-    <tr><td>Trace to logs</td><td>An exact link. Every OTLP log carries <code>trace_id</code> and <code>span_id</code>.</td></tr>
+    <tr><td>Trace to logs</td><td>An exact link. A log written during a request carries its <code>trace_id</code> and <code>span_id</code>.</td></tr>
     <tr><td>Metric to trace</td><td>No direct link. You match by <code>service.name</code>, attributes and time.</td></tr>
-    <tr><td>Everything to a service</td><td><code>service.name</code> is on all three signals, set once by <code>OTEL_SERVICE_NAME</code>.</td></tr>
+    <tr><td>Everything to a service</td><td><code>service.name</code> is on all three signals. In Lab 1 the Operator sets it from the Deployment's name.</td></tr>
     <tr><td>Spans to metrics</td><td>SigNoz generates <code>signoz_*</code> metrics from spans in its collector.</td></tr>
   </tbody>
 </table>
 <div class="finding"><p>A useful working order: a <strong>metric</strong> tells you something is wrong, a <strong>trace</strong> shows you where, and a <strong>log</strong> tells you why. Every incident in this tutorial follows that shape.</p></div>
 
 <h2>How the data reaches SigNoz</h2>
-<p>There are two separate paths, and the difference matters later.</p>
-<div class="flow"><span class="box">App SDK</span><span class="arrow">→ OTLP/HTTP :4318 →</span><span class="box">SigNoz collector</span><span class="arrow">→</span><span class="box">ClickHouse</span><span class="arrow">→</span><span class="box">SigNoz UI</span></div>
+<p>Everything goes through the SigNoz agent on each node, and the agent adds what an app can't see for itself.</p>
+<div class="flow"><span class="box">App</span><span class="arrow">→ OTLP/HTTP :4318 →</span><span class="box">k8s-infra agent on the node</span><span class="arrow">→</span><span class="box">SigNoz collector</span><span class="arrow">→</span><span class="box">ClickHouse</span><span class="arrow">→</span><span class="box">SigNoz UI</span></div>
 <div class="flow"><span class="box">k8s-infra agent</span><span class="arrow">→ pod metrics, stdout logs, events →</span><span class="box">SigNoz collector</span></div>
-<p>The app's traces, metrics and logs take the first path, and they are standard OTLP with no SigNoz code. The second path adds what the app cannot see for itself, such as pod CPU. Because the app skips the agent, its telemetry has no Kubernetes attributes (<a href="gaps.html#k8s">gap 3</a>), and its logs get collected twice (<a href="gaps.html#logs">gap 4</a>).</p>
+<p>The app's traces, metrics and logs take the first path, as standard OTLP with no SigNoz code. Passing through the agent is what puts pod names on them (<a href="gaps.html#k8s">gap 3</a>). The second path adds things like pod CPU. It also reads the same log lines from stdout, so app logs get stored twice (<a href="gaps.html#logs">gap 4</a>).</p>
 
 <div class="quiz" data-quiz="c1"><p class="q">Check yourself: A user reports one failed checkout. Which signal do you open first to see what happened to that request?</p><button type="button" data-right="false" data-why="A metric is a total across many requests. It cannot show you one request.">A metric, because it is cheapest to query.</button><button type="button" data-right="true" data-why="A trace follows one request through frontend, backend and Postgres, with timings and errors on each span.">A trace, because it shows that one request across every service.</button><button type="button" data-right="false" data-why="That finds error messages from every request. Start from the trace, then read the logs that share its trace ID.">A log search for the word error.</button></div>
-<div class="quiz" data-quiz="c2"><p class="q">Check yourself: What connects a log line to its trace in this app?</p><button type="button" data-right="false" data-why="Time only narrows it down. Under load, many requests overlap.">The timestamp, because they happen at the same moment.</button><button type="button" data-right="true" data-why="LoggingHandler attaches the active trace_id and span_id to every record, so the link is exact.">The trace_id stamped on the log record by the OTLP log bridge.</button><button type="button" data-right="false" data-why="App logs sent over OTLP carry no pod name in this lab. That is gap 3.">The pod name.</button></div>
-<div class="quiz" data-quiz="c3"><p class="q">Check yourself: Why does orders.created have no trace ID on it?</p><button type="button" data-right="false" data-why="It is by design.">It is a bug in the instrumentation.</button><button type="button" data-right="true" data-why="A counter sums events. Per-request detail belongs on spans and logs.">Metrics are pre-aggregated numbers, so one value covers many requests.</button><button type="button" data-right="false" data-why="The SDK never attaches them to a counter in the first place.">SigNoz strips trace IDs from metrics.</button></div>
+<div class="quiz" data-quiz="c2"><p class="q">Check yourself: What connects a log line to its trace in this app?</p><button type="button" data-right="false" data-why="Time only narrows it down. Under load, many requests overlap.">The timestamp, because they happen at the same moment.</button><button type="button" data-right="true" data-why="The bridge attaches the active trace_id and span_id to each record, so the link is exact.">The trace_id stamped on the log record by the OTLP log bridge.</button><button type="button" data-right="false" data-why="Logs do carry a pod name here, but one pod serves many requests, so it cannot identify a trace.">The pod name.</button></div>
+<div class="quiz" data-quiz="c3"><p class="q">Check yourself: Why does signoz_calls_total have no trace ID on it?</p><button type="button" data-right="false" data-why="It is by design.">It is a bug in the instrumentation.</button><button type="button" data-right="true" data-why="A counter sums events. Per-request detail belongs on spans and logs.">Metrics are pre-aggregated numbers, so one value covers many requests.</button><button type="button" data-right="false" data-why="The SDK never attaches them to a counter in the first place.">SigNoz strips trace IDs from metrics.</button></div>
 
 <section class="page-end" id="page-end" aria-label="Page navigation"></section>
 </main>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incident: only one product is slow | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="slowitem">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 2: incident 1 of 4</p>
+<h1>Only one product is slow</h1>
+<p class="lead">Some orders take over a second, and nothing fails. Lab 1 can tell you which orders were slow, and its logs can even name the product. What it can't do is connect the two. That connection is one dimension on one span.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#search">4. Search</a></li><li><a href="#evidence">5. Evidence</a></li><li><a href="#cause">6. Root cause</a></li><li><a href="#fix">7. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p>The <code>slow_item</code> scenario places five orders, and two of them are for <code>catering</code>. Both labs have the same bug, so fire it in each one.</p>
+<div data-fire="slow_item" data-lab="lab1"></div>
+<div data-fire="slow_item" data-lab="lab2"></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>The call succeeds, but slowly. In saved runs it returned HTTP 200 after 3,142 ms in Lab 1, and 3,131 ms in Lab 2. No span has an error, and each order looks the same from the outside.</p>
+
+<h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
+<p>In both labs, start with the slow spans. Then ask three questions: which product, where did the time go, and does it happen every time?</p>
+
+<h2 class="step" id="search"><span class="n">4</span>Search</h2>
+<h3>Lab 1</h3>
+<p>The slow requests are easy to find:</p>
+<div data-query="t-orders-slow">Loading saved query...</div>
+<p>But the span can't tell you more. Nothing puts the product on a span, so this finds nothing:</p>
+<div data-query="t-neg-order">Loading saved query...</div>
+<p>The logs do have it, because the app writes <code>order.item</code> in its <code>order stored</code> line. That is plain <code>logging</code>, as covered in <a href="instrumentation.html">the instrumentation code</a>:</p>
+<div data-query="l-order-attrs">Loading saved query...</div>
+<p>You can count these and sum them, but a log has no duration. So you can see how many catering orders there were, and not how slow they were. Each log shares a <code>span_id</code> with its slow span, so you can check one at a time.</p>
+<div data-query="a-log-orders">Loading saved query...</div>
+<h3>Lab 2</h3>
+<p>The <code>price_order</code> span carries the product, so one search answers it:</p>
+<div data-query="t2-price-slow">Loading saved query...</div>
+<div data-query="a2-price-by-item">Loading saved query...</div>
+<figure class="shot"><img src="screenshots/lab2-price-by-item.png" alt="SigNoz Traces Explorer table grouping price_order spans by order.item, where catering has a P99 of 1.5 seconds" width="1440" height="900" loading="lazy"><figcaption>Latency grouped by product. <span class="badge ui">Seen in SigNoz UI</span> Values are in nanoseconds: <code>catering</code> is about 1.5 s, and the others about 30 ms.</figcaption></figure>
+
+<h2 class="step" id="evidence"><span class="n">5</span>Evidence</h2>
+<h3>Lab 1</h3>
+<div data-evidence="lab1/slow_item" data-logs="order stored" data-log-limit="5">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/lab1-slow-item-trace.png" alt="SigNoz trace page for slow_item in Lab 1, with two POST /orders spans of 1.51 seconds" width="1440" height="900" loading="lazy"><figcaption>Lab 1. <span class="badge ui">Seen in SigNoz UI</span> Two <code>POST /orders</code> spans take 1.51 s, and the flame graph has nothing under them but a thin <code>INSERT</code>.</figcaption></figure>
+<p>Two <code>POST /orders</code> spans take about 1.5 seconds, and their only child is an <code>INSERT</code> of a few milliseconds. The rest of the time is unexplained. The logs below the trace show that those two orders were for <code>catering</code>, but you have to match them up by hand.</p>
+<h3>Lab 2</h3>
+<div data-evidence="lab2/slow_item" data-logs="order stored" data-log-limit="5">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/lab2-slow-item-trace.png" alt="SigNoz trace page for slow_item in Lab 2, where a price_order span fills each slow POST /orders span" width="1440" height="900" loading="lazy"><figcaption>Lab 2. <span class="badge ui">Seen in SigNoz UI</span> The same two slow orders, and now <code>price_order</code> fills each one.</figcaption></figure>
+<p>Now the time has a home. <code>price_order</code> takes about 1,500 ms for <code>catering</code>, and under 30 ms for everything else.</p>
+<table>
+  <thead><tr><th>Question</th><th>Lab 1</th><th>Lab 2</th></tr></thead>
+  <tbody>
+    <tr><td>Which requests are slow?</td><td>Yes, from spans</td><td>Yes, from spans</td></tr>
+    <tr><td>Which product was it?</td><td>Yes, from the log on each slow span, one at a time</td><td>Yes, on the span</td></tr>
+    <tr><td>Where did the time go?</td><td>No, only a gap before the <code>INSERT</code></td><td>Yes, <code>price_order</code></td></tr>
+    <tr><td>Latency by product, in one search?</td><td>No</td><td>Yes</td></tr>
+  </tbody>
+</table>
+<p>The Lab 1 answer does exist, but only outside SigNoz's search box. Joining logs to spans on <code>span_id</code> in ClickHouse gives the same picture:</p>
+<div data-ch="c-item-latency">Loading saved SQL...</div>
+
+<h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/backend.py</code> lines 87–100</span></figcaption><pre><code><span class="ln">87</span>def price_order(order: OrderIn) -&gt; float:
+<span class="ln">88</span>    # Manual span: shows up as a child of the request span, with attributes.
+<span class="ln">89</span>    with tracer.start_as_current_span(&quot;price_order&quot;) as span:
+<span class="ln">90</span>        span.set_attribute(&quot;order.item&quot;, order.item)
+<span class="ln">91</span>        span.set_attribute(&quot;order.qty&quot;, order.qty)
+<span class="ln">92</span>        # Deliberate bug: pricing is very slow for this one item.
+<span class="ln">93</span>        time.sleep(1.5 if order.item == &quot;catering&quot; else random.uniform(0.005, 0.03))
+<span class="ln">94</span>        total = round(PRICES.get(order.item, 5.0) * order.qty, 2)
+<span class="ln">95</span>        # Deliberate bug: this 10% coupon makes the whole order free.
+<span class="ln">96</span>        if order.coupon == &quot;SAVE10&quot;:
+<span class="ln">97</span>            span.set_attribute(&quot;order.coupon&quot;, order.coupon)
+<span class="ln">98</span>            total = 0.0
+<span class="ln">99</span>        span.set_attribute(&quot;order.total&quot;, total)
+<span class="ln">100</span>        return total</code></pre></figure>
+<p>Pricing sleeps for 1.5 seconds when the item is <code>catering</code>. It is deliberate here. In a real app it might be a call to a supplier, or a slow calculation for one product type.</p>
+<p>The bug is in both labs. The code around it is the only difference: Lab 2 wraps the same logic in a span, and sets two attributes.</p>
+
+<h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
+<p>In this lab the sleep is deliberate, so removing it is the fix.</p>
+<figure class="code"><figcaption><span>Proposed fix for labs/lab2-custom-dimensions/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code><span class="del">-        time.sleep(1.5 if order.item == &quot;catering&quot; else random.uniform(0.005, 0.03))</span><span class="add">+        time.sleep(random.uniform(0.005, 0.03))</span></code></pre></figure>
+<p>To confirm a fix in real life, deploy it and re-run the latency-by-product search. <code>catering</code> should drop to the same level as the others.</p>
+
+<div class="quiz" data-quiz="si1"><p class="q">Check yourself: Lab 1 has order.item on its logs. Why can it still not give you P99 latency by product?</p><button type="button" data-right="false" data-why="They can. Lab 1 can count and sum by order.item.">Logs cannot be grouped.</button><button type="button" data-right="true" data-why="The two facts are on different signals. Only a join outside the search box connects them.">A log has no duration, and the span has no product.</button><button type="button" data-right="false" data-why="It does, on every span.">Lab 1 does not record latency.</button></div>
+<div class="quiz" data-quiz="si2"><p class="q">Check yourself: What does the price_order span add that no log line could?</p><button type="button" data-right="false" data-why="The log already has that.">The product name.</button><button type="button" data-right="true" data-why="That is what turns an unexplained gap into an answer.">A measured duration for the pricing step, tied to the product.</button><button type="button" data-right="false" data-why="The log has that too.">The trace ID.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

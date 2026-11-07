@@ -5,7 +5,7 @@ import time
 
 from signoz_client import LABS, count, fire, login, metric_exists, read_credentials
 
-SCENARIOS = ["order"] * 5 + ["list", "slow_query", "bad_input", "crash", "backend_500", "db_error", "timeout"]
+SCENARIOS = ["order"] * 5 + ["list", "slow_query", "bad_input", "crash", "backend_500", "db_error", "timeout", "cache_miss"]
 WINDOW_MINUTES = 3
 # On a fresh boot, a new metric takes a while to become queryable, so a quick
 # "no" can be wrong. Keep asking until this many seconds after the spans check.
@@ -44,8 +44,10 @@ def checks(token, lab, deadline):
         ("Logs linked to traces", count(token, "logs", f"{both} AND trace_id != ''", WINDOW_MINUTES)),
         ("HTTP metrics", metric("http.server.duration.count", backend)),
         ("Python runtime metrics", metric("cpython.gc.collections", backend)),
+        ("Log fields from plain logging (order.item)", count(token, "logs", f"service.name = '{backend}' AND order.item EXISTS", WINDOW_MINUTES)),
         ("Custom span (price_order)", spans(token, f"service.name = '{backend}' AND name = 'price_order'")),
         ("Business attribute on spans (order.item)", spans(token, f"service.name = '{backend}' AND order.item EXISTS")),
+        ("Technical attribute on spans (cache.hit)", spans(token, f"service.name = '{backend}' AND cache.hit EXISTS")),
         ("Scenario name on spans (lab.scenario)", spans(token, f"service.name = '{frontend}' AND lab.scenario EXISTS")),
         ("Business metric (orders.created)", metric("orders.created", backend)),
     ]
@@ -86,8 +88,8 @@ def main():
     rows.append(("Trace ID in the API response", show(trace_ids["1"]), show(trace_ids["2"])))
 
     width = max(len(row[0]) for row in rows)
-    print(f"\n{'What SigNoz received':<{width}}  {'Lab 1 (hands-off)':<18}  Lab 2 (SDK)")
-    print("-" * (width + 34))
+    print(f"\n{'What SigNoz received':<{width}}  {'Lab 1 (hands-off)':<18}  Lab 2 (custom dimensions)")
+    print("-" * (width + 48))
     for name, first, second in rows:
         print(f"{name:<{width}}  {first:<18}  {second}")
     print(f"\nCounts cover the last {WINDOW_MINUTES} minutes, so they include any other traffic.")

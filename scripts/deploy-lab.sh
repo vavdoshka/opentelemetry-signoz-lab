@@ -7,7 +7,7 @@ cd "$ROOT"
 case "${1:-}" in
   1) dir=labs/lab1-hands-off; namespace=lab1; image=telemetry-lab1:dev
      apps="lab1-backend lab1-frontend lab1-loadgen" ;;
-  2) dir=labs/lab2-sdk; namespace=lab2; image=telemetry-lab2:dev
+  2) dir=labs/lab2-custom-dimensions; namespace=lab2; image=telemetry-lab2:dev
      apps="backend frontend loadgen" ;;
   *) echo "Usage: $0 1|2" >&2; exit 1 ;;
 esac
@@ -16,10 +16,8 @@ step "Lab $1"
 docker build -t "$image" "$dir/app"
 load_image "$image"
 
-# Lab 1 only. The Instrumentation must exist before the pods start.
-if [ -f "$dir/k8s/instrumentation.yaml" ]; then
-  k apply -f "$dir/k8s/instrumentation.yaml"
-fi
+# The Instrumentation must exist before the pods start.
+k apply -f "$dir/k8s/instrumentation.yaml"
 k apply -f "$dir/k8s/app.yaml"
 
 # The image tag does not change, so restart to pick up a new build.
@@ -32,3 +30,8 @@ done
 
 step "Smoke test: Lab $1"
 python3 scripts/smoke_test.py "$1"
+
+if [ "$1" = 2 ]; then
+  step "Dashboard"
+  python3 scripts/create_dashboard.py
+fi

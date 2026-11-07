@@ -57,7 +57,7 @@ What this shows:
 | Small batches on agents, larger on gateways | OTel agent-to-gateway | 200 ms on agents, 1 s on collectors | Meets |
 | Agents plus a gateway pool | OTel anti-patterns | Agents yes. SigNoz collectors act as the pool | Partly |
 | Queue and retry on exporters | OTel agent-to-gateway | Not configured, relies on exporter defaults. The crash test kept 99.6% of traces | Partly |
-| Reduce noise | SigNoz checklist | Probes excluded, but 56% of spans are ASGI noise | Partly |
+| Reduce noise | SigNoz checklist | Probes excluded, but more than half of spans are ASGI noise | Partly |
 | Production-suitable distribution | OTel anti-patterns | Agents use stock `contrib`, fine for a lab | Partly |
 | All spans of a trace on one collector | OTel scaling, tail sampling, service graph | Plain Service, so traces split across collectors | **Misses** |
 | Do not rely on L4 balancing for persistent connections | OTel scaling (written for gRPC) | One collector took every span in one run | **Misses** |
@@ -113,7 +113,8 @@ sampling, span metrics and service graphs, not for SigNoz's map specifically. It
 
 ## Recommended order
 
-1. Remove ASGI noise spans. Biggest saving, no loss.
+1. Remove ASGI noise spans. Biggest saving, no loss. The injected agent has no setting for this, so
+   check how before relying on it.
 2. Add trace-ID routing in the agents, then rerun the same map measurement.
 3. Add `memory_limiter`, and send collector metrics to SigNoz.
 4. Add tail sampling only if volume or cost requires it. Expect understated APM counts until SigNoz

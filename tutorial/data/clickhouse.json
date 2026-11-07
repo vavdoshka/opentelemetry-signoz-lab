@@ -1,12 +1,13 @@
 {
- "generatedAt": "2026-11-05T01:10:26Z",
+ "generatedAt": "2026-11-07T11:22:41Z",
  "how": "kubectl -n signoz exec chi-signoz-clickhouse-cluster-0-0-0 -c clickhouse -- clickhouse-client --query \"...\"",
  "queries": [
   {
    "id": "c-tree",
+   "lab": "lab1",
    "title": "Every span of one trace, with parent links",
    "why": "The timeout run. Shows the frontend stopping near 1 s while the backend carries on to 3 s.",
-   "sql": "SELECT toString(timestamp) AS ts, resource_string_service$$name AS service, name, kind_string AS kind, status_code_string AS status, response_status_code AS http, round(duration_nano/1e6,1) AS ms, span_id, parent_span_id FROM signoz_traces.distributed_signoz_index_v3 WHERE trace_id='ab23d22ff92a4c83b20b29657447a38b' ORDER BY timestamp",
+   "sql": "SELECT toString(timestamp) AS ts, resource_string_service$$name AS service, name, kind_string AS kind, status_code_string AS status, response_status_code AS http, round(duration_nano/1e6,1) AS ms, span_id, parent_span_id FROM signoz_traces.distributed_signoz_index_v3 WHERE trace_id='fd707025097ba2c2c93c07c60eda4ea7' ORDER BY timestamp",
    "result": {
     "columns": [
      "ts",
@@ -21,102 +22,102 @@
     ],
     "rows": [
      [
-      "2026-11-04 23:10:23.415264794",
-      "frontend",
+      "2026-11-07 11:01:39.498627219",
+      "lab1-frontend",
       "POST /api/scenario/{name}",
       "Server",
       "Error",
       "504",
-      "1024.4",
-      "afaccf80e771d62d",
+      "1006.7",
+      "5ffde26a9f747685",
       ""
      ],
      [
-      "2026-11-04 23:10:23.415470377",
-      "frontend",
+      "2026-11-07 11:01:39.498890511",
+      "lab1-frontend",
       "POST /api/scenario/{name} http receive",
       "Internal",
       "Unset",
       "",
       "0",
-      "9635b598273c3871",
-      "afaccf80e771d62d"
+      "ae819f35c746daaa",
+      "5ffde26a9f747685"
      ],
      [
-      "2026-11-04 23:10:23.415778169",
-      "frontend",
+      "2026-11-07 11:01:39.499210011",
+      "lab1-frontend",
       "GET",
       "Client",
       "Error",
       "",
-      "1020.7",
-      "773d61dffa530331",
-      "afaccf80e771d62d"
+      "1005.5",
+      "7adfc287e7b56a97",
+      "5ffde26a9f747685"
      ],
      [
-      "2026-11-04 23:10:23.416610960",
-      "backend",
+      "2026-11-07 11:01:39.501070178",
+      "lab1-backend",
       "GET /work/slow",
       "Server",
       "Unset",
       "200",
-      "3001.6",
-      "6136ce4b739aba02",
-      "773d61dffa530331"
+      "3001.8",
+      "6e0191e060a35973",
+      "7adfc287e7b56a97"
      ],
      [
-      "2026-11-04 23:10:24.437830627",
-      "frontend",
+      "2026-11-07 11:01:40.504957428",
+      "lab1-frontend",
       "POST /api/scenario/{name} http send",
       "Internal",
       "Error",
       "504",
-      "0.1",
-      "79a6386288ae7a13",
-      "afaccf80e771d62d"
+      "0",
+      "8b3041859dc77ad9",
+      "5ffde26a9f747685"
      ],
      [
-      "2026-11-04 23:10:24.439423044",
-      "frontend",
+      "2026-11-07 11:01:40.505215761",
+      "lab1-frontend",
       "POST /api/scenario/{name} http send",
       "Internal",
       "Unset",
       "",
       "0",
-      "570d35f143c536b0",
-      "afaccf80e771d62d"
+      "04abebd70d42bd47",
+      "5ffde26a9f747685"
      ],
      [
-      "2026-11-04 23:10:26.418159212",
-      "backend",
+      "2026-11-07 11:01:42.502816137",
+      "lab1-backend",
       "GET /work/slow http send",
       "Internal",
       "Unset",
       "200",
       "0",
-      "d94046075feb935d",
-      "6136ce4b739aba02"
+      "b3d6e4a90fd7491d",
+      "6e0191e060a35973"
      ],
      [
-      "2026-11-04 23:10:26.418237170",
-      "backend",
+      "2026-11-07 11:01:42.502885221",
+      "lab1-backend",
       "GET /work/slow http send",
       "Internal",
       "Unset",
       "",
       "0",
-      "9b6068329c3fb45f",
-      "6136ce4b739aba02"
+      "492762d2f4aa117c",
+      "6e0191e060a35973"
      ]
     ]
-   },
-   "verified": "clickhouse"
+   }
   },
   {
    "id": "c-sql-slowest",
+   "lab": "lab1",
    "title": "Slowest SQL statements",
-   "why": "`db.statement` is a map entry in `attributes_string`.",
-   "sql": "SELECT attributes_string['db.statement'] AS statement, count() AS calls, round(avg(duration_nano)/1e6,1) AS avg_ms, round(max(duration_nano)/1e6,1) AS max_ms FROM signoz_traces.distributed_signoz_index_v3 WHERE attributes_string['db.system']='postgresql' AND timestamp BETWEEN '2026-11-04 23:08:00' AND '2026-11-04 23:59:00' GROUP BY statement ORDER BY max_ms DESC LIMIT 6",
+   "why": "`db.statement` is a map entry in `attributes_string`. Covers the load run.",
+   "sql": "SELECT attributes_string['db.statement'] AS statement, count() AS calls, round(avg(duration_nano)/1e6,1) AS avg_ms, round(max(duration_nano)/1e6,1) AS max_ms FROM signoz_traces.distributed_signoz_index_v3 WHERE resource_string_service$$name='lab1-backend' AND attributes_string['db.system']='postgresql' AND timestamp BETWEEN '2026-11-07 11:10:17' AND '2026-11-07 11:21:03' GROUP BY statement ORDER BY max_ms DESC LIMIT 6",
    "result": {
     "columns": [
      "statement",
@@ -128,36 +129,36 @@
      [
       "SELECT pg_sleep(%s)",
       "3",
-      "2004.2",
-      "2005.9"
+      "2002.2",
+      "2002.6"
      ],
      [
       "INSERT INTO orders (item, qty, total) VALUES (%s, %s, %s) RETURNING id",
-      "7810",
-      "4.2",
-      "1700.8"
+      "1757",
+      "4.6",
+      "204.8"
      ],
      [
       "SELECT id, item, qty, total, created_at FROM orders ORDER BY id DESC LIMIT 20",
-      "4166",
-      "3.3",
-      "605.5"
+      "983",
+      "3.9",
+      "156.8"
      ],
      [
       "SELECT * FROM table_that_does_not_exist",
-      "287",
-      "4.3",
-      "63"
+      "60",
+      "4",
+      "33.4"
      ]
     ]
-   },
-   "verified": "clickhouse"
+   }
   },
   {
    "id": "c-exceptions",
+   "lab": "both",
    "title": "Exception types recorded on spans",
    "why": "Reads the events array. The same types appear on the Exceptions page.",
-   "sql": "SELECT resource_string_service$$name AS service, JSONExtractString(e,'attributeMap','exception.type') AS exception_type, count() AS n FROM signoz_traces.distributed_signoz_index_v3 ARRAY JOIN events AS e WHERE JSONExtractString(e,'name')='exception' AND timestamp BETWEEN '2026-11-04 23:08:00' AND '2026-11-04 23:59:00' GROUP BY service, exception_type ORDER BY n DESC",
+   "sql": "SELECT resource_string_service$$name AS service, JSONExtractString(e,'attributeMap','exception.type') AS exception_type, count() AS n FROM signoz_traces.distributed_signoz_index_v3 ARRAY JOIN events AS e WHERE JSONExtractString(e,'name')='exception' AND timestamp BETWEEN '2026-11-07 11:10:17' AND '2026-11-07 11:21:03' GROUP BY service, exception_type ORDER BY n DESC",
    "result": {
     "columns": [
      "service",
@@ -166,39 +167,59 @@
     ],
     "rows": [
      [
+      "lab1-backend",
+      "RuntimeError",
+      "76"
+     ],
+     [
       "frontend",
       "httpx.ReadTimeout",
-      "298"
+      "74"
      ],
      [
       "backend",
       "psycopg.errors.UndefinedTable",
-      "287"
-     ],
-     [
-      "frontend",
-      "ZeroDivisionError",
-      "282"
+      "68"
      ],
      [
       "backend",
       "RuntimeError",
-      "277"
+      "64"
+     ],
+     [
+      "lab1-backend",
+      "psycopg.errors.UndefinedTable",
+      "60"
+     ],
+     [
+      "lab1-frontend",
+      "ZeroDivisionError",
+      "60"
+     ],
+     [
+      "lab1-frontend",
+      "httpx.ReadTimeout",
+      "51"
      ],
      [
       "frontend",
+      "ZeroDivisionError",
+      "48"
+     ],
+     [
+      "lab1-loadgen",
       "httpx.ReadError",
-      "2"
+      "1"
      ]
     ]
-   },
-   "verified": "clickhouse"
+   }
   },
   {
    "id": "c-logs-trace",
+   "lab": "lab1",
    "title": "Logs for one trace",
    "why": "The db_error run. Three logs from two services under one trace ID.",
-   "sql": "SELECT toString(fromUnixTimestamp64Nano(timestamp)) AS ts, resources_string['service.name'] AS service, severity_text AS severity, substring(body,1,90) AS body FROM signoz_logs.distributed_logs_v2 WHERE trace_id='8b890cacc615088c5d6508a6e8b7cfcc' ORDER BY timestamp",
+   "sql": "SELECT toString(fromUnixTimestamp64Nano(timestamp)) AS ts, resources_string['service.name'] AS service, severity_text AS severity, substring(body,1,90) AS body FROM signoz_logs.distributed_logs_v2 WHERE trace_id='e0156d74a8f61d779d050f6fab39994f' ORDER BY timestamp",
    "result": {
     "columns": [
      "ts",
@@ -208,32 +229,32 @@
     ],
     "rows": [
      [
-      "2026-11-04 23:10:26.514086144",
-      "backend",
+      "2026-11-07 11:01:26.462027776",
+      "lab1-backend",
       "ERROR",
       "query failed: relation \"table_that_does_not_exist\" does not exist"
      ],
      [
-      "2026-11-04 23:10:26.515863808",
-      "frontend",
+      "2026-11-07 11:01:26.463481088",
+      "lab1-frontend",
       "INFO",
       "HTTP Request: GET http://backend:8000/work/db-error \"HTTP/1.1 500 Internal Server Error\""
      ],
      [
-      "2026-11-04 23:10:26.516532224",
-      "frontend",
+      "2026-11-07 11:01:26.463947264",
+      "lab1-frontend",
       "ERROR",
       "backend reported a database error"
      ]
     ]
-   },
-   "verified": "clickhouse"
+   }
   },
   {
    "id": "c-log-copies",
+   "lab": "lab1",
    "title": "OTLP copies versus stdout copies",
-   "why": "Gap 4 in numbers, over the 51-minute load run.",
-   "sql": "SELECT if(resources_string['service.name']='', 'stdout copy (k8s-infra)', 'OTLP copy') AS copy, count() AS n, countIf(trace_id!='') AS with_trace_id, countIf(severity_text!='') AS with_severity FROM signoz_logs.distributed_logs_v2 WHERE timestamp BETWEEN toUnixTimestamp64Nano(toDateTime64('2026-11-04 23:08:00',9)) AND toUnixTimestamp64Nano(toDateTime64('2026-11-04 23:59:00',9)) AND (resources_string['service.name'] IN ('frontend','backend') OR resources_string['k8s.namespace.name']='lab2') GROUP BY copy ORDER BY copy",
+   "why": "Gap 4 in numbers, over the load run.",
+   "sql": "SELECT if(resources_string['service.name']='', 'stdout copy (k8s-infra)', 'OTLP copy') AS copy, count() AS n, countIf(trace_id!='') AS with_trace_id, countIf(severity_text!='') AS with_severity FROM signoz_logs.distributed_logs_v2 WHERE timestamp BETWEEN toUnixTimestamp64Nano(toDateTime64('2026-11-07 11:10:17',9)) AND toUnixTimestamp64Nano(toDateTime64('2026-11-07 11:21:03',9)) AND (resources_string['service.name'] IN ('lab1-frontend','lab1-backend','lab1-loadgen') OR (resources_string['service.name']='' AND resources_string['k8s.namespace.name']='lab1')) GROUP BY copy ORDER BY copy",
    "result": {
     "columns": [
      "copy",
@@ -244,25 +265,25 @@
     "rows": [
      [
       "OTLP copy",
-      "39328",
-      "39328",
-      "39328"
+      "8824",
+      "5625",
+      "8824"
      ],
      [
       "stdout copy (k8s-infra)",
-      "132914",
+      "30825",
       "0",
       "0"
      ]
     ]
-   },
-   "verified": "clickhouse"
+   }
   },
   {
    "id": "c-stdout-kinds",
+   "lab": "lab1",
    "title": "What the stdout log lines actually are",
-   "why": "Sorts the stdout copies from the load run by what each line is. The twins match the OTLP count exactly.",
-   "sql": "SELECT multiIf(resources_string['k8s.container.name']='postgres','Postgres', body LIKE '%trace_id=%','Twin of an OTLP log (trace_id only as text)', body LIKE 'INFO:%/healthz%','Health probe access line', body LIKE 'INFO:%','uvicorn access line', body LIKE '%File \"%' OR body LIKE ' %' OR body LIKE '%Traceback (most recent%','Stack trace line, one record per line','Other') AS kind, count() AS n FROM signoz_logs.distributed_logs_v2 WHERE timestamp BETWEEN toUnixTimestamp64Nano(toDateTime64('2026-11-04 23:08:00',9)) AND toUnixTimestamp64Nano(toDateTime64('2026-11-04 23:59:00',9)) AND resources_string['service.name']='' AND resources_string['k8s.namespace.name']='lab2' GROUP BY kind ORDER BY n DESC",
+   "why": "Sorts the stdout copies from the load run by what each line is. Classified by pattern, so approximate.",
+   "sql": "SELECT multiIf(resources_string['k8s.container.name']='postgres','Postgres', match(body,'^[0-9]{4}-[0-9]{2}-[0-9]{2} '),'App log line, also sent over OTLP', body LIKE 'INFO:%/healthz%','Health probe access line', body LIKE 'INFO:%','uvicorn access line', body LIKE '%File \"%' OR body LIKE ' %' OR body LIKE '%Traceback (most recent%','Stack trace line, one record per line','Other') AS kind, count() AS n FROM signoz_logs.distributed_logs_v2 WHERE timestamp BETWEEN toUnixTimestamp64Nano(toDateTime64('2026-11-07 11:10:17',9)) AND toUnixTimestamp64Nano(toDateTime64('2026-11-07 11:21:03',9)) AND resources_string['service.name']='' AND resources_string['k8s.namespace.name']='lab1' GROUP BY kind ORDER BY n DESC",
    "result": {
     "columns": [
      "kind",
@@ -271,37 +292,37 @@
     "rows": [
      [
       "Stack trace line, one record per line",
-      "61061"
+      "14460"
      ],
      [
-      "Twin of an OTLP log (trace_id only as text)",
-      "39328"
+      "App log line, also sent over OTLP",
+      "8824"
      ],
      [
       "uvicorn access line",
-      "28446"
+      "6500"
      ],
      [
       "Other",
-      "2262"
+      "528"
      ],
      [
       "Health probe access line",
-      "1223"
+      "387"
      ],
      [
       "Postgres",
-      "594"
+      "126"
      ]
     ]
-   },
-   "verified": "clickhouse"
+   }
   },
   {
    "id": "c-k8s-coverage",
+   "lab": "both",
    "title": "Spans with Kubernetes context",
-   "why": "Gap 3 in numbers.",
-   "sql": "SELECT count() AS spans, countIf(resources_string['k8s.pod.name']!='') AS with_pod_name FROM signoz_traces.distributed_signoz_index_v3 WHERE timestamp BETWEEN '2026-11-04 23:08:00' AND '2026-11-04 23:59:00'",
+   "why": "Gap 3 in numbers, over the load run.",
+   "sql": "SELECT count() AS spans, countIf(resources_string['k8s.pod.name']!='') AS with_pod_name FROM signoz_traces.distributed_signoz_index_v3 WHERE resource_string_service$$name IN ('lab1-frontend','lab1-backend','frontend','backend') AND timestamp BETWEEN '2026-11-07 11:10:17' AND '2026-11-07 11:21:03'",
    "result": {
     "columns": [
      "spans",
@@ -309,18 +330,18 @@
     ],
     "rows": [
      [
-      "142872",
-      "0"
+      "62872",
+      "62872"
      ]
     ]
-   },
-   "verified": "clickhouse"
+   }
   },
   {
    "id": "c-noise",
+   "lab": "lab1",
    "title": "Share of ASGI send and receive spans",
-   "why": "Gap 6 in numbers.",
-   "sql": "SELECT count() AS spans, countIf(name LIKE '% http send' OR name LIKE '% http receive') AS asgi_noise, round(100*asgi_noise/spans,1) AS pct FROM signoz_traces.distributed_signoz_index_v3 WHERE timestamp BETWEEN '2026-11-04 23:08:00' AND '2026-11-04 23:59:00'",
+   "why": "Gap 6 in numbers, over the load run.",
+   "sql": "SELECT count() AS spans, countIf(name LIKE '% http send' OR name LIKE '% http receive') AS asgi_noise, round(100*asgi_noise/spans,1) AS pct FROM signoz_traces.distributed_signoz_index_v3 WHERE resource_string_service$$name IN ('lab1-frontend','lab1-backend') AND timestamp BETWEEN '2026-11-07 11:10:17' AND '2026-11-07 11:21:03'",
    "result": {
     "columns": [
      "spans",
@@ -329,114 +350,68 @@
     ],
     "rows": [
      [
-      "142872",
-      "79954",
-      "56"
+      "30760",
+      "18190",
+      "59.1"
      ]
     ]
-   },
-   "verified": "clickhouse"
+   }
   },
   {
-   "id": "c-top-level",
-   "title": "The rows that decide who appears on Services",
-   "why": "`time` here is when the row was written. `backend` only has rows from about 45 seconds.",
-   "sql": "SELECT serviceName, count() AS ops, toString(min(time)) AS first_row, toString(max(time)) AS last_row FROM signoz_traces.distributed_top_level_operations GROUP BY serviceName ORDER BY serviceName",
-   "result": {
-    "columns": [
-     "serviceName",
-     "ops",
-     "first_row",
-     "last_row"
-    ],
-    "rows": [
-     [
-      "backend",
-      "6",
-      "2026-11-04 23:10:29",
-      "2026-11-04 23:11:14"
-     ],
-     [
-      "frontend",
-      "6",
-      "2026-11-04 23:01:23",
-      "2026-11-05 00:00:24"
-     ]
-    ]
-   },
-   "verified": "clickhouse"
-  },
-  {
-   "id": "c-dep-graph",
-   "title": "The rows behind the Service Map",
-   "why": "`frontend \u2192 backend` has two one-minute rows.",
-   "sql": "SELECT src, dest, count() AS rows_, toString(min(timestamp)) AS first_row, toString(max(timestamp)) AS last_row, sum(total_count) AS calls FROM signoz_traces.distributed_dependency_graph_minutes_v2 GROUP BY src, dest",
+   "id": "c-map-vs-real",
+   "lab": "both",
+   "title": "Service Map counts against real calls",
+   "why": "Gap 2 in numbers, over the load run. `real_calls` joins each Client span to the Server span it called. `map_calls` is what the Service Map reads.",
+   "sql": "SELECT r.src AS src, r.dest AS dest, r.real_calls AS real_calls, ifNull(m.map_calls,0) AS map_calls, round(100*map_calls/real_calls,1) AS pct FROM (SELECT c.s AS src, v.s AS dest, count() AS real_calls FROM (SELECT span_id, resource_string_service$$name AS s FROM signoz_traces.distributed_signoz_index_v3 WHERE timestamp BETWEEN '2026-11-07 11:10:17' AND '2026-11-07 11:21:03' AND kind_string='Client' AND resource_string_service$$name IN ('lab1-frontend','lab1-loadgen','frontend','loadgen')) AS c INNER JOIN (SELECT parent_span_id, resource_string_service$$name AS s FROM signoz_traces.distributed_signoz_index_v3 WHERE timestamp BETWEEN '2026-11-07 11:10:17' AND '2026-11-07 11:21:03' AND kind_string='Server') AS v ON c.span_id=v.parent_span_id GROUP BY src, dest) AS r LEFT JOIN (SELECT src, dest, sum(total_count) AS map_calls FROM signoz_traces.distributed_dependency_graph_minutes_v2 WHERE timestamp BETWEEN '2026-11-07 11:10:17' AND '2026-11-07 11:21:03' GROUP BY src, dest) AS m ON r.src=m.src AND r.dest=m.dest ORDER BY src SETTINGS join_use_nulls=1",
    "result": {
     "columns": [
      "src",
      "dest",
-     "rows_",
-     "first_row",
-     "last_row",
-     "calls"
+     "real_calls",
+     "map_calls",
+     "pct"
     ],
     "rows": [
      [
       "frontend",
       "backend",
-      "2",
-      "2026-11-04 23:10:00",
-      "2026-11-04 23:11:00",
-      "246"
+      "3082",
+      "957",
+      "31.1"
      ],
      [
-      "backend",
-      "postgresql",
-      "82",
-      "2026-11-04 22:28:00",
-      "2026-11-05 00:00:00",
-      "19768"
-     ]
-    ]
-   },
-   "verified": "clickhouse"
-  },
-  {
-   "id": "c-view-runs",
-   "title": "How often the two views wrote anything",
-   "why": "`system.query_views_log` records each view run. Rows in it age out, so counts depend on when you run this.",
-   "sql": "SELECT view_name, count() AS runs, countIf(written_rows>0) AS runs_with_rows, sum(written_rows) AS rows_written FROM system.query_views_log WHERE view_name LIKE '%sub_root_operations%' OR view_name LIKE '%dependency_graph_minutes_service_calls_mv_v2%' GROUP BY view_name",
-   "result": {
-    "columns": [
-     "view_name",
-     "runs",
-     "runs_with_rows",
-     "rows_written"
-    ],
-    "rows": [
-     [
-      "signoz_traces.dependency_graph_minutes_service_calls_mv_v2",
-      "1903",
-      "11",
-      "12"
+      "lab1-frontend",
+      "lab1-backend",
+      "3216",
+      "0",
+      "0"
      ],
      [
-      "signoz_traces.sub_root_operations",
-      "1903",
-      "11",
-      "37"
+      "lab1-loadgen",
+      "lab1-frontend",
+      "3200",
+      "0",
+      "0"
+     ],
+     [
+      "loadgen",
+      "frontend",
+      "3200",
+      "1123",
+      "35.1"
      ]
     ]
-   },
-   "verified": "clickhouse"
+   }
   },
   {
    "id": "c-burn-effect",
-   "title": "Backend latency during the CPU burn",
-   "why": "p50 of unrelated routes in the 90 seconds of the burn. Run once per window: 23:13:00-23:15:40, 23:15:46-23:17:12, 23:17:20-23:19:00. Saved output is the \"during\" window.",
-   "sql": "SELECT name, count() AS n, round(quantile(0.5)(duration_nano)/1e6,1) AS p50_ms, round(quantile(0.95)(duration_nano)/1e6,1) AS p95_ms FROM signoz_traces.distributed_signoz_index_v3 WHERE resource_string_service$$name='backend' AND kind_string='Server' AND name IN ('GET /orders','POST /orders') AND timestamp BETWEEN '2026-11-04 23:15:46' AND '2026-11-04 23:17:12' GROUP BY name ORDER BY name",
+   "lab": "lab1",
+   "title": "Backend latency before, during and after the CPU burn",
+   "why": "P50 of routes that did nothing wrong, split by period.",
+   "sql": "SELECT multiIf(timestamp < '2026-11-07 11:15:23','1 before',timestamp <= '2026-11-07 11:16:53','2 during','3 after') AS period, name, count() AS n, round(quantile(0.5)(duration_nano)/1e6,1) AS p50_ms, round(quantile(0.95)(duration_nano)/1e6,1) AS p95_ms FROM signoz_traces.distributed_signoz_index_v3 WHERE resource_string_service$$name='lab1-backend' AND kind_string='Server' AND name IN ('GET /orders','POST /orders') AND timestamp BETWEEN '2026-11-07 11:10:17' AND '2026-11-07 11:21:03' AND timestamp < '2026-11-07 11:18:53' GROUP BY period, name ORDER BY name, period",
    "result": {
     "columns": [
+     "period",
      "name",
      "n",
      "p50_ms",
@@ -444,26 +419,56 @@
     ],
     "rows": [
      [
+      "1 before",
       "GET /orders",
-      "178",
-      "96.3",
-      "145.3"
+      "428",
+      "9.8",
+      "22.1"
      ],
      [
+      "2 during",
+      "GET /orders",
+      "195",
+      "88.6",
+      "133.1"
+     ],
+     [
+      "3 after",
+      "GET /orders",
+      "175",
+      "9.4",
+      "26"
+     ],
+     [
+      "1 before",
       "POST /orders",
-      "230",
-      "123",
-      "167.1"
+      "838",
+      "30.7",
+      "46.9"
+     ],
+     [
+      "2 during",
+      "POST /orders",
+      "244",
+      "113.8",
+      "154.4"
+     ],
+     [
+      "3 after",
+      "POST /orders",
+      "327",
+      "30.7",
+      "55.5"
      ]
     ]
-   },
-   "verified": "clickhouse"
+   }
   },
   {
    "id": "c-cpu-samples",
+   "lab": "lab1",
    "title": "Raw CPU samples for the backend pod",
    "why": "One sample every 30 seconds. `sample` is a reserved word in ClickHouse SQL, so the alias is `s`.",
-   "sql": "SELECT toString(toDateTime(intDiv(s.unix_milli,1000))) AS t, round(s.value,3) AS cores FROM signoz_metrics.distributed_samples_v4 AS s WHERE s.metric_name='k8s.pod.cpu.usage' AND s.fingerprint IN (SELECT fingerprint FROM signoz_metrics.distributed_time_series_v4 WHERE metric_name='k8s.pod.cpu.usage' AND JSONExtractString(labels,'k8s.pod.name') LIKE 'backend-%') AND s.unix_milli BETWEEN 1793833800000 AND 1793834400000 ORDER BY s.unix_milli",
+   "sql": "SELECT toString(toDateTime(intDiv(s.unix_milli,1000))) AS t, round(s.value,3) AS cores FROM signoz_metrics.distributed_samples_v4 AS s WHERE s.metric_name='k8s.pod.cpu.usage' AND s.fingerprint IN (SELECT fingerprint FROM signoz_metrics.distributed_time_series_v4 WHERE metric_name='k8s.pod.cpu.usage' AND JSONExtractString(labels,'k8s.pod.name') LIKE 'lab1-backend-%') AND s.unix_milli BETWEEN 1794049817000 AND 1794050583000 ORDER BY s.unix_milli",
    "result": {
     "columns": [
      "t",
@@ -471,88 +476,167 @@
     ],
     "rows": [
      [
-      "2026-11-04 23:10:29",
-      "0.021"
+      "2026-11-07 11:10:23",
+      "0.008"
      ],
      [
-      "2026-11-04 23:10:59",
-      "0.042"
-     ],
-     [
-      "2026-11-04 23:11:29",
-      "0.336"
-     ],
-     [
-      "2026-11-04 23:11:59",
-      "0.985"
-     ],
-     [
-      "2026-11-04 23:12:29",
-      "0.973"
-     ],
-     [
-      "2026-11-04 23:12:59",
-      "0.702"
-     ],
-     [
-      "2026-11-04 23:13:29",
-      "0.033"
-     ],
-     [
-      "2026-11-04 23:13:59",
-      "0.039"
-     ],
-     [
-      "2026-11-04 23:14:29",
+      "2026-11-07 11:10:53",
       "0.035"
      ],
      [
-      "2026-11-04 23:14:59",
+      "2026-11-07 11:11:23",
       "0.039"
      ],
      [
-      "2026-11-04 23:15:29",
-      "0.046"
+      "2026-11-07 11:11:53",
+      "0.034"
      ],
      [
-      "2026-11-04 23:15:59",
-      "0.043"
-     ],
-     [
-      "2026-11-04 23:16:29",
-      "0.917"
-     ],
-     [
-      "2026-11-04 23:16:59",
-      "0.993"
-     ],
-     [
-      "2026-11-04 23:17:29",
-      "0.37"
-     ],
-     [
-      "2026-11-04 23:17:59",
-      "0.039"
-     ],
-     [
-      "2026-11-04 23:18:29",
-      "0.031"
-     ],
-     [
-      "2026-11-04 23:18:59",
-      "0.031"
-     ],
-     [
-      "2026-11-04 23:19:29",
+      "2026-11-07 11:12:23",
       "0.033"
      ],
      [
-      "2026-11-04 23:19:59",
-      "0.036"
+      "2026-11-07 11:12:53",
+      "0.035"
+     ],
+     [
+      "2026-11-07 11:13:23",
+      "0.035"
+     ],
+     [
+      "2026-11-07 11:13:53",
+      "0.035"
+     ],
+     [
+      "2026-11-07 11:14:23",
+      "0.043"
+     ],
+     [
+      "2026-11-07 11:14:53",
+      "0.039"
+     ],
+     [
+      "2026-11-07 11:15:23",
+      "0.053"
+     ],
+     [
+      "2026-11-07 11:15:53",
+      "0.968"
+     ],
+     [
+      "2026-11-07 11:16:23",
+      "0.991"
+     ],
+     [
+      "2026-11-07 11:16:53",
+      "0.985"
+     ],
+     [
+      "2026-11-07 11:17:23",
+      "0.038"
+     ],
+     [
+      "2026-11-07 11:17:53",
+      "0.038"
+     ],
+     [
+      "2026-11-07 11:18:23",
+      "0.051"
+     ],
+     [
+      "2026-11-07 11:18:53",
+      "0.037"
+     ],
+     [
+      "2026-11-07 11:19:23",
+      "0.509"
+     ],
+     [
+      "2026-11-07 11:19:53",
+      "0.035"
+     ],
+     [
+      "2026-11-07 11:20:23",
+      "0.037"
+     ],
+     [
+      "2026-11-07 11:20:53",
+      "0.037"
+     ],
+     [
+      "2026-11-07 11:21:23",
+      "0.008"
+     ],
+     [
+      "2026-11-07 11:21:53",
+      "0.004"
+     ],
+     [
+      "2026-11-07 11:22:23",
+      "0.006"
      ]
     ]
    },
-   "verified": "clickhouse"
+   "bands": [
+    {
+     "start": "2026-11-07T11:15:23Z",
+     "end": "2026-11-07T11:16:53Z",
+     "label": "90 s burn"
+    },
+    {
+     "start": "2026-11-07T11:18:53Z",
+     "end": "2026-11-07T11:19:03Z",
+     "label": "10 s burn"
+    }
+   ],
+   "caption": "Raw k8s.pod.cpu.usage samples for the lab1-backend pod, one every 30 seconds, read from ClickHouse. Shaded bands are the 90-second and 10-second burns."
+  },
+  {
+   "id": "c-item-latency",
+   "lab": "lab1",
+   "title": "Latency by product in Lab 1, by joining logs to spans",
+   "why": "Lab 1 can only get this outside the search box: the item is on the log, the duration is on the span, and `span_id` joins them.",
+   "sql": "SELECT l.item, count() AS orders, round(quantile(0.5)(s.ms),1) AS p50_ms, round(max(s.ms),1) AS max_ms FROM (SELECT span_id, attributes_string['order.item'] AS item FROM signoz_logs.distributed_logs_v2 WHERE timestamp >= toUnixTimestamp64Nano(toDateTime64('2026-11-07 11:00:50',9)) AND resources_string['service.name']='lab1-backend' AND body='order stored') AS l INNER JOIN (SELECT span_id, duration_nano/1e6 AS ms FROM signoz_traces.distributed_signoz_index_v3 WHERE timestamp >= '2026-11-07 11:00:50' AND resource_string_service$$name='lab1-backend' AND name='POST /orders') AS s ON l.span_id=s.span_id GROUP BY l.item ORDER BY max_ms DESC",
+   "result": {
+    "columns": [
+     "item",
+     "orders",
+     "p50_ms",
+     "max_ms"
+    ],
+    "rows": [
+     [
+      "catering",
+      "2",
+      "1510.1",
+      "1510.8"
+     ],
+     [
+      "cake",
+      "513",
+      "32.4",
+      "276"
+     ],
+     [
+      "sandwich",
+      "478",
+      "33.1",
+      "271.7"
+     ],
+     [
+      "bagel",
+      "451",
+      "32.9",
+      "238.5"
+     ],
+     [
+      "coffee",
+      "511",
+      "32",
+      "222.1"
+     ]
+    ]
+   }
   }
  ]
 }

@@ -220,6 +220,7 @@ h2.step .n {
 .badge.api { background: var(--accent-soft); color: var(--accent); }
 .badge.data { background: var(--surface-2); color: var(--muted); }
 .badge.untested { background: var(--warn-soft); color: var(--warn); }
+.badge.lab { background: var(--surface-2); color: var(--ink); }
 .badge.err { background: var(--err-soft); color: var(--err); }
 
 #lab-banner {
@@ -229,6 +230,7 @@ h2.step .n {
   font-size: 0.93rem;
   margin-bottom: 1rem;
 }
+#lab-banner.info { background: var(--surface-2); }
 
 /* ---------- code ---------- */
 
@@ -372,6 +374,7 @@ details > summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; }
 .wf-row:hover { background: var(--surface-2); }
 .wf-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 0.78rem; }
 .wf-svc { color: var(--muted); font-family: var(--sans); }
+.wf-note { display: block; color: var(--muted); font-size: 0.72rem; white-space: normal; }
 .wf-track { position: relative; height: 0.85rem; background: linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 25% 100%; border-right: 1px solid var(--line); }
 .wf-bar { position: absolute; top: 1px; bottom: 1px; min-width: 3px; border-radius: 4px; }
 .wf-bar.s1 { background: var(--series-1); }

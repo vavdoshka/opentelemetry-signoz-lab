@@ -14,7 +14,7 @@
 <main id="main">
 <p class="eyebrow">Reference</p>
 <h1>Search query reference</h1>
-<p class="lead">Every query here was run against this lab, and its real result is saved with it. Use <strong>Run live</strong> to run it again now. Start load first if you want recent data.</p>
+<p class="lead">Every query here was run against this lab, and its real result is saved with it. Each one says which lab it is for, because the two labs use different service names. Use <strong>Run live</strong> to run it again now. Start load first if you want recent data.</p>
 
 <h2>Three languages, not one</h2>
 <table>
@@ -30,26 +30,27 @@
 <p>An empty result usually means the wrong time range, not a bad query. The Explorers default to the last 30 minutes. If you have not fired a scenario in that time, or if load is stopped, widen the range. <strong>Run live</strong> uses the window stated in each result.</p>
 
 <h2>Search expression syntax</h2>
-<p>Each operator was run with the example shown. Quote strings with single quotes. Attribute names are the OTel names, such as <code>http.route</code>.</p>
+<p>Each operator was run with the example shown, and returned rows. Quote strings with single quotes. Attribute names are the OpenTelemetry names, such as <code>http.route</code>. These examples work in any lab, so add a <code>service.name</code> filter to narrow one down: Lab 1 uses <code>lab1-frontend</code> and <code>lab1-backend</code>, and Lab 2 uses <code>frontend</code> and <code>backend</code>.</p>
 <table>
   <thead><tr><th>Operator</th><th>Example</th><th>Checked</th></tr></thead>
   <tbody>
-    <tr><td><code>=</code></td><td><code>lab.scenario = 'timeout'</code></td><td><span class="badge ui">UI</span></td></tr>
-    <tr><td><code>!=</code></td><td><code>service.name != 'frontend'</code></td><td><span class="badge api">API</span></td></tr>
-    <tr><td><code>&gt;</code> <code>&gt;=</code> <code>&lt;</code></td><td><code>response_status_code &gt;= 500</code></td><td><span class="badge ui">UI</span></td></tr>
+    <tr><td><code>=</code></td><td><code>http.target = &#x27;/api/scenario/timeout&#x27;</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>!=</code></td><td><code>service.name != &#x27;lab1-frontend&#x27;</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>&gt; &gt;= &lt;</code></td><td><code>response_status_code &gt;= 500</code></td><td><span class="badge api">API</span></td></tr>
     <tr><td><code>BETWEEN</code></td><td><code>duration_nano BETWEEN 1000000000 AND 2000000000</code></td><td><span class="badge api">API</span></td></tr>
-    <tr><td><code>IN</code></td><td><code>severity_text IN ('ERROR','WARN')</code></td><td><span class="badge ui">UI</span></td></tr>
-    <tr><td><code>NOT IN</code></td><td><code>service.name NOT IN ('frontend')</code></td><td><span class="badge api">API</span></td></tr>
-    <tr><td><code>CONTAINS</code></td><td><code>db.statement CONTAINS 'pg_sleep'</code></td><td><span class="badge ui">UI</span></td></tr>
-    <tr><td><code>NOT CONTAINS</code></td><td><code>name NOT CONTAINS 'http send'</code></td><td><span class="badge api">API</span></td></tr>
-    <tr><td><code>LIKE</code></td><td><code>name LIKE '%http send'</code></td><td><span class="badge api">API</span></td></tr>
-    <tr><td><code>ILIKE</code></td><td><code>name ILIKE 'get /work%'</code></td><td><span class="badge api">API</span></td></tr>
-    <tr><td><code>REGEXP</code></td><td><code>name REGEXP '^GET /work/.*'</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>IN</code></td><td><code>severity_text IN (&#x27;ERROR&#x27;,&#x27;WARN&#x27;)</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>NOT IN</code></td><td><code>service.name NOT IN (&#x27;lab1-frontend&#x27;)</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>CONTAINS</code></td><td><code>db.statement CONTAINS &#x27;pg_sleep&#x27;</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>NOT CONTAINS</code></td><td><code>name NOT CONTAINS &#x27;http send&#x27;</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>LIKE</code></td><td><code>name LIKE &#x27;%http send&#x27;</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>ILIKE</code></td><td><code>name ILIKE &#x27;get /work%&#x27;</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>REGEXP</code></td><td><code>name REGEXP &#x27;^GET /work/.*&#x27;</code></td><td><span class="badge api">API</span></td></tr>
     <tr><td><code>EXISTS</code></td><td><code>db.statement EXISTS</code></td><td><span class="badge api">API</span></td></tr>
     <tr><td><code>NOT EXISTS</code></td><td><code>service.name NOT EXISTS</code></td><td><span class="badge api">API</span></td></tr>
-    <tr><td><code>AND</code></td><td><code>service.name = 'backend' AND has_error = true</code></td><td><span class="badge ui">UI</span></td></tr>
-    <tr><td><code>OR</code>, brackets</td><td><code>(service.name = 'backend' OR service.name = 'frontend') AND has_error = true</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>AND</code></td><td><code>service.name = &#x27;lab1-backend&#x27; AND has_error = true</code></td><td><span class="badge ui">UI</span></td></tr>
+    <tr><td><code>OR, brackets</code></td><td><code>(service.name = &#x27;lab1-backend&#x27; OR service.name = &#x27;lab1-frontend&#x27;) AND has_error = true</code></td><td><span class="badge api">API</span></td></tr>
     <tr><td><code>NOT</code></td><td><code>NOT has_error = true</code></td><td><span class="badge api">API</span></td></tr>
+    <tr><td><code>= on a boolean attribute</code></td><td><code>cache.hit = false</code></td><td><span class="badge api">API</span></td></tr>
   </tbody>
 </table>
 
@@ -59,17 +60,20 @@
   <tbody>
     <tr><td><code>service.name</code></td><td>Spans, logs</td><td>Blank on stdout log copies (<a href="gaps.html#logs">gap 4</a>)</td></tr>
     <tr><td><code>trace_id</code></td><td>Spans, logs</td><td>The link between the two</td></tr>
+    <tr><td><code>k8s.pod.name</code></td><td>Spans, logs</td><td>Added by the agent on the node</td></tr>
     <tr><td><code>name</code></td><td>Spans</td><td>The operation, such as <code>GET /work/slow</code></td></tr>
+    <tr><td><code>http.target</code></td><td>Spans</td><td>The URL path, such as <code>/api/scenario/crash</code>. Tells Lab 1's scenarios apart.</td></tr>
     <tr><td><code>duration_nano</code></td><td>Spans</td><td>Nanoseconds: one second is <code>1000000000</code></td></tr>
     <tr><td><code>has_error</code></td><td>Spans</td><td>True when span status is Error. It also matches ASGI <code>http send</code> spans, so counts run high.</td></tr>
     <tr><td><code>kind_string</code></td><td>Spans</td><td><code>Server</code>, <code>Client</code> or <code>Internal</code></td></tr>
     <tr><td><code>response_status_code</code></td><td>Spans</td><td>Compares numerically. Empty on non-HTTP spans.</td></tr>
     <tr><td><code>body</code></td><td>Logs</td><td>The log message</td></tr>
+    <tr><td><code>attribute.order.total</code></td><td>Logs, spans</td><td>Inside an aggregation, as in <code>sum(attribute.order.total)</code>. In a filter, write <code>order.total</code>.</td></tr>
     <tr><td><code>severity_text</code></td><td>Logs</td><td><code>INFO</code>, <code>WARN</code>, <code>ERROR</code>. Note it is <code>WARN</code>, not <code>WARNING</code>.</td></tr>
   </tbody>
 </table>
 
-<div class="note"><p><strong>Traces, what to count:</strong> <code>has_error = true</code> matched 4,568 spans in the load run, but 1,145 of those were <code>http send</code> copies of a Server span. Add <code>kind_string = 'Server'</code> if you want to count failed requests.</p></div>
+<div class="note"><p><strong>Traces, what to count:</strong> <code>has_error = true</code> matched 1,013 Lab 1 spans in the load run, but 383 of those were <code>http send</code> copies. Only 383 were Server spans. Add <code>kind_string = 'Server'</code> if you want to count failed requests.</p></div>
 
 <h2>All queries</h2>
 <div data-query-index>Loading queries...</div>

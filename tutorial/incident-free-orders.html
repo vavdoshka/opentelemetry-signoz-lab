@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incident: revenue dropped with no errors | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="freeorders">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 2: incident 2 of 4</p>
+<h1>Revenue dropped with no errors</h1>
+<p class="lead">Every request succeeds, and every chart that watches errors stays green. Meanwhile, orders are going out for free. Lab 1 can show you that it is happening, if the app happened to log the total. Only Lab 2 can show you why.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#search">4. Search</a></li><li><a href="#evidence">5. Evidence</a></li><li><a href="#cause">6. Root cause</a></li><li><a href="#fix">7. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p>The <code>free_orders</code> scenario places five orders with the coupon <code>SAVE10</code>. Fire it in both labs.</p>
+<div data-fire="free_orders" data-lab="lab1"></div>
+<div data-fire="free_orders" data-lab="lab2"></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>Nothing looks wrong. A saved run returned HTTP 200 in 151 ms from Lab 1, with this response:</p>
+<figure class="code"><figcaption><span>Real response from Lab 1</span></figcaption><pre><code>{&quot;scenario&quot;: &quot;free_orders&quot;, &quot;status&quot;: 200, &quot;result&quot;: {&quot;orders&quot;: 5, &quot;revenue&quot;: 0.0}}</code></pre></figure>
+<p>That revenue figure comes from this scenario adding up its own five orders. A real app wouldn't report it. In real life you find out from a finance report, days later.</p>
+
+<h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
+<p>Error searches and error rates won't help here, because nothing failed. You need something that knows about money.</p>
+
+<h2 class="step" id="search"><span class="n">4</span>Search</h2>
+<h3>Lab 1</h3>
+<p>Errors first. There are none:</p>
+<div data-query="t-neg-free-errors">Loading saved query...</div>
+<p>Next, the SQL. The total is stored by an <code>INSERT</code>, so it should be on that span, but it isn't:</p>
+<div data-query="t-sql-insert">Loading saved query...</div>
+<h3>Why the values are missing from <code>db.statement</code></h3>
+<p>Look at how the app runs that statement:</p>
+<figure class="code"><figcaption><span><code>labs/lab1-hands-off/app/backend.py</code> lines 83–85</span></figcaption><pre><code><span class="ln">83</span>        row = conn.execute(
+<span class="ln">84</span>            &quot;INSERT INTO orders (item, qty, total) VALUES (%s, %s, %s) RETURNING id&quot;,
+<span class="ln">85</span>            (order.item, order.qty, total),</code></pre></figure>
+<p>The SQL text and the values are two separate arguments. The <code>%s</code> markers are placeholders, and psycopg sends the values alongside the statement. The instrumentation records the first argument, so <code>db.statement</code> holds the statement and never the values.</p>
+<p>That default is deliberate. Values can hold names, emails and other personal data, and those shouldn't end up in telemetry by accident. It also keeps the number of different statements small, so grouping by statement works. The instrumentation does have a <code>capture_parameters</code> option, which is off by default. That was confirmed by reading the installed source in a running pod, but it was not tried here <span class="badge untested">Untested</span>.</p>
+<p>What's left is the logs. The app logs the total, so you can find the free orders, and even chart revenue:</p>
+<div data-query="l-free-orders">Loading saved query...</div>
+<div data-query="s-log-revenue">Loading saved query...</div>
+<figure class="shot"><img src="screenshots/lab1-logs-revenue.png" alt="SigNoz Logs Explorer time series of sum(attribute.order.total) for lab1-backend, flat near 490 and then falling to zero" width="1440" height="900" loading="lazy"><figcaption>Lab 1 revenue per minute, charted from a plain log field. <span class="badge ui">Seen in SigNoz UI</span> It falls to zero when the coupon orders start. No OpenTelemetry code was involved. The chart draws a smooth line between points.</figcaption></figure>
+<p>So Lab 1 can show <em>that</em> revenue fell. It can't show why, because the app never logs the coupon:</p>
+<div data-query="l-neg-coupon">Loading saved query...</div>
+<h3>Lab 2</h3>
+<p>The same zero totals are on the span, with the cause right next to them:</p>
+<div data-query="t2-free">Loading saved query...</div>
+<figure class="shot"><img src="screenshots/lab2-search-free-orders.png" alt="SigNoz Traces Explorer listing price_order spans with order.total = 0" width="1440" height="900" loading="lazy"><figcaption>The search in the Traces Explorer. <span class="badge ui">Seen in SigNoz UI</span></figcaption></figure>
+<figure class="shot"><img src="screenshots/lab2-free-span.png" alt="SigNoz span details for price_order, with order.coupon SAVE10, order.item sandwich, order.qty 4 and order.total 0" width="1440" height="900" loading="lazy"><figcaption>One <code>price_order</code> span. <span class="badge ui">Seen in SigNoz UI</span> <code>order.coupon</code> and <code>order.total</code> sit side by side: four sandwiches for nothing.</figcaption></figure>
+<div data-query="t2-coupon">Loading saved query...</div>
+<p>And <code>orders.value</code> is a metric, so revenue can be charted and alerted on without searching logs:</p>
+<div data-query="m-order-value">Loading saved query...</div>
+<div data-query="m-order-count">Loading saved query...</div>
+
+<h2 class="step" id="evidence"><span class="n">5</span>Evidence</h2>
+<h3>Lab 1</h3>
+<div data-evidence="lab1/free_orders" data-logs="order stored" data-log-limit="5">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/lab1-insert-span.png" alt="SigNoz span details for an INSERT span, with db.statement showing VALUES (%s, %s, %s)" width="1440" height="900" loading="lazy"><figcaption>The <code>INSERT</code> for a free order in Lab 1. <span class="badge ui">Seen in SigNoz UI</span> <code>db.statement</code> has placeholders, not the total.</figcaption></figure>
+<h3>Lab 2</h3>
+<div data-evidence="lab2/free_orders" data-logs="order stored" data-log-limit="5">Loading saved run...</div>
+<h3>A real revenue drop</h3>
+<p>To see the shape of this, both labs received normal orders for 3 minutes, then coupon orders at about the same rate for 3 minutes. These are real per-minute figures. Lab 1's come from logs, and Lab 2's come from the <code>orders.value</code> metric:</p>
+<table>
+  <thead><tr><th>Minute (UTC)</th><th>Orders placed</th><th>Lab 1 orders</th><th>Lab 1 revenue</th><th>Lab 2 orders</th><th>Lab 2 revenue</th></tr></thead>
+  <tbody>
+    <tr><td>11:04</td><td>Normal</td><td>31</td><td>487.55</td><td>30</td><td>361.55</td></tr>
+    <tr><td>11:05</td><td>Normal</td><td>30</td><td>487.70</td><td>30</td><td>360.95</td></tr>
+    <tr><td>11:06</td><td>Coupon orders start at 11:06:38</td><td>34</td><td>210.05</td><td>32</td><td>312.70</td></tr>
+    <tr><td>11:07</td><td>Coupon</td><td>30</td><td>0.00</td><td>30</td><td>0.00</td></tr>
+    <tr><td>11:08</td><td>Coupon</td><td>30</td><td>0.00</td><td>30</td><td>0.00</td></tr>
+  </tbody>
+</table>
+<p>Lab 1 and Lab 2 differ because each order is random. Within Lab 2, the metric and the logs agree exactly over the whole run: 186 orders and 1,133.45 of revenue. They can differ slightly in any one minute, because metrics are exported every 10 seconds.</p>
+<figure class="shot"><img src="screenshots/lab2-metrics-revenue.png" alt="SigNoz Metrics Explorer chart of orders.value.sum, flat near 6 USD per second and then falling to zero" width="1440" height="1180" loading="lazy"><figcaption>Lab 2 revenue per second, from the <code>orders.value</code> metric. <span class="badge ui">Seen in SigNoz UI</span> The same drop, from a metric you could alert on.</figcaption></figure>
+<p>Order counts hold steady while revenue goes to zero. That is the whole incident in one table, and neither row contains an error.</p>
+<table>
+  <thead><tr><th>Question</th><th>Lab 1</th><th>Lab 2</th></tr></thead>
+  <tbody>
+    <tr><td>Did anything fail?</td><td>No</td><td>No</td></tr>
+    <tr><td>Is the total in the SQL?</td><td>No, only placeholders</td><td>No, only placeholders</td></tr>
+    <tr><td>Can you see free orders?</td><td>Yes, in logs, because the app logs the total</td><td>Yes, on spans and logs</td></tr>
+    <tr><td>Can you chart revenue?</td><td>Yes, from logs</td><td>Yes, from logs or the metric</td></tr>
+    <tr><td>Can you see the coupon?</td><td>No, nobody logged it</td><td>Yes, <code>order.coupon</code></td></tr>
+  </tbody>
+</table>
+
+<h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/backend.py</code> lines 87–100</span></figcaption><pre><code><span class="ln">87</span>def price_order(order: OrderIn) -&gt; float:
+<span class="ln">88</span>    # Manual span: shows up as a child of the request span, with attributes.
+<span class="ln">89</span>    with tracer.start_as_current_span(&quot;price_order&quot;) as span:
+<span class="ln">90</span>        span.set_attribute(&quot;order.item&quot;, order.item)
+<span class="ln">91</span>        span.set_attribute(&quot;order.qty&quot;, order.qty)
+<span class="ln">92</span>        # Deliberate bug: pricing is very slow for this one item.
+<span class="ln">93</span>        time.sleep(1.5 if order.item == &quot;catering&quot; else random.uniform(0.005, 0.03))
+<span class="ln">94</span>        total = round(PRICES.get(order.item, 5.0) * order.qty, 2)
+<span class="ln">95</span>        # Deliberate bug: this 10% coupon makes the whole order free.
+<span class="ln">96</span>        if order.coupon == &quot;SAVE10&quot;:
+<span class="ln">97</span>            span.set_attribute(&quot;order.coupon&quot;, order.coupon)
+<span class="ln">98</span>            total = 0.0
+<span class="ln">99</span>        span.set_attribute(&quot;order.total&quot;, total)
+<span class="ln">100</span>        return total</code></pre></figure>
+<p>A coupon meant to take 10% off sets the total to zero instead. Nothing raises an error, because to the code this is a valid number. Only someone who knows what the number should be can see that it is wrong.</p>
+
+<h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
+<p>Apply the discount properly:</p>
+<figure class="code"><figcaption><span>Proposed fix for labs/lab2-custom-dimensions/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code>         if order.coupon == &quot;SAVE10&quot;:
+             span.set_attribute(&quot;order.coupon&quot;, order.coupon)
+<span class="del">-            total = 0.0</span><span class="add">+            total = round(total * 0.9, 2)</span></code></pre></figure>
+<p>Then make sure you hear about it next time. A fresh install has no alerts, so you would write a rule on <code>orders.value.sum</code> yourself (<a href="gaps.html#setup">gap 5</a>).</p>
+
+<div class="quiz" data-quiz="fo1"><p class="q">Check yourself: Why does db.statement show VALUES (%s, %s, %s) instead of the real numbers?</p><button type="button" data-right="false" data-why="SigNoz stores what it receives.">SigNoz removes them.</button><button type="button" data-right="true" data-why="That also keeps personal data out of spans by default.">The values are passed separately, and the instrumentation records only the statement.</button><button type="button" data-right="false" data-why="It succeeded, and the order was stored.">The INSERT failed.</button></div>
+<div class="quiz" data-quiz="fo2"><p class="q">Check yourself: Lab 1 can chart revenue from logs. What can it still not tell you?</p><button type="button" data-right="false" data-why="It can see that, from the order.total field.">Whether revenue fell.</button><button type="button" data-right="true" data-why="Telemetry can only hold a field somebody recorded. In Lab 2 the code records order.coupon.">Why it fell, because the coupon was never logged.</button><button type="button" data-right="false" data-why="It can count those too.">How many orders were placed.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

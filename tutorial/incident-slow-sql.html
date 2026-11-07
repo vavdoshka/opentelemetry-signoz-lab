@@ -12,72 +12,66 @@
 <a class="skip" href="#main">Skip to content</a>
 <nav id="sidebar" aria-label="Tutorial pages"></nav>
 <main id="main">
-<p class="eyebrow">Incident 4 of 6</p>
+<p class="eyebrow">Lab 1: incident 4 of 6</p>
 <h1>A slow SQL query</h1>
-<p class="lead">The app is slow because of one statement. The psycopg instrumentation records every statement, so you can find it by its text, with no changes to your queries.</p>
+<p class="lead">The app is slow because of one statement. The agent the Operator injected records every statement, so you can find it by its text, with no changes to your queries or your code.</p>
 <ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#search">4. Search</a></li><li><a href="#evidence">5. Evidence</a></li><li><a href="#cause">6. Root cause</a></li><li><a href="#fix">7. Resolution</a></li></ul>
 
 <h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
 <p>The <code>slow_query</code> scenario runs <code>SELECT pg_sleep(2)</code>. It is not part of the load mix, so fire it yourself before searching.</p>
-<div data-fire="slow_query"></div>
+<div data-fire="slow_query" data-lab="lab1"></div>
 
 <h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
-<p>A saved run returned HTTP 200 after 2,059 ms. As in the latency incident there is no error, only a slow response. What is different is what you find under the backend span.</p>
+<p>A saved run returned HTTP 200 after 2,028 ms. As in the latency incident there is no error, only a slow response. What is different is what you find under the backend span.</p>
 
 <h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
 <ol>
   <li>Open a slow trace, and look for a long database span.</li>
   <li>Search by database attributes in the Traces Explorer.</li>
-  <li>Use the DB Call Metrics tab on <a href="http://signoz.localhost:8080/services/backend" target="_blank" rel="noopener">/services/backend</a> for a chart of database calls. That tab was seen on the page, but its charts were not checked in this lab.</li>
+  <li>Use the DB Call Metrics tab on <a href="http://signoz.localhost:8080/services/lab1-backend" target="_blank" rel="noopener">/services/lab1-backend</a> for a chart of database calls.</li>
 </ol>
+<figure class="shot"><img src="screenshots/lab1-db-call-metrics.png" alt="SigNoz DB Call Metrics tab for lab1-backend with database call rate and average duration charts" width="1440" height="900" loading="lazy"><figcaption>The DB Call Metrics tab on <code>lab1-backend</code>. <span class="badge ui">Seen in SigNoz UI</span> The spike in average duration is three <code>pg_sleep</code> calls, fired during the load run.</figcaption></figure>
 
 <h2 class="step" id="search"><span class="n">4</span>Search</h2>
 <p>Search for all slow database calls first:</p>
 <div data-query="t-sql-slow">Loading saved query...</div>
 <p>Or find a statement by its text:</p>
 <div data-query="t-sql-text">Loading saved query...</div>
-<figure class="shot"><img src="screenshots/search-sql-text.png" alt="SigNoz Traces Explorer with the search db.statement CONTAINS pg_sleep, showing two SELECT spans of about 2005 ms" width="1440" height="900" loading="lazy"><figcaption>The search in the Traces Explorer. <span class="badge ui">Seen in SigNoz UI</span> The box suggests real values as you type.</figcaption></figure>
+<figure class="shot"><img src="screenshots/lab1-search-sql-text.png" alt="SigNoz Traces Explorer with the search db.statement CONTAINS pg_sleep, showing SELECT spans of about 2002 ms" width="1440" height="900" loading="lazy"><figcaption>The search in the Traces Explorer. <span class="badge ui">Seen in SigNoz UI</span> The box suggests real values as you type.</figcaption></figure>
 <p>For a broader view, aggregate by statement type:</p>
 <div data-query="a-sql-by-op">Loading saved query...</div>
 
 <h2 class="step" id="evidence"><span class="n">5</span>Evidence</h2>
-<div data-evidence="slow_query">Loading saved run...</div>
-<figure class="shot"><img src="screenshots/slow-query-trace.png" alt="SigNoz trace page showing a SELECT span filling almost the whole 2 second trace" width="1440" height="900" loading="lazy"><figcaption>The trace. <span class="badge ui">Seen in SigNoz UI</span> The <code>SELECT</code> span fills almost all of the backend span.</figcaption></figure>
+<div data-evidence="lab1/slow_query">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/lab1-slow-query-trace.png" alt="SigNoz trace page showing a SELECT span filling almost the whole 2 second trace" width="1440" height="900" loading="lazy"><figcaption>The trace. <span class="badge ui">Seen in SigNoz UI</span> The <code>SELECT</code> span fills almost all of the backend span.</figcaption></figure>
 <ul>
-  <li>Backend Server span: 2,025.7 ms. Its <code>SELECT</code> child: 2,002.2 ms. So 99% of the time was in Postgres.</li>
+  <li><code>lab1-backend</code> Server span: 2,014.8 ms. Its <code>SELECT</code> child: 2,002.1 ms. So over 99% of the time was in Postgres.</li>
   <li>That span is a Client span, so it measures the wait from the app's side. It includes network time, not only query time.</li>
   <li>The statement is <code>SELECT pg_sleep(%s)</code>. Bound values are not recorded, which also keeps user data out of spans.</li>
 </ul>
 <p>Compare this with the <a href="incident-latency.html">latency incident</a>. There, a long span had no children, which pointed at the code. Here, a long child points at the database.</p>
 
 <h3>Real outliers you did not ask for</h3>
-<p>The first search above also found two spans that no scenario caused:</p>
-<table>
-  <thead><tr><th>Time (UTC)</th><th>Statement type</th><th>Duration</th><th>Normal average</th></tr></thead>
-  <tbody>
-    <tr><td>23:54:03</td><td><code>INSERT</code></td><td>1,700.8 ms</td><td>4.2 ms</td></tr>
-    <tr><td>23:49:05</td><td><code>SELECT</code></td><td>605.5 ms</td><td>4.8 ms for all SELECTs</td></tr>
-  </tbody>
-</table>
-<p>The host was heavily overloaded by unrelated work at the time, which is the likely cause, but that is not proven. Either way, this is how a real problem would look: rare, and invisible in the averages, but easy to find with one search.</p>
+<p>The load run also had slow statements that no scenario caused:</p>
 <div data-ch="c-sql-slowest">Loading saved SQL...</div>
+<p><code>INSERT</code> averaged 4.6 ms but reached 204.8 ms, and the list <code>SELECT</code> averaged 3.9 ms but reached 156.8 ms. The five slowest of these fell at 11:11, 11:12, 11:14, 11:19 and 11:20 UTC, so none was inside the CPU burn. The cause was not identified. This is how a real problem would look: rare, and invisible in the averages, but easy to find with one search.</p>
 
 <h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/backend.py</code> lines 142–146</span></figcaption><pre><code><span class="ln">142</span>@app.get(&quot;/work/slow-query&quot;)
-<span class="ln">143</span>def slow_query(seconds: float = 2.0) -&gt; dict:
-<span class="ln">144</span>    with db() as conn:
-<span class="ln">145</span>        conn.execute(&quot;SELECT pg_sleep(%s)&quot;, (seconds,))
-<span class="ln">146</span>    return {&quot;query_s&quot;: seconds}</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab1-hands-off/app/backend.py</code> lines 124–128</span></figcaption><pre><code><span class="ln">124</span>@app.get(&quot;/work/slow-query&quot;)
+<span class="ln">125</span>def slow_query(seconds: float = 2.0) -&gt; dict:
+<span class="ln">126</span>    with db() as conn:
+<span class="ln">127</span>        conn.execute(&quot;SELECT pg_sleep(%s)&quot;, (seconds,))
+<span class="ln">128</span>    return {&quot;query_s&quot;: seconds}</code></pre></figure>
 <p>The statement sleeps on purpose. In a real incident this is where you would run <code>EXPLAIN (ANALYZE, BUFFERS)</code> on the statement, and look for a missing index, a large scan, or lock waits. Spans tell you <em>which</em> statement. They do not tell you why Postgres was slow.</p>
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>Fix the query itself first. Then add a safety net, so that one bad query cannot hold a request open:</p>
-<figure class="code"><figcaption><span>Proposed safety net for labs/lab2-sdk/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> def db() -&gt; psycopg.Connection:
+<figure class="code"><figcaption><span>Proposed safety net for labs/lab1-hands-off/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> def db() -&gt; psycopg.Connection:
 <span class="del">-    return psycopg.connect(DSN, autocommit=True)</span><span class="add">+    return psycopg.connect(DSN, autocommit=True, options=&quot;-c statement_timeout=1000&quot;)</span></code></pre></figure>
 <p>With this in place the statement would fail after one second. You would see a failed <code>SELECT</code> span instead of a slow one, which you can find with the failed database calls search.</p>
 
 <div class="quiz" data-quiz="s1"><p class="q">Check yourself: db.statement shows SELECT pg_sleep(%s). Why not the real value?</p><button type="button" data-right="false" data-why="SigNoz stores what it receives.">SigNoz redacts it.</button><button type="button" data-right="true" data-why="That keeps user data out of spans. The value is visible elsewhere here: http.url has seconds=2.">The instrumentation records the parameterised statement, not the bound values.</button><button type="button" data-right="false" data-why="It captured the statement as the app sent it.">It failed to capture the query.</button></div>
-<div class="quiz" data-quiz="s2"><p class="q">Check yourself: Which span tells you the time went to Postgres rather than to Python?</p><button type="button" data-right="false" data-why="That shows the total for the whole request.">The frontend server span.</button><button type="button" data-right="true" data-why="A CLIENT span with db.system shows the time waiting for the database. 2002 ms of the 2026 ms backend span.">The backend client span named SELECT, about as long as its parent.</button><button type="button" data-right="false" data-why="That span is in the order flow, not this one.">The price_order span.</button></div>
+<div class="quiz" data-quiz="s2"><p class="q">Check yourself: Which span tells you the time went to Postgres rather than to Python?</p><button type="button" data-right="false" data-why="That shows the total for the whole request.">The frontend server span.</button><button type="button" data-right="true" data-why="A CLIENT span with db.system shows the time waiting for the database: 2002 ms of the 2015 ms backend span.">The backend client span named SELECT, about as long as its parent.</button><button type="button" data-right="false" data-why="That is the span the SELECT sits inside. It only tells you the backend took 2 seconds, not why.">The backend server span, GET /work/slow-query.</button></div>
 
 <section class="page-end" id="page-end" aria-label="Page navigation"></section>
 </main>

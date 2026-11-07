@@ -1,6 +1,6 @@
 """backend service for Lab 1: orders API on Postgres, plus deliberate failure modes.
 
-This file contains no OpenTelemetry code and has no OpenTelemetry dependency.
+This file contains no OpenTelemetry code.
 All telemetry is added at pod start by the OpenTelemetry Operator.
 """
 
@@ -60,14 +60,20 @@ def healthz() -> dict:
 class OrderIn(BaseModel):
     item: str
     qty: int
+    coupon: str | None = None
 
 
-PRICES = {"coffee": 3.5, "bagel": 2.25, "sandwich": 7.9, "cake": 4.75}
+PRICES = {"coffee": 3.5, "bagel": 2.25, "sandwich": 7.9, "cake": 4.75, "catering": 49.0}
 
 
 def price_order(order: OrderIn) -> float:
-    time.sleep(random.uniform(0.005, 0.03))  # pretend work
-    return round(PRICES.get(order.item, 5.0) * order.qty, 2)
+    # Deliberate bug: pricing is very slow for this one item.
+    time.sleep(1.5 if order.item == "catering" else random.uniform(0.005, 0.03))
+    total = round(PRICES.get(order.item, 5.0) * order.qty, 2)
+    # Deliberate bug: this 10% coupon makes the whole order free.
+    if order.coupon == "SAVE10":
+        total = 0.0
+    return total
 
 
 @app.post("/orders")
@@ -92,6 +98,14 @@ def list_orders() -> list[dict]:
         {"id": r[0], "item": r[1], "qty": r[2], "total": float(r[3]), "created_at": r[4].isoformat()}
         for r in rows
     ]
+
+
+@app.get("/catalog")
+def catalog(item: str) -> dict:
+    # Deliberate problem: about a third of lookups miss the cache and take the slow path.
+    if random.random() < 0.33:
+        time.sleep(0.8)
+    return {"item": item, "price": PRICES.get(item, 5.0)}
 
 
 @app.get("/work/slow")

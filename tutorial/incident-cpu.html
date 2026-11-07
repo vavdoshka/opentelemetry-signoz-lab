@@ -12,98 +12,93 @@
 <a class="skip" href="#main">Skip to content</a>
 <nav id="sidebar" aria-label="Tutorial pages"></nav>
 <main id="main">
-<p class="eyebrow">Incident 6 of 6</p>
+<p class="eyebrow">Lab 1: incident 6 of 6</p>
 <h1>CPU saturation</h1>
 <p class="lead">One expensive request slows down unrelated requests. Traces alone will not explain this. You need infrastructure metrics, and that is where the k8s-infra chart comes in.</p>
 <ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#search">4. Search</a></li><li><a href="#evidence">5. Evidence</a></li><li><a href="#cause">6. Root cause</a></li><li><a href="#fix">7. Resolution</a></li></ul>
 
 <h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
 <p>The <code>cpu_burn</code> scenario spins the CPU in the backend. To see it on charts, burn for at least 60 seconds, and keep the load generator running so you can watch other requests suffer.</p>
-<div data-fire="cpu_burn" data-params='{"seconds":60}' data-hint="Blocks for the full duration. Maximum 120 seconds."></div>
+<div data-fire="cpu_burn" data-lab="lab1" data-params='{"seconds":60}' data-hint="Blocks for the full duration. Maximum 120 seconds."></div>
 
 <h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
 <p>Requests that have nothing to do with the burn get slower. During a real 90-second burn, a <code>list</code> request was sent every second from outside the cluster, and the load generator kept running at 5 requests/s:</p>
 <table>
   <thead><tr><th><code>list</code>, as measured by the client</th><th>Samples</th><th>P50</th><th>P95</th><th>Max</th></tr></thead>
   <tbody>
-    <tr><td>Before the burn</td><td>30</td><td>21 ms</td><td>65 ms</td><td>100 ms</td></tr>
-    <tr><td>During the burn</td><td>60</td><td>118 ms</td><td>172 ms</td><td>237 ms</td></tr>
-    <tr><td>After the burn</td><td>15</td><td>24 ms</td><td>95 ms</td><td>95 ms</td></tr>
+    <tr><td>Before the burn</td><td>30</td><td>20.1 ms</td><td>49.9 ms</td><td>115.9 ms</td></tr>
+    <tr><td>During the burn</td><td>80</td><td>113.5 ms</td><td>170.3 ms</td><td>188.9 ms</td></tr>
+    <tr><td>After the burn</td><td>20</td><td>15.4 ms</td><td>36.7 ms</td><td>36.7 ms</td></tr>
   </tbody>
 </table>
 <p>The spans show the same effect from inside the backend:</p>
 <table>
   <thead><tr><th>Backend route</th><th>P50 before</th><th>P50 during</th><th>P50 after</th></tr></thead>
   <tbody>
-    <tr><td><code>GET /orders</code></td><td>11.4 ms</td><td><strong>96.3 ms</strong></td><td>8.8 ms</td></tr>
-    <tr><td><code>POST /orders</code></td><td>32.8 ms</td><td><strong>123 ms</strong></td><td>29.8 ms</td></tr>
+    <tr><td><code>GET /orders</code></td><td>9.8 ms</td><td><strong>88.6 ms</strong></td><td>9.4 ms</td></tr>
+    <tr><td><code>POST /orders</code></td><td>30.7 ms</td><td><strong>113.8 ms</strong></td><td>30.7 ms</td></tr>
   </tbody>
 </table>
 <p>You can feel this yourself. Start a burn above, then fire <code>list</code> here a few times while it runs, and again after it ends. Compare the times.</p>
-<div data-fire="list"></div>
-<p>That is an 8-fold slowdown on a route that did nothing wrong. A trace of one of these requests looks normal, only slower. It has no hint of the real cause.</p>
+<div data-fire="list" data-lab="lab1"></div>
+<p>That is about a 9-fold slowdown on <code>GET /orders</code>, a route that did nothing wrong. A trace of one of these requests looks normal, only slower. It has no hint of the real cause.</p>
 
 <h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
 <ol>
-  <li>A metric first: <code>k8s.pod.cpu.usage</code> for the pods in namespace <code>lab2</code>.</li>
+  <li>A metric first: <code>k8s.pod.cpu.usage</code> for the pods in namespace <code>lab1</code>. It lags by about a minute.</li>
   <li>Then find what was running at that moment, with a search for long spans in that service.</li>
   <li>Infra Monitoring in SigNoz has Hosts and Kubernetes tabs. See below for what was confirmed.</li>
 </ol>
-<div class="warn"><p><strong>You must match by time and name.</strong> Spans have no <code>k8s.pod.name</code> in this lab (<a href="gaps.html#k8s">gap 3</a>), so you cannot jump from a slow trace to its pod. With one replica you can work it out. With several you could not.</p></div>
+<div class="note"><p><strong>From a trace to its pod:</strong> every span in this lab carries <code>k8s.pod.name</code>, added by the SigNoz agent on the node. So you can go straight from a slow trace to the pod that served it, and then to that pod's CPU. In the saved run it is <code>lab1-backend-7554c777f4-khppk</code>.</p></div>
 
 <h2 class="step" id="search"><span class="n">4</span>Search</h2>
 <p>Metrics use a builder rather than a search expression. These are the settings:</p>
 <div data-query="m-cpu">Loading saved query...</div>
-<figure class="shot"><img src="screenshots/metrics-cpu.png" alt="SigNoz Metrics Explorer with metric k8s.pod.cpu.usage, filter k8s.namespace.name = lab, grouped by pod, with a chart peaking near 0.96 cores" width="1440" height="900" loading="lazy"><figcaption>The same query in the Metrics Explorer, over 6 hours. <span class="badge ui">Seen in SigNoz UI</span> The two tall peaks are the 90-second burns. The small one before them is the 10-second burn, which reaches only 0.15.</figcaption></figure>
-<p>Then find the culprit. <code>cpu_burn</code> exists as a span only because the code creates it by hand:</p>
-<div data-query="t-cpu-span">Loading saved query...</div>
+<figure class="shot"><img src="screenshots/lab1-metrics-cpu.png" alt="SigNoz Metrics Explorer with metric k8s.pod.cpu.usage, filter k8s.namespace.name = lab1, grouped by pod, peaking near 1 core" width="1440" height="1180" loading="lazy"><figcaption>The same query in the Metrics Explorer. <span class="badge ui">Seen in SigNoz UI</span> The tall peak is the 90-second burn, and the small one is the 10-second burn. The other pods stay flat near the bottom.</figcaption></figure>
+<p>Then find the culprit. Lab 1 has no span of its own for this work, but the route's Server span covers it, so a search for that route ties the spike to a request:</p>
+<div data-query="t-cpu-route">Loading saved query...</div>
 <div data-query="l-burn">Loading saved query...</div>
 
 <h2 class="step" id="evidence"><span class="n">5</span>Evidence</h2>
 <div data-cpu-chart>Loading chart...</div>
-<p>The pod goes from about 0.04 cores to almost a full core, and returns afterwards. Nothing else in the lab moved: Postgres and the frontend stayed under 0.05 cores.</p>
-<p>The trace of the burn itself is simple. Its long <code>cpu_burn</code> span ties the spike to a specific request:</p>
-<div data-evidence="cpu_burn">Loading saved run...</div>
-<figure class="shot"><img src="screenshots/cpu-burn-trace.png" alt="SigNoz trace page showing a 1.5 minute trace dominated by the cpu_burn span" width="1440" height="900" loading="lazy"><figcaption>The burn trace. <span class="badge ui">Seen in SigNoz UI</span> SigNoz rounds the 90-second duration to 1.5 min.</figcaption></figure>
-<figure class="shot"><img src="screenshots/service-backend.png" alt="SigNoz service page for backend, with GET /work/cpu at the top of the key operations table at about 90 seconds" width="1440" height="900" loading="lazy"><figcaption>The backend's Key Operations, reached by direct URL. <span class="badge ui">Seen in SigNoz UI</span> <code>GET /work/cpu</code> tops the list at about 90,007 ms. The charts were still loading when this was taken.</figcaption></figure>
+<p>The pod goes from about 0.04 cores to almost a full core, and returns afterwards. Nothing else in the lab moved: the frontend, Postgres and the load generator all stayed under 0.04 cores.</p>
+<p>The trace of the burn itself is simple. Its long <code>GET /work/cpu</code> span ties the spike to a specific request:</p>
+<div data-evidence="lab1/cpu_burn">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/lab1-cpu-burn-trace.png" alt="SigNoz trace page showing a 1.5 minute trace dominated by GET /work/cpu" width="1440" height="900" loading="lazy"><figcaption>The burn trace. <span class="badge ui">Seen in SigNoz UI</span> SigNoz rounds the 90-second duration to 1.5 mins.</figcaption></figure>
+<figure class="shot"><img src="screenshots/lab1-service-backend.png" alt="SigNoz service page for lab1-backend, with empty charts and GET /work/cpu at the top of the key operations table" width="1440" height="900" loading="lazy"><figcaption><code>lab1-backend</code>, reached by direct URL. <span class="badge ui">Seen in SigNoz UI</span> Key Operations has real data, with <code>GET /work/cpu</code> at the top, but the charts are empty. <a href="gaps.html#services">Gap 2</a> explains why.</figcaption></figure>
 
-<h3>Two things to watch for in the data</h3>
-<ul>
-  <li><strong>Why two burns?</strong> The first was a mistake that became a useful example. The test client gave up after 40 seconds, and the backend still burned for the full 90. It is the same wasted work you saw in the <a href="incident-timeout.html">timeout incident</a>.</li>
-  <li><strong>Short spikes hide.</strong> An earlier 10-second burn showed only 0.15 cores with a 60-second step, because averaging mixes the spike with idle time. Pod CPU is also sampled every 30 seconds, so a very short burst can disappear entirely.</li>
-</ul>
+<h3>Short spikes hide</h3>
+<p>The 10-second burn reached 0.509 cores in its one raw sample, but only about 0.27 on the 60-second chart above, because averaging mixes the spike with idle time. Pod CPU is also sampled every 30 seconds, so a very short burst can disappear entirely.</p>
 <div data-ch="c-burn-effect">Loading saved SQL...</div>
 
 <h3>Infra Monitoring</h3>
-<p>The Hosts tab rendered and lists the lab's one node, with real CPU, memory and disk figures. It was captured after the burns, so it does not show this incident, and it is per node rather than per pod.</p>
-<figure class="shot"><img src="screenshots/infra-hosts.png" alt="SigNoz Infra Monitoring Hosts tab listing k3d-signoz-lab-server-0 as active at 16.2% CPU and 47.2% memory" width="1440" height="900" loading="lazy"><figcaption>The Hosts tab. <span class="badge ui">Seen in SigNoz UI</span></figcaption></figure>
-<figure class="nocapture"><p><strong>Screenshot not captured.</strong> The Kubernetes tab opened and listed Containers, Pods, Nodes and more, but its data never finished loading, so its contents are not verified. The browser timed out on this page while the host was overloaded. Open it yourself: <a href="http://signoz.localhost:8080/infrastructure-monitoring/kubernetes" target="_blank" rel="noopener">http://signoz.localhost:8080/infrastructure-monitoring/kubernetes</a></p><figcaption>Not verified. The figures on this page come from the Metrics Explorer, the query API and ClickHouse instead.</figcaption></figure>
+<p>Both tabs loaded with real data, but they show the state now, not a history of this incident. The Hosts tab is per node rather than per pod.</p>
+<figure class="shot"><img src="screenshots/infra-hosts.png" alt="SigNoz Infra Monitoring Hosts tab listing k3d-signoz-lab-server-0 and k3d-signoz-lab-agent-0 as active with CPU, memory and disk figures" width="1440" height="900" loading="lazy"><figcaption>The Hosts tab. <span class="badge ui">Seen in SigNoz UI</span> Both nodes show the same figures, which fits them sharing one Docker VM.</figcaption></figure>
+<figure class="shot"><img src="screenshots/infra-kubernetes.png" alt="SigNoz Infra Monitoring Kubernetes tab listing containers with their pods, namespaces and status" width="1440" height="900" loading="lazy"><figcaption>The Kubernetes tab. <span class="badge ui">Seen in SigNoz UI</span> It lists every container in the cluster, including the Lab 1 pods, with instrumentation checks at the top.</figcaption></figure>
 
 <h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/app/backend.py</code> lines 161–170</span></figcaption><pre><code><span class="ln">161</span>@app.get(&quot;/work/cpu&quot;)
-<span class="ln">162</span>def cpu(seconds: float = 10.0) -&gt; dict:
-<span class="ln">163</span>    with tracer.start_as_current_span(&quot;cpu_burn&quot;) as span:
-<span class="ln">164</span>        span.set_attribute(&quot;burn.seconds&quot;, seconds)
-<span class="ln">165</span>        end = time.monotonic() + seconds
-<span class="ln">166</span>        n = 0
-<span class="ln">167</span>        while time.monotonic() &lt; end:
-<span class="ln">168</span>            n += sum(i * i for i in range(1000))
-<span class="ln">169</span>    log.warning(&quot;burned CPU for %.1fs&quot;, seconds)
-<span class="ln">170</span>    return {&quot;burned_s&quot;: seconds}</code></pre></figure>
-<p>A CPU-bound Python loop runs inside a request handler, in a service with one process. The pod peaked at 0.993 cores, which is what a single busy Python process can use. <code>labs/lab2-sdk/k8s/app.yaml</code> sets a CPU request of <code>50m</code> but no limit, so this was not throttling:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-sdk/k8s/app.yaml</code> line 86</span></figcaption><pre><code><span class="ln">65</span>          resources: { requests: { cpu: 50m, memory: 96Mi } }</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab1-hands-off/app/backend.py</code> lines 143–150</span></figcaption><pre><code><span class="ln">143</span>@app.get(&quot;/work/cpu&quot;)
+<span class="ln">144</span>def cpu(seconds: float = 10.0) -&gt; dict:
+<span class="ln">145</span>    end = time.monotonic() + seconds
+<span class="ln">146</span>    n = 0
+<span class="ln">147</span>    while time.monotonic() &lt; end:
+<span class="ln">148</span>        n += sum(i * i for i in range(1000))
+<span class="ln">149</span>    log.warning(&quot;burned CPU for %.1fs&quot;, seconds)
+<span class="ln">150</span>    return {&quot;burned_s&quot;: seconds}</code></pre></figure>
+<p>A CPU-bound Python loop runs inside a request handler, in a service with one process. The pod peaked at 0.991 cores in the raw samples, which is what a single busy Python process can use. <code>labs/lab1-hands-off/k8s/app.yaml</code> sets a CPU request of <code>50m</code> but no limit, so this was not throttling:</p>
+<figure class="code"><figcaption><span><code>labs/lab1-hands-off/k8s/app.yaml</code> line 55</span></figcaption><pre><code><span class="ln">55</span>          resources: { requests: { cpu: 50m, memory: 128Mi } }</code></pre></figure>
 <p>Why are other requests slowed? The most likely reason is that Python's global interpreter lock lets only one thread run Python code at a time, so handlers wait for their turn. That fits the numbers, but it was not measured directly.</p>
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>Keep heavy work away from the process that serves requests. Move it to a background job or a worker pool. For a quick improvement, run more than one process, so that one burn cannot hold up every request:</p>
-<figure class="code"><figcaption><span>Proposed change for labs/lab2-sdk/k8s/app.yaml, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code>           image: telemetry-lab:dev
+<figure class="code"><figcaption><span>Proposed change for labs/lab1-hands-off/k8s/app.yaml, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code>           image: telemetry-lab1:dev
            imagePullPolicy: IfNotPresent
 <span class="del">-          command: [&quot;uvicorn&quot;, &quot;backend:app&quot;, &quot;--host&quot;, &quot;0.0.0.0&quot;, &quot;--port&quot;, &quot;8000&quot;]</span><span class="add">+          command: [&quot;uvicorn&quot;, &quot;backend:app&quot;, &quot;--host&quot;, &quot;0.0.0.0&quot;, &quot;--port&quot;, &quot;8000&quot;, &quot;--workers&quot;, &quot;2&quot;]</span></code></pre></figure>
-<p>This one needs care: each worker runs its own SDK. And it only helps while a free worker exists.</p>
+<p>This one needs care: each worker is its own process with its own copy of the agent. And it only helps while a free worker exists.</p>
 <p>Once it is fixed, you want to hear about it before users do. A CPU alert on <code>k8s.pod.cpu.usage</code> would catch this. A fresh install has no alerts, so you need to write that rule yourself (<a href="gaps.html#setup">gap 5</a>).</p>
 
-<div class="quiz" data-quiz="u1"><p class="q">Check yourself: A 10-second burn shows only 0.15 cores on a 60-second step. Why?</p><button type="button" data-right="false" data-why="It did. The raw samples show the spike.">The burn did not work.</button><button type="button" data-right="true" data-why="A short burst inside a long step gets averaged with idle time. Use a smaller step, max, or a longer burn.">Averaging across the step dilutes a short spike.</button><button type="button" data-right="false" data-why="labs/lab2-sdk/k8s/app.yaml sets a request, not a limit.">The pod has a CPU limit.</button></div>
-<div class="quiz" data-quiz="u2"><p class="q">Check yourself: How do you get from a slow trace to the pod that served it in this lab?</p><button type="button" data-right="false" data-why="That attribute is absent from every span. That is gap 3.">Read k8s.pod.name on the span.</button><button type="button" data-right="true" data-why="It works here with one replica. With several replicas you could not tell which pod served it.">Match by time and service name, because spans carry no pod attribute.</button><button type="button" data-right="false" data-why="The map shows services, not pods.">Open the Service Map.</button></div>
+<div class="quiz" data-quiz="u1"><p class="q">Check yourself: A 10-second burn shows only about 0.27 cores on a 60-second step. Why?</p><button type="button" data-right="false" data-why="It did. A raw sample shows 0.509 cores.">The burn did not work.</button><button type="button" data-right="true" data-why="A short burst inside a long step gets averaged with idle time. Use a smaller step, max, or a longer burn.">Averaging across the step dilutes a short spike.</button><button type="button" data-right="false" data-why="labs/lab1-hands-off/k8s/app.yaml sets a request, not a limit.">The pod has a CPU limit.</button></div>
+<div class="quiz" data-quiz="u2"><p class="q">Check yourself: How do you get from a slow trace to the pod that served it in this lab?</p><button type="button" data-right="true" data-why="The SigNoz agent adds it to every span, because the app sends through the agent on its node.">Read k8s.pod.name on the span.</button><button type="button" data-right="false" data-why="That works with one replica, but you do not need to guess. The pod name is on the span.">Guess from the time and the service name.</button><button type="button" data-right="false" data-why="The map shows services, not pods.">Open the Service Map.</button></div>
 
 <section class="page-end" id="page-end" aria-label="Page navigation"></section>
 </main>

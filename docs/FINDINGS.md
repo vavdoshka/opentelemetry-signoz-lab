@@ -1,7 +1,7 @@
 # SigNoz evaluation: what a dev gets from plain OpenTelemetry + a simple install
 
-These findings were measured on the hand-instrumented app, now called Lab 2, in the namespace `lab`.
-The section "Hands-off versus SDK" covers Lab 1.
+Most of these findings were measured on an earlier hand-instrumented version of the app, in the
+namespace `lab`. The section "Hands-off versus custom dimensions" covers today's two labs.
 
 Tested 2026-11-04 with SigNoz chart 0.149.0, k8s-infra chart 0.17.1, ClickHouse 25.12.5,
 k3s v1.26.4 on k3d, OTel Python SDK 1.45.2 (instrumentation 0.66b2), Python 3.13.
@@ -67,9 +67,12 @@ while the backend kept working until 3002 ms. That kind of wasted work is hard t
 
 ### 2. `backend` comes and goes on Services, and the Service Map undercounts it
 
-**Status: listing fixed, map only partly.** `OTEL_BSP_SCHEDULE_DELAY=500` keeps `backend` listed,
-but map accuracy depends on the setup: 85% on one node, 41% with two collectors. Results are at the
-end of this section. Everything before them describes the default 5-second flush.
+**Status: improved, not fixed.** `OTEL_BSP_SCHEDULE_DELAY=500` helps a lot, but the result depends on
+whether a parent and child reach the same collector. Calls that all crossed nodes gave about 44%
+with spans on one collector. In one later run, `lab1-backend` was missing from Services, and the map
+showed 0 of 3,216 calls. That run could not be reproduced. Which collector an agent uses is decided
+by chance when it connects, so the outcome can change between restarts. Results are at the end of
+this section. Everything before them describes the default 5-second flush.
 
 - **Services:** whether `backend` is listed depends on your time range. On 2026-11-05 a range
   starting at 01:50 UTC listed it, and one starting at 01:56 did not (**API**). For about the first
@@ -149,7 +152,7 @@ end of this section. Everything before them describes the default 5-second flush
 | `service.name` | Yes | Blank |
 | Kubernetes attributes | Yes, since the gap 3 fix | Yes |
 | Severity | Yes | Blank |
-| Link to trace | Yes | No: the ID is only text in the message |
+| Link to trace | Yes | No |
 | Count, 5-minute sample (frontend / backend) | 3,017 / 1,015 | 5,597 / 3,274 |
 
 - **Effect:** more storage, and searches return mixed results that filter differently (**Data**).
@@ -176,9 +179,10 @@ A fresh install has 0 dashboards, 0 alert rules, 0 notification channels, 0 log 
 
 ### 6. Smaller issues
 
-- **Span noise:** 56% of stored spans (47,450 of 84,695) are zero-length ASGI `http send` and
-  `http receive` spans. `FastAPIInstrumentor.instrument_app` has an `exclude_spans` option that
-  should remove them (**Untested**; the option exists in the installed version).
+- **Span noise:** more than half of stored spans (47,450 of 84,695) are zero-length ASGI `http send` and
+  `http receive` spans. `FastAPIInstrumentor.instrument_app` has an `exclude_spans` argument that
+  should remove them, but it is a code argument, and the injected agent has no setting for it
+  (**Untested**).
 - **Vague span names:** client spans are named just `GET` or `POST`, and every scenario shares the
   operation `POST /api/scenario/{name}`. The custom `lab.scenario` attribute separates them.
 - **4xx is not an error:** `bad_input` has span status Unset, which follows OTel conventions. It
@@ -203,36 +207,51 @@ A fresh install has 0 dashboards, 0 alert rules, 0 notification channels, 0 log 
 | Duplicate app logs | No | Yes (gap 4) |
 | Infra Monitoring UI | Not checked | Hosts tab works (**UI**). Kubernetes tab **not verified:** its data never finished loading |
 
-## Hands-off versus SDK
+## Hands-off versus custom dimensions
 
-Tested 2026-11-06 with `make compare`, which sends both labs the same requests. Lab 1's app has no
-OpenTelemetry code, and the OpenTelemetry Operator injects the Python agent at pod start.
+Tested 2026-11-07 with `make compare`, which sends both labs the same requests. Both use the same
+injected agent. Lab 1's app has no OpenTelemetry code. Lab 2 adds a few API calls, with no SDK setup.
 
-| What SigNoz received | Lab 1 (hands-off) | Lab 2 (SDK) |
+| What SigNoz received | Lab 1 | Lab 2 |
 |---|---|---|
 | Traces crossing both services | Yes | Yes |
 | SQL text on spans | Yes | Yes |
 | Spans marked as errors | Yes | Yes |
 | Pod names on spans | Yes | Yes |
 | Logs linked to traces | Yes | Yes |
-| HTTP metrics | Yes | Yes |
-| Python runtime metrics | **Yes** | No |
+| HTTP and Python runtime metrics | Yes | Yes |
+| Log fields from plain `logging` (`order.item`) | Yes | Yes |
 | Custom span (`price_order`) | No | **Yes** |
 | Business attribute on spans (`order.item`) | No | **Yes** |
+| Technical attribute on spans (`cache.hit`) | No | **Yes** |
 | Scenario name on spans (`lab.scenario`) | No | **Yes** |
 | Business metric (`orders.created`) | No | **Yes** |
 | Trace ID in the API response | No | **Yes** |
 
-- **Hands-off covers the plumbing.** It sees everything that passes through instrumented libraries,
-  including SQL text and exceptions, for one annotation.
-- **Only code knows your business.** Custom spans, business attributes and metrics need the SDK.
-- **More metrics by default.** The agent also sends process, runtime and system metrics. In one run,
-  Lab 1 sent 2,355 metric series from 2 pods, and Lab 2 sent 1,314 from 4. Check the cost at scale.
-- **The platform gaps remain.** Lab 1 has the same duplicate stdout logs, and the same Service Map
-  limit, so it uses the same flush setting.
-- **Python 3.13 worked,** although the Operator's agent image is built with a newer Python.
+- **You don't have to choose.** Code using only the OpenTelemetry API works on top of the injected
+  agent, so you can keep hands-off instrumentation and add detail only where you need it.
+- **All six debugging incidents are solvable with no code.** Exceptions, SQL text, slow spans and pod
+  CPU are enough to find each root cause.
+- **Logs are the first free dimension.** Python logs need one setting. After that, plain `logging`
+  `extra=` fields become searchable, linked to traces, and can be counted, summed and charted.
+- **Log fields have limits.** They can't be connected to latency, because the field is on the log and
+  the duration is on the span. And you can't see a field nobody logged.
+- **The agent turns on everything that applies,** including process, runtime and system metrics, so
+  expect more metric series than you'd choose yourself.
 
-**Recommendation:** start hands-off, then add SDK code only where you need business context.
+### Metric labels and cardinality
+
+The same 1,000 orders were sent as two metrics, with different labels:
+
+| Label | Distinct values | Series | Samples stored |
+|---|---|---|---|
+| `order.item` | 5 | 5 | 65 |
+| `order.id` | 1,000 | 1,000 | 13,000 |
+
+Put unbounded values on spans or logs, not on metric labels.
+
+**Recommendation:** start hands-off, use log fields where they're enough, and add span attributes and
+metrics where you need to connect a value to latency or track it over time.
 
 eBPF instrumentation (OBI) and Odigos were not tested.
 
@@ -325,7 +344,7 @@ about 5.3 GiB in total, after about 30 minutes at 5 requests/s. That is a small 
 
 Suggested order. Nothing here has been applied.
 
-1. Remove the noisy ASGI spans. This saves 56% of spans and loses nothing.
+1. Remove the noisy ASGI spans. This saves more than half of stored spans and loses nothing.
 2. Try trace-ID load balancing, to restore map accuracy with two collectors.
 3. Add `memory_limiter`, and send the collectors' own metrics to SigNoz.
 4. Remove duplicate logs (gap 4).

@@ -21,9 +21,10 @@ the HTML files directly, because the pages load their saved examples through it.
 |---|---|
 | `concepts.html` | Traces, metrics and logs, and how they connect here |
 | `lab1.html` | Lab 1: telemetry with no code, using the OpenTelemetry Operator |
-| `instrumentation.html` | Lab 2: the real setup code, quoted with file and line numbers |
-| `incident-*.html` | Lab 2: six walkthroughs: error, latency, cross-service, slow SQL, timeout, CPU |
-| `queries.html` | Working searches for traces, logs and metrics, plus ClickHouse SQL |
+| `incident-error.html`, `-latency`, `-cross-service`, `-slow-sql`, `-timeout`, `-cpu` | Lab 1: six incidents, solved with no code |
+| `instrumentation.html` | Lab 2: the whole difference from Lab 1, quoted with file and line numbers |
+| `incident-slow-item.html`, `-free-orders`, `-cache-miss`, `-trace-id` | Lab 2: four incidents, each shown in both labs |
+| `queries.html` | Working searches for traces, logs and metrics, labelled by lab, plus ClickHouse SQL |
 | `gaps.html` | What a plain install leaves out, and possible fixes |
 
 ## How the live parts work
@@ -31,32 +32,38 @@ the HTML files directly, because the pages load their saved examples through it.
 The app sends no CORS headers and SigNoz needs a login, so `server.py` sits between the pages and
 the lab. The bridge is narrow:
 
-- It runs the known scenarios and controls the load generator.
-- It runs read-only searches: the saved catalogue in `data/queries.json`, and a lookup of one
-  trace by ID.
+- It runs the known scenarios on either lab, and controls each lab's load generator.
+- It runs read-only searches: the saved catalogue in `data/queries.json`, a lookup of one trace by
+  ID, and a fixed search for the trace of a scenario it has just fired.
 - It reads `.lab-credentials` when it starts a session. The password stays in the server and is
   never sent to the browser.
 - It listens on `127.0.0.1` only, and refuses requests from other origins.
+
+Lab 1's API returns no trace ID, so after firing a Lab 1 scenario the page asks the bridge to find
+it in SigNoz. The bridge sends scenarios with the `User-Agent` `telemetry-tutorial` and searches for
+that, so it finds its own request even while the load generator is hitting the same route. A trace
+usually takes a few seconds to arrive, and the page shows a waiting state until it does.
 
 It does not change SigNoz or the app. Scenarios and load do create telemetry, so stop the load
 generator when you finish.
 
 ## If the lab is down
 
-The pages still work. Live buttons turn off, a banner says so, and every walkthrough shows its
-saved example from a real run.
+The pages still work. Each lab is checked on its own, so Lab 1 keeps working when Lab 2 is not
+deployed, which is normal after `make up`. A banner reports both labs, live buttons for anything
+down turn off, and every walkthrough shows its saved example from a real run.
 
 ## Saved data
 
 | Folder | Contents |
 |---|---|
-| `data/evidence.json` | Spans and logs from the saved scenario runs |
+| `data/evidence.json` | Spans and logs from the saved scenario runs, keyed by lab |
 | `data/queries.json` | The query catalogue, with real saved results and how each was checked |
 | `data/clickhouse.json` | ClickHouse SQL and its real output |
-| `data/overview.json` | Services, Service Map and Exceptions API captures |
 | `screenshots/` | Real SigNoz screenshots from this lab |
 
-All of it was captured on 2026-11-04 and 2026-11-05 (UTC). SigNoz keeps traces and logs for 15
-days, so links to saved trace IDs stop working after about 2026-11-19. The saved copies stay.
+All of it was captured on 2026-11-07 (UTC), on the labs as they are now. SigNoz keeps traces and
+logs for 15 days, so links to saved trace IDs stop working after about 2026-11-22. The saved copies
+stay.
 
-Optional settings: `TUTORIAL_PORT`, `TUTORIAL_APP_URL`, `TUTORIAL_SIGNOZ_URL`.
+Optional settings: `TUTORIAL_PORT`, `TUTORIAL_LAB1_URL`, `TUTORIAL_LAB2_URL`, `TUTORIAL_SIGNOZ_URL`.

@@ -10,22 +10,32 @@
     { id: 'start', href: 'index.html', title: 'Start here', group: 'Start' },
     { id: 'concepts', href: 'concepts.html', title: 'Traces, metrics and logs', group: 'Learn' },
     { id: 'lab1', href: 'lab1.html', title: 'Telemetry with no code', group: 'Lab 1: hands-off' },
-    { id: 'code', href: 'instrumentation.html', title: 'The instrumentation code', group: 'Lab 2: SDK' },
-    { id: 'error', href: 'incident-error.html', title: 'An unhandled error', group: 'Lab 2: incidents' },
-    { id: 'latency', href: 'incident-latency.html', title: 'A latency spike', group: 'Lab 2: incidents' },
-    { id: 'cross', href: 'incident-cross-service.html', title: 'A cross-service failure', group: 'Lab 2: incidents' },
-    { id: 'sql', href: 'incident-slow-sql.html', title: 'A slow SQL query', group: 'Lab 2: incidents' },
-    { id: 'timeout', href: 'incident-timeout.html', title: 'A timeout', group: 'Lab 2: incidents' },
-    { id: 'cpu', href: 'incident-cpu.html', title: 'CPU saturation', group: 'Lab 2: incidents' },
+    { id: 'error', href: 'incident-error.html', title: 'An unhandled error', group: 'Lab 1: hands-off' },
+    { id: 'latency', href: 'incident-latency.html', title: 'A latency spike', group: 'Lab 1: hands-off' },
+    { id: 'cross', href: 'incident-cross-service.html', title: 'A cross-service failure', group: 'Lab 1: hands-off' },
+    { id: 'sql', href: 'incident-slow-sql.html', title: 'A slow SQL query', group: 'Lab 1: hands-off' },
+    { id: 'timeout', href: 'incident-timeout.html', title: 'A timeout', group: 'Lab 1: hands-off' },
+    { id: 'cpu', href: 'incident-cpu.html', title: 'CPU saturation', group: 'Lab 1: hands-off' },
+    { id: 'code', href: 'instrumentation.html', title: 'The instrumentation code', group: 'Lab 2: custom dimensions' },
+    { id: 'dimensions', href: 'dimensions.html', title: 'Dimensions and granularity', group: 'Lab 2: custom dimensions' },
+    { id: 'slowitem', href: 'incident-slow-item.html', title: 'Only one product is slow', group: 'Lab 2: custom dimensions' },
+    { id: 'freeorders', href: 'incident-free-orders.html', title: 'Revenue dropped with no errors', group: 'Lab 2: custom dimensions' },
+    { id: 'cachemiss', href: 'incident-cache-miss.html', title: 'Slow for no visible reason', group: 'Lab 2: custom dimensions' },
+    { id: 'traceid', href: 'incident-trace-id.html', title: 'A customer quotes a trace ID', group: 'Lab 2: custom dimensions' },
     { id: 'queries', href: 'queries.html', title: 'Search query reference', group: 'Reference' },
     { id: 'gaps', href: 'gaps.html', title: 'What is missing, and fixes', group: 'Reference' },
   ];
 
   const SIGNOZ = 'http://signoz.localhost:8080';
   const STORE = 'telemetry-tutorial-v1';
-  const SPAN_ARRIVAL_WAIT_MS = 8000;
-  const SPAN_RETRY_WAIT_MS = 6000;
-  const SPAN_RETRIES = 4;
+  const LAB_NAMES = { lab1: 'Lab 1', lab2: 'Lab 2' };
+  const LAB_START = { lab1: 'make up', lab2: 'make lab2' };
+  const LAB_FRONTEND = { lab1: 'lab1-frontend', lab2: 'frontend' };
+  const SPAN_ARRIVAL_WAIT_MS = 2000;
+  const SPAN_RETRY_WAIT_MS = 3000;
+  const SPAN_RETRIES = 8;
+  const TRACE_SEARCH_POLL_MS = 2000;
+  const TRACE_SEARCH_LIMIT_MS = 60000;
 
   const pageId = document.body.dataset.page;
   let lab = null;
@@ -101,6 +111,10 @@
     return value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
   }
 
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   function httpChip(code) {
     const cls = code >= 500 ? 'c5' : code >= 400 ? 'c4' : 'c2';
     return el('span', { class: 'chip ' + cls, text: 'HTTP ' + code });
@@ -151,8 +165,8 @@
   }
 
   /* Confirmed in the UI for k8s.pod.cpu.usage. Other metrics open the plain Explorer. */
-  function cpuMetricLink() {
-    const query = compositeQuery('metrics', "k8s.namespace.name = 'lab2'");
+  function cpuMetricLink(expression) {
+    const query = compositeQuery('metrics', expression);
     Object.assign(query.builder.queryData[0], {
       aggregateOperator: 'avg',
       aggregateAttribute: { id: 'k8s.pod.cpu.usage--float64--Gauge--true', dataType: 'float64', key: 'k8s.pod.cpu.usage', type: 'Gauge', isColumn: true, isJSON: false },
@@ -241,8 +255,8 @@
 
   /* ---------- lab status ---------- */
 
-  function liveAvailable() {
-    return Boolean(lab && lab.app && lab.app.up);
+  function labUp(labId) {
+    return Boolean(lab && lab.labs && lab.labs[labId] && lab.labs[labId].up);
   }
 
   function queriesAvailable() {
@@ -261,17 +275,32 @@
       host.append(el('strong', { text: 'Tutorial server not running' }), 'Start it with: make tutorial');
       return;
     }
+    const running = Object.keys(LAB_NAMES).filter((labId) => labUp(labId) && lab.labs[labId].load && lab.labs[labId].load.running);
     add(host,
-      el('strong', { text: 'Lab 2: ' + (lab.app.up ? 'up' : 'not running. Start it with: make lab2') }),
+      Object.keys(LAB_NAMES).map((labId) => el('strong', {
+        text: LAB_NAMES[labId] + ': ' + (labUp(labId) ? 'up' : 'not running. Start it with: ' + LAB_START[labId]),
+      })),
       el('strong', { text: 'SigNoz: ' + (lab.signoz.up ? 'up' : 'not reachable') }),
-      lab.app.load && lab.app.load.running ? 'Load generator is running. Stop it when you finish.' : null,
+      running.length ? 'Load generator is running in ' + running.map((labId) => LAB_NAMES[labId]).join(' and ') + '. Stop it when you finish.' : null,
     );
+  }
+
+  function bannerText() {
+    if (lab.bridge === false) {
+      return 'The tutorial server is not running, so live buttons and saved examples are unavailable. Start it with: make tutorial';
+    }
+    const parts = Object.keys(LAB_NAMES).map((labId) => (labUp(labId)
+      ? LAB_NAMES[labId] + ' is up.'
+      : LAB_NAMES[labId] + ' is not running, so its live buttons are off. Start it with: ' + LAB_START[labId] + '.'));
+    parts.push(lab.signoz.up ? 'SigNoz is up.' : 'SigNoz is not reachable, so searches and trace lookups are off. Start it with: make up.');
+    parts.push('Saved examples from real runs are still shown below.');
+    return parts.join(' ');
   }
 
   function renderBanner() {
     const main = document.getElementById('main');
     let banner = document.getElementById('lab-banner');
-    const down = lab && (lab.bridge === false || !lab.app.up || !lab.signoz.up);
+    const down = lab && (lab.bridge === false || !labUp('lab1') || !labUp('lab2') || !lab.signoz.up);
     if (!down) {
       if (banner) banner.remove();
       return;
@@ -280,9 +309,10 @@
       banner = el('div', { id: 'lab-banner', role: 'status' });
       main.prepend(banner);
     }
-    banner.textContent = lab.bridge === false
-      ? 'The tutorial server is not running, so live buttons and saved examples are unavailable. Start it with: make tutoriaerver.py'
-      : 'Lab 2 or SigNoz is not reachable, so live buttons are off. Start them with: make up, then make lab2. Saved examples from real runs are still shown below.';
+    /* make up deploys only Lab 1, so Lab 2 being absent is normal, not a fault. */
+    const onlyLab2 = lab.bridge !== false && labUp('lab1') && lab.signoz.up;
+    banner.classList.toggle('info', onlyLab2);
+    banner.textContent = bannerText();
   }
 
   async function refreshLab() {
@@ -290,7 +320,7 @@
       const { body } = await getJSON('/live/status');
       lab = body;
     } catch (error) {
-      lab = { bridge: false, app: { up: false }, signoz: { up: false } };
+      lab = { bridge: false, labs: {}, signoz: { up: false } };
     }
     renderLabPill();
     renderBanner();
@@ -351,6 +381,20 @@
     if (tip) tip.style.display = 'none';
   }
 
+  function isBackend(span) {
+    return /backend$/.test(span.service || '');
+  }
+
+  /* Custom dimensions, which only Lab 2's spans have. */
+  function spanNote(span) {
+    const parts = [];
+    if (span.order_item) parts.push('order.item=' + span.order_item);
+    if (span.order_item && span.order_total !== undefined && span.order_total !== null) parts.push('order.total=' + span.order_total);
+    if (span.order_coupon) parts.push('order.coupon=' + span.order_coupon);
+    if (span.cache_hit !== undefined && span.cache_hit !== null) parts.push('cache.hit=' + span.cache_hit);
+    return parts.join(' ');
+  }
+
   function renderWaterfall(spans, showNoise) {
     const ordered = orderSpans(spans).filter(({ span }) => showNoise || !isNoise(span));
     const seen = ordered.map(({ span }) => span);
@@ -359,20 +403,23 @@
     const total = Math.max(end - start, 0.001);
     const box = el('div', { class: 'wf' });
     box.append(el('div', { class: 'wf-legend' },
-      el('span', {}, el('span', { class: 'sw', style: 'background:var(--series-1)' }), 'frontend'),
-      el('span', {}, el('span', { class: 'sw', style: 'background:var(--series-2)' }), 'backend'),
+      [...new Set(seen.map((span) => span.service))].sort().reverse().map((service) => el('span', {},
+        el('span', { class: 'sw', style: 'background:var(--series-' + (isBackend({ service }) ? 2 : 1) + ')' }), service)),
       el('span', { text: '! marks a span with status Error' })));
     ordered.forEach(({ span, depth }) => {
       const ms = span.duration_nano / 1e6;
       const left = 100 * (startMs(span) - start) / total;
       const width = 100 * ms / total;
       const failed = span.has_error || span.status === 'Error';
+      const note = spanNote(span);
       const tip = [
         span.name,
         span.service + ', ' + span.kind + ' span',
         'Duration ' + formatDuration(ms) + ', starts at +' + formatDuration(startMs(span) - start),
         'Status ' + (span.status || 'Unset') + (span.http ? ', HTTP ' + span.http : ''),
-      ].join('\n');
+        span.sql ? 'db.statement: ' + span.sql : null,
+        note || null,
+      ].filter(Boolean).join('\n');
       box.append(el('div', {
         class: 'wf-row',
         onmousemove: (event) => showTip(event, tip),
@@ -381,10 +428,11 @@
         el('div', { class: 'wf-name', style: 'padding-left:' + depth * 0.8 + 'rem', title: span.name },
           failed ? el('span', { class: 'wf-err', 'aria-label': 'Error', text: '! ' }) : null,
           span.name, ' ',
-          el('span', { class: 'wf-svc', text: span.service })),
+          el('span', { class: 'wf-svc', text: span.service }),
+          note ? el('span', { class: 'wf-note', text: note }) : null),
         el('div', { class: 'wf-track' },
           el('div', {
-            class: 'wf-bar ' + (span.service === 'backend' ? 's2' : 's1'),
+            class: 'wf-bar ' + (isBackend(span) ? 's2' : 's1'),
             style: 'left:' + left + '%;width:' + width + '%',
           })),
         el('div', { class: 'wf-dur', text: formatDuration(ms) })));
@@ -423,12 +471,15 @@
 
   function logTable(logs) {
     if (!logs.length) return el('p', { class: 'meta', text: 'No logs carry this trace ID.' });
+    const withAttrs = logs.some((log) => log.attrs && Object.keys(log.attrs).length);
+    const attrText = (log) => Object.entries(log.attrs || {}).map(([key, value]) => key + '=' + value).join(' ');
     return el('div', { class: 'table-scroll' }, el('table', {},
-      el('thead', {}, el('tr', {}, ['Service', 'Severity', 'Message'].map((name) => el('th', { text: name })))),
+      el('thead', {}, el('tr', {}, ['Service', 'Severity', 'Message', withAttrs ? 'Attributes from extra=' : null].filter(Boolean).map((name) => el('th', { text: name })))),
       el('tbody', {}, logs.map((log) => el('tr', {},
         el('td', { text: log.service || '(blank)' }),
         el('td', { text: log.severity || '(blank)' }),
-        el('td', { text: log.body }))))));
+        el('td', { text: log.body }),
+        withAttrs ? el('td', { text: attrText(log) }) : null)))));
   }
 
   /* ---------- saved evidence ---------- */
@@ -439,18 +490,20 @@
       const data = await loadData('evidence');
       const run = data.runs[name];
       const spans = run.spans.map((span) => ({ ...span }));
+      const logs = host.dataset.logs ? run.logs.filter((log) => log.body.includes(host.dataset.logs)) : run.logs;
+      const limit = Number(host.dataset.logLimit || 6);
       host.classList.add('panel', 'wide');
       host.textContent = '';
       const realSpans = spans.filter((span) => !isNoise(span)).length;
       add(host,
-        el('h4', { text: 'Saved run: ' + name }),
+        el('h4', { text: 'Saved run: ' + run.scenario + ' in ' + LAB_NAMES[run.lab] }),
         el('p', { class: 'meta', style: 'color:var(--muted);font-size:.84rem;margin:.1rem 0 .5rem' },
           'Fired ' + run.fired_at + '. ', httpChip(run.http), ' in ' + formatNumber(run.wall_ms) + ' ms. ',
           realSpans + ' spans, plus ' + (spans.length - realSpans) + ' ASGI noise spans. Trace ', el('code', { text: run.trace_id })),
         waterfallBlock(spans),
-        el('h4', { style: 'margin-top:.9rem', text: 'Logs with this trace ID' }),
-        logTable(run.logs.slice(0, 6)),
-        run.logs.length > 6 ? el('p', { class: 'meta', text: run.logs.length + '+ logs in total. First 6 shown.' }) : null,
+        el('h4', { style: 'margin-top:.9rem', text: host.dataset.logs ? 'Logs with this trace ID, showing "' + host.dataset.logs + '"' : 'Logs with this trace ID' }),
+        logTable(logs.slice(0, limit)),
+        logs.length > limit ? el('p', { class: 'meta', text: logs.length + ' logs in total. First ' + limit + ' shown.' }) : null,
         run.stack ? el('details', {},
           el('summary', { text: 'Last lines of the stack trace stored on the span' }),
           el('pre', {}, el('code', { text: run.stack.tail.join('\n') }))) : null,
@@ -464,37 +517,40 @@
 
   /* ---------- fire a scenario ---------- */
 
-  function fireLabel(name) {
-    return 'Fire ' + name;
-  }
-
   function renderFire(host) {
     const name = host.dataset.fire;
+    const labId = host.dataset.lab || 'lab1';
     host.classList.add('panel');
     const params = JSON.parse(host.dataset.params || '{}');
-    const button = el('button', { class: 'go', text: host.dataset.label || fireLabel(name) });
+    const button = el('button', { class: 'go', text: host.dataset.label || 'Fire ' + name + ' in ' + LAB_NAMES[labId] });
     const secondsInput = name === 'cpu_burn'
       ? el('input', { type: 'number', min: 1, max: 120, value: params.seconds || 60, 'aria-label': 'Seconds to burn' })
       : null;
     const output = el('div', { class: 'result', 'aria-live': 'polite' });
     const hint = el('span', { class: 'meta', style: 'color:var(--muted);font-size:.86rem' });
+    let busy = false;
     const update = () => {
-      button.disabled = !liveAvailable();
-      hint.textContent = liveAvailable()
+      button.disabled = busy || !labUp(labId);
+      hint.textContent = labUp(labId)
         ? (host.dataset.hint || '')
-        : 'Live button off: the lab is not reachable.';
+        : 'Live button off: ' + LAB_NAMES[labId] + ' is not running. Start it with: ' + LAB_START[labId];
     };
     document.addEventListener('labchange', update);
     update();
-    button.addEventListener('click', () => fire(name, secondsInput ? { ...params, seconds: Number(secondsInput.value) } : params, button, output));
+    button.addEventListener('click', async () => {
+      busy = true;
+      update();
+      await fire(labId, name, secondsInput ? { ...params, seconds: Number(secondsInput.value) } : params, output);
+      busy = false;
+      update();
+    });
     host.append(el('div', { class: 'row' },
       button,
       secondsInput ? el('label', { style: 'font-size:.9rem' }, 'Seconds ', secondsInput) : null,
       hint), output);
   }
 
-  async function fire(name, params, button, output) {
-    button.disabled = true;
+  async function fire(labId, name, params, output) {
     output.textContent = '';
     const started = Date.now();
     const progress = el('p', { class: 'meta', text: 'Running...' });
@@ -503,7 +559,7 @@
       progress.textContent = 'Running... ' + Math.round((Date.now() - started) / 1000) + ' s';
     }, 1000);
     try {
-      const { body } = await getJSON('/live/scenario/' + name, {
+      const { body } = await getJSON('/live/scenario/' + labId + '/' + name, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
@@ -511,29 +567,72 @@
       clearInterval(ticker);
       output.textContent = '';
       if (!body.response || typeof body.response !== 'object') {
-        output.append(el('p', { text: 'The lab did not answer: ' + (body.error || 'unknown error') }));
+        output.append(el('p', { text: body.http
+          ? 'The request did not reach the app: the proxy answered HTTP ' + body.http + '. Fire it again.'
+          : LAB_NAMES[labId] + ' did not answer. It may be down.' }));
         return;
       }
       const state = loadState();
-      state.fired[name] = Date.now();
+      state.fired[labId + '/' + name] = Date.now();
       saveState(state);
-      const traceId = body.response.trace_id;
       output.append(
         el('p', { class: 'meta' }, httpChip(body.http), ' in ' + formatNumber(body.wall_ms) + ' ms'),
         el('pre', {}, el('code', { text: JSON.stringify(body.response, null, 2) })));
-      if (traceId) {
-        output.append(
-          el('div', { class: 'row', style: 'margin-top:.5rem' },
-            el('a', { class: 'go', href: SIGNOZ + '/trace/' + traceId, target: '_blank', rel: 'noopener', text: 'Open trace in SigNoz' }),
-            el('a', { class: 'alt', href: explorerLink('logs', "trace_id = '" + traceId + "'", '1h'), target: '_blank', rel: 'noopener', text: 'Logs for this trace' })),
-          el('div', { class: 'spans-here' }));
-        watchTrace(traceId, output.querySelector('.spans-here'));
-      }
+      if (body.response.trace_id) showTrace(body.response.trace_id, output);
+      else await findTrace(labId, name, body.fired_ms, output);
     } catch (error) {
       clearInterval(ticker);
-      output.textContent = 'The request failed. The lab may be down.';
-    } finally {
-      button.disabled = !liveAvailable();
+      output.textContent = 'The request failed. ' + LAB_NAMES[labId] + ' may be down.';
+    }
+  }
+
+  function showTrace(traceId, output) {
+    const spans = el('div', { class: 'spans-here' });
+    output.append(
+      el('div', { class: 'row', style: 'margin-top:.5rem' },
+        el('a', { class: 'go', href: SIGNOZ + '/trace/' + traceId, target: '_blank', rel: 'noopener', text: 'Open trace in SigNoz' }),
+        el('a', { class: 'alt', href: explorerLink('logs', "trace_id = '" + traceId + "'", '1h'), target: '_blank', rel: 'noopener', text: 'Logs for this trace' })),
+      spans);
+    watchTrace(traceId, spans);
+  }
+
+  /* Lab 1's API returns no trace ID, so ask SigNoz for the trace of the request
+     the bridge just sent. It takes a few seconds to arrive, hence the waiting note. */
+  async function findTrace(labId, name, firedMs, output) {
+    const search = "service.name = '" + LAB_FRONTEND[labId] + "' AND http.target = '/api/scenario/" + name + "'";
+    const note = el('p', { class: 'meta', role: 'status' });
+    output.append(
+      el('p', { class: 'meta', text: 'This response has no trace ID, because ' + LAB_NAMES[labId] + "'s app does not know it is being traced. This page finds the trace by searching SigNoz for the request it just sent." }),
+      note,
+      el('div', { class: 'row', style: 'margin-top:.5rem' },
+        el('a', { class: 'alt', href: explorerLink('traces', search, '1h'), target: '_blank', rel: 'noopener', text: 'Run the search in SigNoz yourself' })));
+    if (!queriesAvailable()) {
+      note.textContent = 'SigNoz lookups are off, so the trace cannot be found from here.';
+      return;
+    }
+    const started = Date.now();
+    const seconds = () => Math.round((Date.now() - started) / 1000);
+    const waiting = () => {
+      note.textContent = 'Waiting for the trace to reach SigNoz: ' + seconds() + ' s. This usually takes a few seconds.';
+    };
+    waiting();
+    const ticker = setInterval(waiting, 1000);
+    try {
+      while (Date.now() - started < TRACE_SEARCH_LIMIT_MS) {
+        const { status, body } = await getJSON('/live/find/' + labId + '/' + name + '?since=' + firedMs);
+        if (status === 200 && body.trace_id) {
+          clearInterval(ticker);
+          note.textContent = 'Found it in SigNoz after ' + seconds() + ' s.';
+          showTrace(body.trace_id, output);
+          return;
+        }
+        await sleep(TRACE_SEARCH_POLL_MS);
+      }
+      clearInterval(ticker);
+      note.textContent = 'No matching trace after ' + seconds() + ' s. SigNoz may be busy. Use the search link below in a moment.';
+    } catch (error) {
+      clearInterval(ticker);
+      note.textContent = 'The search failed. SigNoz may be down. Use the search link below when it is back.';
     }
   }
 
@@ -542,9 +641,9 @@
       host.append(el('p', { class: 'meta', text: 'SigNoz lookups are off, so spans cannot be shown here.' }));
       return;
     }
-    const note = el('p', { class: 'meta', text: 'Waiting for spans. The SDK batches them and flushes every 5 seconds.' });
+    const note = el('p', { class: 'meta', text: 'Waiting for every span to reach SigNoz...' });
     host.append(note);
-    await new Promise((resolve) => setTimeout(resolve, SPAN_ARRIVAL_WAIT_MS));
+    await sleep(SPAN_ARRIVAL_WAIT_MS);
     let spanCount = -1;
     for (let attempt = 0; attempt < SPAN_RETRIES; attempt += 1) {
       try {
@@ -557,13 +656,13 @@
             el('p', { class: 'meta', text: body.spans.length + ' spans and ' + body.logs.length + ' logs, read live from SigNoz just now.' }),
             waterfallBlock(body.spans),
             el('h4', { style: 'margin-top:.8rem;font-size:.92rem', text: 'Logs with this trace ID' }),
-            logTable(body.logs.slice(0, 6)));
+            logTable(body.logs));
           if (stable) return;
         }
       } catch (error) {
         /* Keep trying until the attempts run out. */
       }
-      await new Promise((resolve) => setTimeout(resolve, SPAN_RETRY_WAIT_MS));
+      await sleep(SPAN_RETRY_WAIT_MS);
     }
     if (spanCount < 0) {
       note.textContent = 'No spans yet. Use the SigNoz link above in a few seconds.';
@@ -573,41 +672,47 @@
   /* ---------- load generator ---------- */
 
   function renderLoad(host) {
+    const labId = host.dataset.loadPanel || 'lab1';
     host.classList.add('panel');
-    const rps = el('input', { type: 'number', min: 0.5, max: 20, step: 0.5, value: 5, 'aria-label': 'Requests per second' });
-    const pct = el('input', { type: 'number', min: 0, max: 100, value: 10, 'aria-label': 'Error percentage' });
+    const rps = el('input', { type: 'number', min: 0.5, max: 20, step: 0.5, value: 5, 'aria-label': 'Requests per second in ' + LAB_NAMES[labId] });
+    const pct = el('input', { type: 'number', min: 0, max: 100, value: 10, 'aria-label': 'Error percentage in ' + LAB_NAMES[labId] });
     const start = el('button', { class: 'go', text: 'Start load' });
     const stop = el('button', { class: 'alt', text: 'Stop load' });
     const status = el('p', { class: 'meta', style: 'color:var(--muted);font-size:.88rem;margin:.5rem 0 0', role: 'status' });
     const show = (load) => {
-      status.textContent = load && load.running
+      if (!load || load.error) {
+        status.textContent = LAB_NAMES[labId] + ' did not answer. It may be down.';
+        return;
+      }
+      status.textContent = load.running
         ? 'Running at ' + load.rps + ' requests/s with ' + load.error_pct + '% errors. Sent ' + load.sent + '. Please stop it when you finish.'
         : 'Stopped.';
     };
     const update = () => {
-      start.disabled = !liveAvailable();
-      stop.disabled = !liveAvailable();
-      if (liveAvailable()) show(lab.app.load);
-      else status.textContent = 'Live button off: the lab is not reachable.';
+      start.disabled = !labUp(labId);
+      stop.disabled = !labUp(labId);
+      if (labUp(labId)) show(lab.labs[labId].load);
+      else status.textContent = 'Live button off: ' + LAB_NAMES[labId] + ' is not running. Start it with: ' + LAB_START[labId];
     };
-    start.addEventListener('click', async () => {
-      const { body } = await getJSON('/live/load', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rps: Number(rps.value), error_pct: Number(pct.value) }),
-      });
-      show(body);
+    const send = async (options) => {
+      try {
+        const { body } = await getJSON('/live/load/' + labId, options);
+        show(body);
+      } catch (error) {
+        show(null);
+      }
       refreshLab();
-    });
-    stop.addEventListener('click', async () => {
-      const { body } = await getJSON('/live/load', { method: 'DELETE' });
-      show(body);
-      refreshLab();
-    });
+    };
+    start.addEventListener('click', () => send({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rps: Number(rps.value), error_pct: Number(pct.value) }),
+    }));
+    stop.addEventListener('click', () => send({ method: 'DELETE' }));
     document.addEventListener('labchange', update);
     update();
     host.append(
-      el('h4', { text: 'Background traffic' }),
+      el('h4', { text: 'Background traffic in ' + LAB_NAMES[labId] }),
       el('div', { class: 'row' },
         el('label', { style: 'font-size:.9rem' }, 'Requests/s ', rps),
         el('label', { style: 'font-size:.9rem' }, 'Error % ', pct),
@@ -622,7 +727,12 @@
     return el('span', { class: 'badge api', text: 'Query API only' });
   }
 
-  function savedView(saved) {
+  function labBadge(item) {
+    const text = item.lab === 'both' ? 'Both labs' : LAB_NAMES[item.lab];
+    return text ? el('span', { class: 'badge lab', text }) : null;
+  }
+
+  function savedView(saved, item) {
     const box = el('div');
     if (saved.warnings && saved.warnings.length) {
       box.append(el('p', { class: 'meta', text: 'SigNoz warning: ' + saved.warnings[0].slice(0, 170) }));
@@ -631,7 +741,7 @@
       if (saved.matched !== undefined) {
         box.append(el('p', { class: 'meta', text: formatNumber(saved.matched) + ' matched. Newest ' + saved.rows.length + ' shown.' }));
       }
-      if (saved.rows.length) box.append(rowsTable(saved.rows));
+      if (saved.rows.length) box.append(rowsTable(saved.rows, item.extra));
     } else if (saved.kind === 'table') {
       box.append(scalarTable(saved.columns, saved.data));
     } else if (saved.kind === 'metric') {
@@ -640,11 +750,12 @@
     return box;
   }
 
-  function rowsTable(rows) {
+  function rowsTable(rows, extra) {
     const isSpan = rows[0] && 'duration_nano' in rows[0];
     const columns = isSpan
       ? [['Time (UTC)', (row) => (row.timestamp || '').slice(11, 19)], ['Service', (row) => row['service.name']], ['Span', (row) => row.name], ['Duration', (row) => formatDuration(row.duration_nano / 1e6)], ['HTTP', (row) => row.response_status_code || '']]
       : [['Time (UTC)', (row) => (row.timestamp || '').slice(11, 19)], ['Service', (row) => row.service], ['Severity', (row) => row.severity], ['Message', (row) => row.body]];
+    (extra || []).forEach((key) => columns.push([key, (row) => (row[key] === undefined || row[key] === null ? '' : String(row[key]))]));
     return el('div', { class: 'table-scroll' }, el('table', {},
       el('thead', {}, el('tr', {}, columns.map(([title]) => el('th', { text: title })))),
       el('tbody', {}, rows.map((row) => el('tr', {}, columns.map(([, read]) => el('td', { text: read(row) })))))));
@@ -698,14 +809,19 @@
         return box;
       }
       if (item.signal === 'traces') {
-        box.append(rowsTable(rows.map((row) => row.data)));
+        box.append(rowsTable(rows.map((row) => row.data), item.extra));
       } else {
-        box.append(rowsTable(rows.map((row) => ({
-          timestamp: row.timestamp,
-          service: (row.data.resources_string || {})['service.name'] || '(blank)',
-          severity: row.data.severity_text || '(blank)',
-          body: (row.data.body || '').slice(0, 170),
-        }))));
+        box.append(rowsTable(rows.map((row) => {
+          const attributes = { ...(row.data.attributes_string || {}), ...(row.data.attributes_number || {}) };
+          const extras = Object.fromEntries((item.extra || []).map((key) => [key, attributes[key]]));
+          return {
+            timestamp: row.timestamp,
+            service: (row.data.resources_string || {})['service.name'] || '(blank)',
+            severity: row.data.severity_text || '(blank)',
+            body: (row.data.body || '').slice(0, 170),
+            ...extras,
+          };
+        }), item.extra));
       }
     } else if (item.requestType === 'scalar') {
       if (!first || !first.data || !first.data.length) {
@@ -793,18 +909,19 @@
     document.addEventListener('labchange', update);
     update();
     const canLink = !item.metric && !item.aggs;
+    const isCpu = Boolean(item.metric && item.metric.metricName === 'k8s.pod.cpu.usage');
     const link = canLink
       ? el('a', { class: 'alt', href: explorerLink(item.signal, item.expr, relativeTimeFor(item.liveMinutes)), target: '_blank', rel: 'noopener', text: 'Open in SigNoz' })
-      : el('a', { class: 'alt', href: item.id === 'm-cpu' ? cpuMetricLink() : SIGNOZ + (item.metric ? '/metrics-explorer/explorer' : '/traces-explorer'), target: '_blank', rel: 'noopener', text: item.id === 'm-cpu' ? 'Open in SigNoz' : item.metric ? 'Open Metrics Explorer' : 'Open Explorer' });
+      : el('a', { class: 'alt', href: isCpu ? cpuMetricLink(item.expr) : SIGNOZ + (item.metric ? '/metrics-explorer/explorer' : item.signal === 'logs' ? '/logs/logs-explorer' : '/traces-explorer'), target: '_blank', rel: 'noopener', text: isCpu ? 'Open in SigNoz' : item.metric ? 'Open Metrics Explorer' : 'Open Explorer' });
     return el('div', { class: 'panel query-card', 'data-search': (item.title + ' ' + showText + ' ' + item.group).toLowerCase() },
-      el('h4', {}, item.title, ' ', verifiedBadge(item)),
+      el('h4', {}, item.title, ' ', labBadge(item), ' ', verifiedBadge(item)),
       compact ? null : el('p', { class: 'why', text: item.why.replace(/`/g, '') }),
       el('div', { class: 'expr' }, el('span', { text: showText }), copyButton(item.metric || item.aggs ? showText : item.expr)),
       el('div', { class: 'row' }, run, link),
       output,
       el('details', {},
         el('summary', { text: 'Saved result from ' + item.savedWindow.start.slice(0, 16).replace('T', ' ') + ' to ' + item.savedWindow.end.slice(11, 16) + ' UTC' }),
-        item.requestType === 'scalar' ? scalarTable(item.saved.columns, item.saved.data, item.aggs) : savedView(item.saved)));
+        item.requestType === 'scalar' ? scalarTable(item.saved.columns, item.saved.data, item.aggs) : savedView(item.saved, item)));
   }
 
   async function renderQuery(host) {
@@ -820,7 +937,7 @@
   async function renderQueryIndex(host) {
     const data = await loadData('queries');
     const groups = [...new Set(data.queries.map((query) => query.group))];
-    const search = el('input', { type: 'search', placeholder: 'Filter queries, for example sql, cpu or logs', 'aria-label': 'Filter queries' });
+    const search = el('input', { type: 'search', placeholder: 'Filter queries, for example lab 1, sql, cpu or logs', 'aria-label': 'Filter queries' });
     const count = el('p', { class: 'meta', style: 'color:var(--muted);font-size:.84rem;margin:.3rem 0 0' });
     const cards = [];
     const body = el('div');
@@ -860,7 +977,7 @@
     host.textContent = '';
     items.forEach((item) => {
       host.append(el('div', { class: 'panel' },
-        el('h4', {}, item.title, ' ', el('span', { class: 'badge data', text: 'ClickHouse SQL' })),
+        el('h4', {}, item.title, ' ', labBadge(item), ' ', el('span', { class: 'badge data', text: 'ClickHouse SQL' })),
         el('p', { class: 'why', text: item.why.replace(/`/g, '') }),
         el('details', {},
           el('summary', { text: 'Show the SQL' }),
@@ -877,12 +994,10 @@
 
   async function renderCpuChart(host) {
     const data = await loadData('clickhouse');
-    const samples = data.queries.find((query) => query.id === 'c-cpu-samples').result.rows
+    const source = data.queries.find((query) => query.id === 'c-cpu-samples');
+    const samples = source.result.rows
       .map(([time, cores]) => ({ t: Date.parse(time.replace(' ', 'T') + 'Z'), label: time.slice(11, 19), cores: Number(cores) }));
-    const bands = [
-      { start: Date.parse('2026-11-04T23:11:10Z'), end: Date.parse('2026-11-04T23:12:40Z'), label: 'burn 1' },
-      { start: Date.parse('2026-11-04T23:15:44Z'), end: Date.parse('2026-11-04T23:17:14Z'), label: 'burn 2' },
-    ];
+    const bands = source.bands.map((band) => ({ start: Date.parse(band.start), end: Date.parse(band.end), label: band.label }));
     const width = 760;
     const height = 260;
     const margin = { top: 16, right: 16, bottom: 28, left: 44 };
@@ -897,7 +1012,7 @@
       if (text !== undefined) node.textContent = text;
       return node;
     };
-    const svg = svgEl('svg', { viewBox: '0 0 ' + width + ' ' + height, role: 'img', 'aria-label': 'CPU cores used by the backend pod over time. Two plateaus near one core during the burns.' });
+    const svg = svgEl('svg', { viewBox: '0 0 ' + width + ' ' + height, role: 'img', 'aria-label': source.caption });
     bands.forEach((band) => {
       svg.append(svgEl('rect', { class: 'band', x: px(band.start), y: margin.top, width: px(band.end) - px(band.start), height: height - margin.top - margin.bottom }));
       svg.append(svgEl('text', { class: 'band-label', x: px(band.start) + 5, y: margin.top + 13 }, band.label));
@@ -936,7 +1051,7 @@
     host.textContent = '';
     host.append(
       el('h4', { text: 'Backend pod CPU, in cores' }),
-      el('p', { class: 'why', text: 'Raw k8s.pod.cpu.usage samples, one every 30 seconds, read from ClickHouse. Shaded bands are the two 90-second burns.' }),
+      el('p', { class: 'why', text: source.caption }),
       svg,
       el('details', {},
         el('summary', { text: 'Show as a table' }),

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dimensions and granularity | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="dimensions">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 2: custom dimensions</p>
+<h1>Dimensions and granularity</h1>
+<p class="lead">A dimension is anything you can filter or group by. Each one lets you ask a sharper question. Some come for free, and some only your code knows. The skill is choosing where each one belongs.</p>
+
+<h2>Two kinds of dimension</h2>
+<table>
+  <thead><tr><th></th><th>Examples</th><th>The question it answers</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Free, from Lab 1</strong></td><td><code>service.name</code>, route, status code, <code>k8s.pod.name</code>, <code>k8s.node.name</code></td><td>Which service, endpoint or pod is slow?</td></tr>
+    <tr><td><strong>Technical, needs your code</strong></td><td><code>cache.hit</code>, <code>orders.returned</code></td><td>Is it slow only on cache misses, or only with big results?</td></tr>
+    <tr><td><strong>Business, needs your code</strong></td><td><code>order.item</code>, <code>order.coupon</code></td><td>Is it only one product, and what does it cost us?</td></tr>
+  </tbody>
+</table>
+
+<h2>Three steps, from cheapest to richest</h2>
+<p>You keep Lab 1's setup and take only the steps you need. You never have to instrument everything.</p>
+<table>
+  <thead><tr><th>Step</th><th>What you write</th><th>What you gain</th><th>What it can't do</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1. Log field</strong></td><td><code>log.info("order stored", extra={"order.item": item})</code></td><td>Search, count, sum and chart it, with no OpenTelemetry code</td><td>Connect it to latency, because the duration is on the span</td></tr>
+    <tr><td><strong>2. Span attribute</strong></td><td><code>trace.get_current_span().set_attribute("cache.hit", hit)</code></td><td>Filter and group traces by it, including latency</td><td>Stay complete if you ever sample traces</td></tr>
+    <tr><td><strong>3. Metric label</strong></td><td><code>cache_lookups.add(1, {"cache.hit": hit})</code></td><td>Cheap totals and trends over time, however many requests you have</td><td>Hold values with no fixed limit</td></tr>
+  </tbody>
+</table>
+
+<h2>Where each value belongs</h2>
+<table>
+  <thead><tr><th>Kind of value</th><th>Example</th><th>Log field</th><th>Span attribute</th><th>Metric label</th></tr></thead>
+  <tbody>
+    <tr><td>A few possible values</td><td><code>order.item</code>, <code>cache.hit</code></td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+    <tr><td>No fixed limit</td><td><code>order.id</code>, a customer ID</td><td>Yes</td><td>Yes</td><td><strong>No</strong></td></tr>
+  </tbody>
+</table>
+
+<h2>What a bad metric label costs</h2>
+<p>We sent the same 1,000 orders as two metrics, and changed only the label. These numbers come from this lab <span class="badge data">ClickHouse SQL</span>:</p>
+<table>
+  <thead><tr><th>Label</th><th>Distinct values</th><th>Series</th><th>Samples stored in about a minute</th></tr></thead>
+  <tbody>
+    <tr><td><code>order.item</code></td><td>5</td><td>5</td><td>65</td></tr>
+    <tr><td><code>order.id</code></td><td>1,000</td><td>1,000</td><td>13,000</td></tr>
+  </tbody>
+</table>
+<p>Every distinct label value creates a new series, and each series keeps costing storage. An order ID is fine on a span, where it costs one value on one request. As a metric label it grows forever.</p>
+
+<h2>See it in SigNoz</h2>
+<p><code>make lab2</code> creates a dashboard called <strong>Lab 2: custom dimensions</strong>. Run <code>cache_miss</code>, <code>slow_item</code> and <code>free_orders</code> in <a href="http://lab2.localhost:8080" target="_blank" rel="noopener">Lab 2</a> a few times with the load generator on, then open it from Dashboards in <a href="http://signoz.localhost:8080" target="_blank" rel="noopener">SigNoz</a>.</p>
+<p>The cache panel shows why this matters. In one run, P95 latency for <code>GET /catalog</code> was 4 ms on a hit and 802 ms on a miss <span class="badge api">Query API only</span>. Without <code>cache.hit</code>, those requests just look randomly slow.</p>
+<figure class="shot"><img src="screenshots/dimensions-dashboard.png" alt="SigNoz dashboard with orders and revenue per product, catalogue latency by cache result, and cache lookups by result" width="1440" height="900" loading="lazy"><figcaption>Lab 2's dashboard after a few minutes of traffic. Bottom left: misses stay near 800 ms, and hits stay near zero. <span class="badge ui">Seen in SigNoz UI</span></figcaption></figure>
+<div class="quiz" data-quiz="d1"><p class="q">Check yourself: You want to find every request for customer 8841. Where should the customer ID go?</p><button type="button" data-right="false" data-why="Customer IDs have no fixed limit, so each one would create a new series.">A metric label.</button><button type="button" data-right="true" data-why="A span attribute handles unbounded values, and you can search for that customer's traces.">A span attribute.</button><button type="button" data-right="false" data-why="Filtering by service can't tell one customer from another.">Nowhere. Filter by service instead.</button></div>
+<div class="quiz" data-quiz="d2"><p class="q">Check yourself: You logged order.total, and can chart revenue. Your boss asks whether expensive orders are slower. What do you need?</p><button type="button" data-right="false" data-why="The total is on the log and the duration is on the span, so charts can't connect them.">Nothing. Log fields can answer that.</button><button type="button" data-right="true" data-why="With the total on the span, you can group latency by it.">The total as a span attribute.</button><button type="button" data-right="false" data-why="The API call works on top of the injected agent.">A full SDK setup, with the agent removed.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

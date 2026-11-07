@@ -3,22 +3,18 @@
 [![e2e](https://github.com/vavdoshka/opentelemetry-signoz-lab/actions/workflows/e2e.yml/badge.svg)](https://github.com/vavdoshka/opentelemetry-signoz-lab/actions/workflows/e2e.yml)
 
 A hands-on lab for learning OpenTelemetry on Kubernetes with SigNoz, the open source observability
-platform. Get traces, metrics and logs from an app with no code changes, then add the OpenTelemetry
-SDK and debug real incidents. One command, on k3d or kind.
+platform. Get traces, metrics and logs from an app with no code changes, debug real incidents, then
+add custom dimensions only where you need them. One command, on k3d or kind.
 
-What do you get from plain OpenTelemetry and a simple SigNoz install, and what's missing? This lab
-lets you find out.
-
-It has two labs, in order:
-
-| | Lab 1: hands-off | Lab 2: SDK |
+| | Lab 1: hands-off | Lab 2: custom dimensions |
 |---|---|---|
-| **The app** | Contains no OpenTelemetry code | Set up by hand with the OpenTelemetry SDK |
-| **Telemetry comes from** | The OpenTelemetry Operator, at pod start | Code you write, plus instrumentation libraries |
-| **You learn** | How much you get for free | What code adds, and how to investigate incidents |
+| **The app** | Contains no OpenTelemetry code | Lab 1 plus a few OpenTelemetry API calls |
+| **Telemetry comes from** | The OpenTelemetry Operator, at pod start | The same agent, plus what your code adds |
+| **You learn** | How much you get for free, and how to debug six incidents with it | How to slice telemetry by things only your code knows |
 
-Both run side by side on a local two-node cluster and send to the same SigNoz. Both can fail on
-demand, and an interactive tutorial walks you through it.
+You don't have to choose. Lab 2 keeps Lab 1's setup, and adds detail only where it's worth it. Both
+run side by side on a local two-node cluster and send to the same SigNoz, and an interactive tutorial
+walks you through them.
 
 ## Prerequisites
 
@@ -72,7 +68,7 @@ make compare   # sends both labs the same requests and shows what each captured
 |---|---|
 | `make check` | Checks the prerequisites |
 | `make up` | Creates the cluster and deploys SigNoz and Lab 1. Safe to rerun, and recovers the lab after a restart |
-| `make lab2` | Deploys Lab 2, or redeploys it after you change its code |
+| `make lab2` | Deploys Lab 2 and its SigNoz dashboard, or redeploys it after you change its code |
 | `make lab1` | Redeploys Lab 1 after you change its code |
 | `make compare` | Shows what SigNoz captures from each lab |
 | `make status` | Shows nodes, pods and URLs |
@@ -100,11 +96,17 @@ UI has a button for each scenario:
 | `db_error` | Query on a missing table |
 | `cpu_burn` | Burns CPU for N seconds, visible in pod metrics |
 | `log_burst` | N log lines at a chosen level |
+| `slow_item` | Five orders. One product is slow, and nothing fails |
+| `free_orders` | Five orders with a coupon. Everything succeeds, but revenue is zero |
+| `cache_miss` | Six catalogue lookups. Some are slow, for no visible reason |
+
+The last three are the point of Lab 2. Both labs have those bugs, but Lab 1 can only show the
+symptoms. Lab 2 adds the dimensions that explain them.
 
 ## What we found
 
-- **[Findings](docs/FINDINGS.md):** what works with no configuration, what doesn't, hands-off
-  versus SDK, and a node crash test.
+- **[Findings](docs/FINDINGS.md):** what works with no configuration, what doesn't, what custom
+  dimensions add, and a node crash test.
 - **[Benchmark](docs/BENCHMARK.md):** the lab scored against OpenTelemetry and SigNoz guidance.
 - **[Configuration log](docs/CONFIG.md):** every non-default setting, and why.
 

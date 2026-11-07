@@ -1,10 +1,11 @@
 """frontend service for Lab 1: scenario UI + API that calls the backend.
 
-This file contains no OpenTelemetry code and has no OpenTelemetry dependency.
+This file contains no OpenTelemetry code.
 All telemetry is added at pod start by the OpenTelemetry Operator.
 """
 
 import asyncio
+import contextvars
 import logging
 import os
 import random
@@ -111,6 +112,35 @@ async def s_log_burst(p: dict) -> dict:
     return {"emitted": count, "level": logging.getLevelName(level)}
 
 
+async def s_slow_item(_p: dict) -> dict:
+    # Five orders. Only the catering ones hit the slow pricing bug.
+    results = []
+    for item in ["coffee", "catering", "bagel", "catering", "cake"]:
+        r = await backend.post("/orders", json={"item": item, "qty": 1})
+        r.raise_for_status()
+        results.append(r.json())
+    return {"orders": len(results)}
+
+
+async def s_free_orders(_p: dict) -> dict:
+    # Five orders using a coupon. All succeed, and all come out free.
+    totals = []
+    for _ in range(5):
+        order = {"item": random.choice(ITEMS), "qty": random.randint(1, 5), "coupon": "SAVE10"}
+        r = await backend.post("/orders", json=order)
+        r.raise_for_status()
+        totals.append(r.json()["total"])
+    return {"orders": len(totals), "revenue": sum(totals)}
+
+
+async def s_cache_miss(_p: dict) -> dict:
+    # Six catalogue lookups. Some miss the cache and take the slow path.
+    for item in ITEMS + ITEMS[:2]:
+        r = await backend.get("/catalog", params={"item": item})
+        r.raise_for_status()
+    return {"lookups": 6}
+
+
 SCENARIOS = {
     "order": (s_order, "Place an order: frontend → backend → Postgres INSERT. Happy path."),
     "list": (s_list, "List orders: frontend → backend → Postgres SELECT."),
@@ -123,6 +153,9 @@ SCENARIOS = {
     "db_error": (s_db_error, "Backend queries a missing table; logs ERROR with traceback → 500/502."),
     "cpu_burn": (s_cpu_burn, "Backend burns CPU for N seconds (default 10). Visible in pod CPU metrics."),
     "log_burst": (s_log_burst, "Emit N log lines at a chosen level, with attributes."),
+    "slow_item": (s_slow_item, "Five orders. One product is slow, and nothing fails."),
+    "free_orders": (s_free_orders, "Five orders with a coupon. Everything succeeds, but revenue is zero."),
+    "cache_miss": (s_cache_miss, "Six catalogue lookups. Some are slow, for no visible reason."),
 }
 
 
@@ -244,7 +277,8 @@ async def start_load(cfg: LoadIn) -> dict:
     loadgen.error_pct = max(0, min(cfg.error_pct, 100))
     loadgen.sent = 0
     loadgen.started = time.time()
-    loadgen.task = asyncio.create_task(_loadgen_loop())
+    # Use an empty context, so generated requests don't all join this request's trace.
+    loadgen.task = asyncio.create_task(_loadgen_loop(), context=contextvars.Context())
     log.info("load generator started", extra={"loadgen.rps": loadgen.rps, "loadgen.error_pct": loadgen.error_pct})
     return loadgen.status()
 

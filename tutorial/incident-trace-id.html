@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incident: a customer quotes a trace ID | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="traceid">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 2: incident 4 of 4</p>
+<h1>A customer quotes a trace ID</h1>
+<p class="lead">A customer sends you an error message with an ID in it. Lab 2 takes you from that ID to the exact request in seconds. In Lab 1 the trace exists just the same, but nobody can tell you which one it is.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#search">4. Search</a></li><li><a href="#evidence">5. Evidence</a></li><li><a href="#cause">6. Root cause</a></li><li><a href="#fix">7. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p>Play the customer. Fire <code>crash</code> in Lab 2 and copy the <code>trace_id</code> from the response. Then fire it in Lab 1, and look for the same field.</p>
+<div data-fire="crash" data-lab="lab2"></div>
+<div data-fire="crash" data-lab="lab1"></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>Both labs fail in the same way, but look at what the customer gets back:</p>
+<figure class="code"><figcaption><span>Real response from Lab 2</span></figcaption><pre><code>{&quot;status&quot;: 500, &quot;error&quot;: &quot;ZeroDivisionError(&#x27;division by zero&#x27;)&quot;, &quot;trace_id&quot;: &quot;e43218500da0d3b525f3afca7cdf69f9&quot;}</code></pre></figure>
+<figure class="code"><figcaption><span>Real response from Lab 1</span></figcaption><pre><code>{&quot;status&quot;: 500, &quot;error&quot;: &quot;ZeroDivisionError(&#x27;division by zero&#x27;)&quot;}</code></pre></figure>
+<p>A customer of Lab 2 can quote that ID in a support ticket. A customer of Lab 1 can only say roughly when it happened.</p>
+
+<h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
+<p>With an ID, you don't need to search around. Open it directly: <code>http://signoz.localhost:8080/trace/&lt;trace ID&gt;</code>. Or search for it, which also finds the logs.</p>
+
+<h2 class="step" id="search"><span class="n">4</span>Search</h2>
+<h3>Lab 2: the exact trace</h3>
+<div data-query="t2-trace">Loading saved query...</div>
+<div data-query="l2-trace">Loading saved query...</div>
+<h3>Lab 1: every crash, with nothing to tell them apart</h3>
+<div data-query="t-crash">Loading saved query...</div>
+<p>In the saved window that search matched 61 spans, from crashes that all look the same. You could narrow it by time, but with the same error at the same moment you would be guessing which one was this customer's.</p>
+
+<h2 class="step" id="evidence"><span class="n">5</span>Evidence</h2>
+<div data-evidence="lab2/crash">Loading saved run...</div>
+<figure class="shot"><img src="screenshots/lab2-crash-trace.png" alt="SigNoz trace page for the Lab 2 crash, opened directly by trace ID" width="1440" height="900" loading="lazy"><figcaption>The exact trace, opened by its ID. <span class="badge ui">Seen in SigNoz UI</span></figcaption></figure>
+<p>Everything you need is in one place: the exception, the stack trace with its file and line, and the log. There was no searching, and no guessing at time ranges.</p>
+
+<h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
+<p>This incident is about the ID, not the crash. The crash itself is covered in <a href="incident-error.html">An unhandled error</a>.</p>
+<p>Lab 1's trace has an ID too. The agent creates one for every request. But the app has no code that reads it, so it can't put it in a response. Lab 2 adds that code:</p>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 245–247</span></figcaption><pre><code><span class="ln">245</span>def current_trace_id() -&gt; str | None:
+<span class="ln">246</span>    ctx = trace.get_current_span().get_span_context()
+<span class="ln">247</span>    return format(ctx.trace_id, &quot;032x&quot;) if ctx.is_valid else None</code></pre></figure>
+<p>The exception handler then includes it in the error response:</p>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 250–254</span></figcaption><pre><code><span class="ln">250</span>@app.exception_handler(Exception)
+<span class="ln">251</span>async def unhandled(request: Request, exc: Exception) -&gt; JSONResponse:
+<span class="ln">252</span>    # Common app pattern: log unhandled errors and return JSON.
+<span class="ln">253</span>    log.exception(&quot;unhandled error on %s %s&quot;, request.method, request.url.path)
+<span class="ln">254</span>    return JSONResponse({&quot;status&quot;: 500, &quot;error&quot;: repr(exc), &quot;trace_id&quot;: current_trace_id()}, status_code=500)</code></pre></figure>
+
+<h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
+<p>There's no bug to fix here. It is a habit worth copying: return the trace ID on errors, and show it to the user, so that a support ticket points straight at the evidence.</p>
+<p>Lab 1 can get the same thing with the change you just read. It needs the <code>opentelemetry-api</code> package and these few lines. Nothing else about its setup has to change.</p>
+
+<div class="quiz" data-quiz="ti1"><p class="q">Check yourself: Why does Lab 1 return no trace ID, when the agent creates one for every request?</p><button type="button" data-right="false" data-why="It does. Every Lab 1 trace has one.">Lab 1 does not create trace IDs.</button><button type="button" data-right="true" data-why="The agent traces the request, but the app never asks for the ID. A few API lines change that.">The app has no code that reads the ID.</button><button type="button" data-right="false" data-why="SigNoz shows it. The app never receives it to pass on.">SigNoz hides it.</button></div>
+<div class="quiz" data-quiz="ti2"><p class="q">Check yourself: A customer gives you a trace ID from Lab 2. What is the fastest way to the evidence?</p><button type="button" data-right="false" data-why="That finds every crash, not this one.">Search logs for the error message.</button><button type="button" data-right="true" data-why="It goes straight to that one request, and the same ID finds its logs.">Open /trace/ with that ID in SigNoz.</button><button type="button" data-right="false" data-why="That shows a trend, not one request.">Look at the error rate chart.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

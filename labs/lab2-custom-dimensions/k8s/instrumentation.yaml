@@ -1,0 +1,40 @@
+# This file is all the OpenTelemetry configuration Lab 2 has.
+#
+# The annotation on the Namespace opts in every pod created here. The
+# Instrumentation resource tells the Operator how to instrument them. It must
+# exist before the pods start, because injection happens at pod creation.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab2
+  annotations:
+    instrumentation.opentelemetry.io/inject-python: "true"
+---
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: zero-code
+  namespace: lab2
+spec:
+  exporter:
+    # The SigNoz agent on the same node.
+    endpoint: http://k8s-infra-otel-agent.signoz.svc.cluster.local:4318
+  sampler:
+    # Keep every trace, the same as the SDK default.
+    type: parentbased_always_on
+  propagators:
+    - tracecontext
+    - baggage
+  resource:
+    resourceAttributes:
+      deployment.environment: lab2
+  python:
+    env:
+      # Python logs are off by default in the Operator.
+      - { name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: "true" }
+      # Don't create spans for kubelet probe calls.
+      - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
+      # Service Map fix. See gap 2 in docs/FINDINGS.md.
+      - { name: OTEL_BSP_SCHEDULE_DELAY, value: "500" }
+      # Export metrics every 10 seconds (default 60), so the lab feels responsive.
+      - { name: OTEL_METRIC_EXPORT_INTERVAL, value: "10000" }

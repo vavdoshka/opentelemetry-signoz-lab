@@ -36,3 +36,5 @@ spec:
       - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
       # Service Map fix. See gap 2 in docs/FINDINGS.md.
       - { name: OTEL_BSP_SCHEDULE_DELAY, value: "500" }
+      # Export metrics every 10 seconds (default 60), so the lab feels responsive.
+      - { name: OTEL_METRIC_EXPORT_INTERVAL, value: "10000" }
