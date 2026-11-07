@@ -1,0 +1,4 @@
+# Web stack only, the same as Lab 1. There is no OpenTelemetry package here.
+fastapi==0.162.0
+uvicorn==0.54.0
+httpx==0.28.1

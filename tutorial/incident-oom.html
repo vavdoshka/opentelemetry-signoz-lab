@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A container that disappears | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="oom">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 3: incident 2 of 5</p>
+<h1>A container that disappears</h1>
+<p class="lead">The kernel kills a container that goes over its memory limit, with no warning and no error. The metric named after this event reads 0 the whole time, so you have to know where the real evidence is.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#evidence">4. Evidence</a></li><li><a href="#cause">5. Root cause</a></li><li><a href="#fix">6. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p>Keep some load running, then leak memory. <code>oom</code> allocates 2 MiB a second until the kernel steps in. That takes about 100 seconds, and only this container is affected: the limit protects the node.</p>
+<div data-load-panel="lab3" data-rps="2"></div>
+<div data-fire="oom" data-lab="lab3" data-hint="The container is killed after about 100 seconds."></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>The app reports nothing unusual, and then stops. Its last log line arrived two seconds before the kill:</p>
+<figure class="code"><pre><code>19:24:28  WARN  holding 204 MiB on purpose</code></pre></figure>
+<p>There's no error and no stack trace, because the kernel gives a process no chance to write one. The app's own spans just stop. The caller tells a better story: <code>lab3-loadgen</code> recorded 38 failed calls, and the slowest waited 15 seconds.</p>
+<figure class="code"><pre><code>service.name = 'lab3-loadgen' AND has_error = true</code></pre></figure>
+
+<h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
+<p>This is the surprise. Six signals sound like they should show an OOM kill, and this is what each one did during a real kill:</p>
+<table>
+  <thead><tr><th>Signal</th><th>What it showed</th><th>Useful?</th></tr></thead>
+  <tbody><tr><td><code>container_oom_events_total</code></td><td><strong>0, the whole time</strong></td><td>No</td></tr><tr><td><code>k8s.container.status.reason</code></td><td>0 for <code>OOMKilled</code></td><td>No</td></tr><tr><td>Kubernetes events</td><td>A generic <code>BackOff</code>, with no mention of memory</td><td>No</td></tr><tr><td><code>k8s.container.memory_limit_utilization</code></td><td>Peaked at 0.863, and read 0.995 when nothing was wrong</td><td>No</td></tr><tr><td><code>k8s.pod.memory.working_set</code></td><td>Climbed to 224 MiB, then the series restarted</td><td>An early warning</td></tr><tr><td><code>k8s.container.restarts</code> grouped by <code>k8s.container.status.last_terminated_reason</code></td><td><strong>Restart count 3, reason <code>OOMKilled</code></strong></td><td><strong>Yes</strong></td></tr></tbody>
+</table>
+<p>So search for that last one. In the Metrics Explorer, choose <code>k8s.container.restarts</code>, filter on <code>k8s.namespace.name = 'lab3'</code>, and group by <code>k8s.container.status.last_terminated_reason</code>.</p>
+
+<h2 class="step" id="evidence"><span class="n">4</span>Evidence</h2>
+<p>The exit Kubernetes recorded, from <code>kubectl get pod</code>:</p>
+<figure class="code"><pre><code>reason: OOMKilled
+exitCode: 137
+startedAt:  2026-11-07T19:21:30Z
+finishedAt: 2026-11-07T19:24:30Z</code></pre></figure>
+<p>Exit code 137 means the process received <code>SIGKILL</code>. The timing fits: the app started at about 64 MiB, and (256 − 64) ÷ 2 is 96 seconds. The kill came 104 seconds after the leak started.</p>
+
+<h3>Why the obvious metrics miss it</h3>
+<ul>
+  <li><strong><code>container_oom_events_total</code></strong> belongs to the container's cgroup. The kill destroys that cgroup, and the replacement starts again from 0. Reading cAdvisor directly showed 0 too, so this isn't a SigNoz problem.</li>
+  <li><strong><code>k8s.container.status.reason</code></strong> describes the current state. The container was running again before the next 30-second sample.</li>
+</ul>
+
+<h3>Why the limit metric misleads you both ways</h3>
+<p><code>k8s.container.memory_limit_utilization</code> sounds perfect, but compare it at two moments:</p>
+<table>
+  <thead><tr><th>Moment</th><th>Share of limit</th><th>Working set</th><th>RSS</th><th>In danger?</th></tr></thead>
+  <tbody><tr><td>Just before this OOM kill</td><td>0.863</td><td>224 MiB</td><td>215 MiB</td><td><strong>Yes</strong></td></tr><tr><td>The <a href="incident-node.html"><code>disk</code> scenario</a>, writing a file</td><td><strong>0.995</strong></td><td>61 MiB</td><td>51 MiB</td><td><strong>No</strong></td></tr></tbody>
+</table>
+<ul>
+  <li><strong>It read low before the kill,</strong> because it's sampled every 30 seconds and the kill came between samples.</li>
+  <li><strong>It read high with no danger,</strong> because it counts page cache from the file write. The kernel can reclaim that, so nothing gets killed.</li>
+</ul>
+<p>Working set leaves out that cache, so it tracks the real risk. That's why the dashboard's memory panel uses it.</p>
+
+<h2 class="step" id="cause"><span class="n">5</span>Root cause</h2>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/app/workload.py</code> lines 67–73</span></figcaption><pre><code><span class="ln">67</span>async def leak_memory(mib_per_second: int) -&gt; None:
+<span class="ln">68</span>    &quot;&quot;&quot;Grows until the kernel kills the container. There is no way back from this.&quot;&quot;&quot;
+<span class="ln">69</span>    while True:
+<span class="ln">70</span>        # bytes() of repeated data touches every page, so it really uses memory.
+<span class="ln">71</span>        held_memory.append(b&quot;x&quot; * (mib_per_second * MIB))
+<span class="ln">72</span>        log.warning(&quot;holding %d MiB on purpose&quot;, len(held_memory) * mib_per_second)
+<span class="ln">73</span>        await asyncio.sleep(1)</code></pre></figure>
+<p>The app keeps every block it allocates, so memory grows until it reaches the limit:</p>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s/app.yaml</code> lines 42–43</span></figcaption><pre><code><span class="ln">42</span>            # CPU above this limit is throttled. Memory above it is an OOM kill.
+<span class="ln">43</span>            limits: { cpu: 200m, memory: 256Mi }</code></pre></figure>
+<p>A memory limit is enforced differently from a CPU limit. Going over a CPU limit makes you wait. Going over a memory limit gets you killed, because memory can't be taken back from a running process.</p>
+
+<h2 class="step" id="fix"><span class="n">6</span>Resolution</h2>
+<ul>
+  <li><strong>Find the leak.</strong> A climbing line on <strong>Memory in use (working set)</strong> is your early warning, and you have about a minute and a half here.</li>
+  <li><strong>If it isn't a leak,</strong> raise the limit to fit real usage.</li>
+  <li><strong>Alert on the exit reason,</strong> not on the OOM counter. <a href="lab4.html">Lab 4</a> does this.</li>
+</ul>
+
+<div class="quiz" data-quiz="o1"><p class="q">Check yourself: Why did container_oom_events_total stay at 0 during a real OOM kill?</p><button type="button" data-right="false" data-why="Reading cAdvisor directly also showed 0.">The scrape job was misconfigured.</button><button type="button" data-right="true" data-why="The replacement container starts counting from 0.">The counter belongs to the container&#x27;s cgroup, which the kill destroyed.</button><button type="button" data-right="false" data-why="Kubernetes recorded OOMKilled with exit code 137.">It wasn&#x27;t really an OOM kill.</button></div>
+<div class="quiz" data-quiz="o2"><p class="q">Check yourself: The pod died, so where is the best evidence of failed requests?</p><button type="button" data-right="false" data-why="Spans still in memory die with the process.">In the dead pod&#x27;s spans.</button><button type="button" data-right="true" data-why="lab3-loadgen survived, and recorded 38 failed calls.">In the caller&#x27;s spans.</button><button type="button" data-right="false" data-why="It shows how services connect, and its counts can be unreliable.">In the Service Map.</button></div>
+
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

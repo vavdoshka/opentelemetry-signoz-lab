@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slow, then restarted | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="throttling">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 3: incident 1 of 5</p>
+<h1>Slow, then restarted</h1>
+<p class="lead">A CPU limit quietly slows a pod down. Under a little more load, the same limit gets a healthy pod killed by its own health check. The metric that explains it isn't collected by default.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#evidence">4. Evidence</a></li><li><a href="#cause">5. Root cause</a></li><li><a href="#fix">6. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p>Start the load at 2 requests/s, then burn CPU for two minutes. <code>throttle</code> starts two busy processes inside the container, so they compete for its CPU limit. They're separate processes, so any slowdown you see comes from throttling and not from Python's interpreter lock.</p>
+<div data-load-panel="lab3" data-rps="2"></div>
+<div data-fire="throttle" data-lab="lab3" data-params='{"seconds":120}' data-hint="Runs in the background for two minutes."></div>
+<p>Then try it again at 5 requests/s. The result is very different, so wait for the first burn to end.</p>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>The same code, the same limit and the same burn gave two different outcomes. These are spans for <code>GET /api/work</code>:</p>
+<table>
+  <thead><tr><th>Load</th><th>P50 before</th><th>P50 during</th><th>Slowest request</th><th>What happened</th></tr></thead>
+  <tbody><tr><td>2 requests/s</td><td>About 45 ms</td><td>About 330 ms</td><td>1 s</td><td>Slow, and it survived. No restart</td></tr><tr><td>5 requests/s</td><td>About 40 ms</td><td><strong>12.2 s</strong></td><td><strong>18.8 s</strong></td><td><strong>Restarted after 24 seconds</strong></td></tr></tbody>
+</table>
+<p>There was no error and no crash. The restart at 5 requests/s looks like a separate problem, but it's the same one.</p>
+
+<h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
+<ol>
+  <li>Open the <strong>Lab 3: pod failures</strong> dashboard, which <code>make lab3</code> created.</li>
+  <li>Compare <strong>CPU throttled</strong> with <strong>CPU used, as a share of the limit</strong>.</li>
+  <li>For the restart, search the logs for the Kubernetes event. Note the <code>attribute.</code> prefix, which the search needs here:</li>
+</ol>
+<figure class="code"><pre><code>attribute.k8s.namespace.name = 'lab3' AND body CONTAINS 'liveness'</code></pre></figure>
+<div class="note"><p><strong>Why the prefix?</strong> On a Kubernetes event, <code>k8s.namespace.name</code> is a log attribute. On your app's logs it's a resource attribute. Without <code>attribute.</code>, this search matches nothing and gives no error.</p></div>
+
+<h2 class="step" id="evidence"><span class="n">4</span>Evidence</h2>
+<p>Throttling, as a share of 100 ms CPU periods, worked out from <code>container_cpu_cfs_throttled_periods_total</code> and <code>container_cpu_cfs_periods_total</code>:</p>
+<table>
+  <thead><tr><th>Moment, at 2 requests/s</th><th>Periods throttled</th></tr></thead>
+  <tbody><tr><td>Burning CPU</td><td><strong>89 to 99.7%</strong></td></tr><tr><td>Just serving requests</td><td><strong>19 to 32%</strong></td></tr></tbody>
+</table>
+<p>Look at that second row again. At the same moment, <code>k8s.container.cpu_limit_utilization</code> read about 0.23, so the pod seemed to be using under a quarter of its limit. Both are true:</p>
+<ul>
+  <li>A 200m limit means 20 ms of CPU in each 100 ms period.</li>
+  <li>One request needs about 20 ms of CPU, plus the agent's own work.</li>
+  <li>So one request can use up a whole period's quota, and the container waits for the next one.</li>
+</ul>
+<p>Averaged over 30 seconds that looks idle. <strong>This is why average CPU can't tell you about throttling.</strong> You need the throttling metric, and it isn't collected by default.</p>
+<p>The restart left this trail in the Kubernetes events, which SigNoz stores as logs:</p>
+<figure class="code"><pre><code>Liveness probe failed: Get "http://10.42.0.103:8000/healthz": context deadline exceeded
+Container workload failed liveness probe, will be restarted</code></pre></figure>
+<figure class="shot"><img src="screenshots/lab3-pod-failures.png" alt="SigNoz dashboard Lab 3: pod failures, with panels for CPU throttled, CPU against the limit, memory against the limit, restarts and failed probes" width="1440" height="900" loading="lazy"><figcaption>The <strong>Lab 3: pod failures</strong> dashboard, in UTC+1. Throttling peaks at about 20:15, 20:19 and 20:40. Working set rises to the two OOM kills, at about 20:24 and 20:49. <span class="badge ui">Seen in SigNoz UI</span></figcaption></figure>
+
+<h2 class="step" id="cause"><span class="n">5</span>Root cause</h2>
+<p>Two settings interact:</p>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s/app.yaml</code> lines 42–43</span></figcaption><pre><code><span class="ln">42</span>            # CPU above this limit is throttled. Memory above it is an OOM kill.
+<span class="ln">43</span>            limits: { cpu: 200m, memory: 256Mi }</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s/app.yaml</code> lines 47–48</span></figcaption><pre><code><span class="ln">47</span>          # Three failures 5 seconds apart, and the kubelet restarts the container.
+<span class="ln">48</span>          livenessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5, timeoutSeconds: 3, failureThreshold: 3 }</code></pre></figure>
+<p>At 2 requests/s, the CPU left over was enough to keep up. At 5 requests/s, requests arrived faster than they could finish, so a queue built up. <code>/healthz</code> waited in that queue past its 3-second timeout. Three failures later, the kubelet restarted a container with nothing wrong with it.</p>
+<p>The restart looked like a fix here, but only because the burn died with the container. If the CPU demand were real traffic, the new container would be throttled too, and would be killed again.</p>
+<div class="note"><p><strong>The exit reason doesn't help.</strong> Kubernetes reported this as <code>Completed</code>, because the app shut down cleanly when it was told to. The reason is in the events, not in the exit status.</p></div>
+
+<h2 class="step" id="fix"><span class="n">6</span>Resolution</h2>
+<ul>
+  <li><strong>Give it more CPU.</strong> Raise the limit, or remove it and rely on the request. Teams disagree about CPU limits, so measure throttling before you decide.</li>
+  <li><strong>Size limits for bursts, not averages.</strong> Here, a limit that barely fits one request throttles every request.</li>
+  <li><strong>Make liveness cheap and forgiving.</strong> A liveness probe should only fail if a restart would help. Killing a busy pod removes capacity when you need it most.</li>
+</ul>
+<p>In <a href="lab4.html">Lab 4</a> you turn this into an alert. This pod's normal throttling is 19 to 32%, so a 25% threshold would never stop firing. It uses 50%.</p>
+
+<div class="quiz" data-quiz="t1"><p class="q">Check yourself: CPU reads 0.23 of the limit, and 25% of periods are throttled. How can both be true?</p><button type="button" data-right="false" data-why="Both are right. They measure different things over different time spans.">One of the metrics must be wrong.</button><button type="button" data-right="true" data-why="A short burst can use up a period&#x27;s quota while the long-run average stays low.">Throttling happens within 100 ms periods, and a 30-second average hides it.</button><button type="button" data-right="false" data-why="The limit is what causes the throttling.">The limit only applies to memory.</button></div>
+<div class="quiz" data-quiz="t2"><p class="q">Check yourself: Why did the load decide whether the pod got restarted?</p><button type="button" data-right="false" data-why="Memory stayed near 60 MiB in this scenario.">More load means more memory.</button><button type="button" data-right="true" data-why="The kubelet saw three failed probes and restarted the container.">At 5 requests/s a queue built up, and /healthz waited in it past its timeout.</button><button type="button" data-right="false" data-why="It only acts on failed probes. It has no idea why they failed.">The kubelet restarts busy pods on purpose.</button></div>
+
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

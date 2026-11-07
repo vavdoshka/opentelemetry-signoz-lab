@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Is it the pod or the node? | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="node">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 3: incident 4 of 5</p>
+<h1>Is it the pod or the node?</h1>
+<p class="lead">Before you debug a pod, find out whether the fault is really the pod's. Node and kubelet metrics answer that, with some limits worth knowing.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#evidence">4. Evidence</a></li><li><a href="#cause">5. Root cause</a></li><li><a href="#fix">6. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p><code>disk</code> writes 512 MiB to an <code>emptyDir</code> volume, which lives on the node's disk. It removes the file two minutes later. It doesn't try to fill the disk, because that would make a real node, or your laptop, unhappy.</p>
+<div data-fire="disk" data-lab="lab3" data-hint="Removes the file after two minutes."></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>When an app misbehaves, one of your first questions is whether the fault is the pod's or the node's. A pod can be slow because of its own code, or because something else on the node is using the disk, memory or CPU.</p>
+
+<h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
+<p>Open the <strong>Kubernetes Node Metrics - Detailed</strong> dashboard, and then <strong>Kubernetes Kubelet</strong>. For a quick view, Infra Monitoring's Hosts tab shows the same nodes.</p>
+<table>
+  <thead><tr><th>Question</th><th>Signal</th><th>Comes from</th></tr></thead>
+  <tbody><tr><td>Is the node short of CPU?</td><td><code>k8s.node.cpu.usage</code></td><td>k8s-infra default</td></tr><tr><td>Is it short of memory?</td><td><code>k8s.node.memory.working_set</code>, <code>k8s.node.memory.available</code></td><td>k8s-infra default</td></tr><tr><td>Is its disk filling up?</td><td><code>k8s.node.filesystem.usage</code>, <code>k8s.node.filesystem.available</code></td><td>k8s-infra default</td></tr><tr><td>Does Kubernetes think it's healthy?</td><td><code>k8s.node.condition_ready</code>, <code>k8s.node.condition_memory_pressure</code>, <code>k8s.node.condition_disk_pressure</code></td><td>k8s-infra default</td></tr><tr><td>Is the kubelet keeping up?</td><td><code>kubelet_pleg_relist_duration_seconds</code>, <code>kubelet_pleg_last_seen_seconds</code></td><td>Lab 3</td></tr><tr><td>Is the container runtime failing?</td><td><code>kubelet_runtime_operations_errors_total</code></td><td>Lab 3</td></tr><tr><td>How many pods is it running?</td><td><code>kubelet_running_pods</code></td><td>Lab 3</td></tr></tbody>
+</table>
+
+<h2 class="step" id="evidence"><span class="n">4</span>Evidence</h2>
+<p>Disk used on each node, from <code>k8s.node.filesystem.usage</code>:</p>
+<table>
+  <thead><tr><th></th><th>Before</th><th>File held</th><th>After removal</th></tr></thead>
+  <tbody><tr><td><code>k3d-signoz-lab-server-0</code>, which ran the pod</td><td>98,912 MiB</td><td><strong>99,379 MiB</strong></td><td>98,886 MiB</td></tr><tr><td><code>k3d-signoz-lab-agent-0</code>, which didn't</td><td>98,910 MiB</td><td><strong>99,369 MiB</strong></td><td>98,873 MiB</td></tr></tbody>
+</table>
+<p>Three things stand out:</p>
+<ul>
+  <li><strong>Both nodes rose by the same amount,</strong> although only one wrote the file. k3d nodes are containers on one Docker VM, so they share a disk. On real nodes, only the pod's node would change.</li>
+  <li><strong>The pod's own metric didn't move.</strong> <code>k8s.pod.filesystem.usage</code> stayed at about 32.7 MB, because it doesn't include <code>emptyDir</code> volumes. <code>k8s.volume.available</code> for that volume reports the whole disk. So you can see a node's disk filling up, but not which pod's <code>emptyDir</code> did it.</li>
+  <li><strong>The write looked like a memory problem.</strong> <code>k8s.container.memory_limit_utilization</code> jumped to 0.995, while working set stayed at 61 MiB. That's page cache, and it's harmless. <a href="incident-oom.html">The OOM incident</a> explains why it matters.</li>
+</ul>
+
+<h3>The kubelet and the node's services</h3>
+<p><code>kubelet_runtime_operations_errors_total</code> is the kubelet's view of the container runtime, so it's the closest you get to containerd's health in this lab. Here it showed errors like these, by operation:</p>
+<table>
+  <thead><tr><th>Operation</th><th>Errors so far</th></tr></thead>
+  <tbody><tr><td><code>stop_podsandbox</code></td><td>24</td></tr><tr><td><code>remove_container</code></td><td>5</td></tr><tr><td><code>stop_container</code></td><td>5</td></tr><tr><td><code>create_container</code></td><td>3</td></tr></tbody>
+</table>
+<p>These totals built up over a day of restarts in this lab. What matters is a sudden rise, not the number.</p>
+<div class="note"><p><strong>Not covered here:</strong> containerd's own metrics, and services such as systemd units. k3d nodes are containers and don't run systemd. On real nodes you'd add collector receivers for those. <span class="badge untested">Untested</span></p></div>
+
+<h2 class="step" id="cause"><span class="n">5</span>Root cause</h2>
+<p>Here the cause is simply the scenario. The useful part is the reasoning you can reuse:</p>
+<table>
+  <thead><tr><th>What you see</th><th>Likely fault</th></tr></thead>
+  <tbody><tr><td>One pod is struggling, and its node looks fine</td><td>The pod: its limits, its code, or its dependencies</td></tr><tr><td>Several pods on one node are struggling</td><td>The node, or a noisy neighbour on it</td></tr><tr><td>Pods on every node are struggling</td><td>Something shared: a dependency, the network or the control plane</td></tr></tbody>
+</table>
+
+<h2 class="step" id="fix"><span class="n">6</span>Resolution</h2>
+<ul>
+  <li><strong>Set a <code>sizeLimit</code> on <code>emptyDir</code>,</strong> as this workload does. The kubelet evicts a pod that goes over it, so one pod can't fill a node.</li>
+  <li><strong>Watch for trends.</strong> A disk that rises slowly is easy to miss, and an alert on available space is cheap.</li>
+  <li><strong>Be careful with k3d's node numbers.</strong> Both nodes share one VM, so don't read differences between them as real.</li>
+</ul>
+
+<div class="quiz" data-quiz="n1"><p class="q">Check yourself: Both k3d nodes showed the same disk rise, but only one pod wrote the file. Why?</p><button type="button" data-right="false" data-why="An emptyDir isn&#x27;t replicated.">The file was replicated.</button><button type="button" data-right="true" data-why="On real nodes, only the pod&#x27;s node would change.">k3d nodes are containers sharing one disk.</button><button type="button" data-right="false" data-why="The series are per node. They really do report the same disk.">The metric is averaged across nodes.</button></div>
+<div class="quiz" data-quiz="n2"><p class="q">Check yourself: Pods on every node are slow. What do you suspect first?</p><button type="button" data-right="false" data-why="One pod can&#x27;t easily slow every node.">A single bad pod.</button><button type="button" data-right="true" data-why="A dependency, the network or the control plane are the usual suspects.">Something they all share.</button><button type="button" data-right="false" data-why="That would only affect its own node.">The kubelet on one node.</button></div>
+
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

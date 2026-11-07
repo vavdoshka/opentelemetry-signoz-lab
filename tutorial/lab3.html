@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What Kubernetes tells you | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="lab3">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 3: Kubernetes</p>
+<h1>What Kubernetes tells you</h1>
+<p class="lead">Labs 1 and 2 watch your app. This lab watches what it runs on: pods, nodes, the kubelet and the API server. Some of that comes free, but the signals that explain the worst failures don't. You'll see what they cost, and which metrics quietly mislead you.</p>
+
+<h2>Start it</h2>
+<p>Run <code>make lab3</code>. It takes a minute or two, and it does four things:</p>
+<ol>
+  <li>Deploys a small workload in namespace <code>lab3</code>. Like Lab 1, it has no OpenTelemetry code.</li>
+  <li>Adds four scrape jobs to the cluster collector that <code>k8s-infra</code> already runs.</li>
+  <li>Gives that collector permission to read them.</li>
+  <li>Creates five dashboards: four from SigNoz, and one for this lab.</li>
+</ol>
+<p>Start some load, at <a href="http://lab3.localhost:8080" target="_blank" rel="noopener">the lab's page</a> or here. Use 2 requests/s unless a page says otherwise. Stop it when you finish.</p>
+<div data-load-panel="lab3" data-rps="2"></div>
+
+<h2>A workload with real limits</h2>
+<p>Labs 1 and 2 set no limits and no liveness probes, so nothing here could be throttled, OOM killed or restarted by a probe. This workload sets them, because those are what make Kubernetes step in:</p>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s/app.yaml</code> lines 12–49</span></figcaption><pre><code><span class="ln">12</span>  - { apiGroups: [&quot;&quot;], resources: [pods], verbs: [list] }
+<span class="ln">13</span>---
+<span class="ln">14</span>apiVersion: rbac.authorization.k8s.io/v1
+<span class="ln">15</span>kind: RoleBinding
+<span class="ln">16</span>metadata: { name: workload-list-pods, namespace: lab3 }
+<span class="ln">17</span>roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: list-pods }
+<span class="ln">18</span>subjects:
+<span class="ln">19</span>  - { kind: ServiceAccount, name: workload, namespace: lab3 }
+<span class="ln">20</span>---
+<span class="ln">21</span>apiVersion: apps/v1
+<span class="ln">22</span>kind: Deployment
+<span class="ln">23</span>metadata:
+<span class="ln">24</span>  name: lab3-workload
+<span class="ln">25</span>  namespace: lab3
+<span class="ln">26</span>spec:
+<span class="ln">27</span>  replicas: 1
+<span class="ln">28</span>  selector: { matchLabels: { app: workload } }
+<span class="ln">29</span>  template:
+<span class="ln">30</span>    metadata: { labels: { app: workload } }
+<span class="ln">31</span>    spec:
+<span class="ln">32</span>      serviceAccountName: workload
+<span class="ln">33</span>      containers:
+<span class="ln">34</span>        - name: workload
+<span class="ln">35</span>          image: telemetry-lab3:dev
+<span class="ln">36</span>          imagePullPolicy: IfNotPresent
+<span class="ln">37</span>          env:
+<span class="ln">38</span>            - { name: POD_NAMESPACE, valueFrom: { fieldRef: { fieldPath: metadata.namespace } } }
+<span class="ln">39</span>          ports: [{ containerPort: 8000 }]
+<span class="ln">40</span>          resources:
+<span class="ln">41</span>            requests: { cpu: 50m, memory: 128Mi }
+<span class="ln">42</span>            # CPU above this limit is throttled. Memory above it is an OOM kill.
+<span class="ln">43</span>            limits: { cpu: 200m, memory: 256Mi }
+<span class="ln">44</span>          # Start-up is slow under a CPU limit, because the agent has a lot to
+<span class="ln">45</span>          # import. This holds off the liveness probe until the app is up.
+<span class="ln">46</span>          startupProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5, failureThreshold: 24 }
+<span class="ln">47</span>          # Three failures 5 seconds apart, and the kubelet restarts the container.
+<span class="ln">48</span>          livenessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5, timeoutSeconds: 3, failureThreshold: 3 }
+<span class="ln">49</span>          readinessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5, timeoutSeconds: 3 }</code></pre></figure>
+
+<h2>What you get, and what you don't</h2>
+<p>Much of this comes with <code>k8s-infra</code>. The most useful signals for debugging limits don't:</p>
+<table>
+  <thead><tr><th>What you want to know</th><th>Signal</th><th>From</th></tr></thead>
+  <tbody><tr><td>Pod CPU and memory</td><td><code>k8s.pod.cpu.usage</code>, <code>k8s.pod.memory.working_set</code></td><td>Default</td></tr><tr><td>Usage against limits</td><td><code>k8s.container.cpu_limit_utilization</code>, <code>k8s.container.memory_limit_utilization</code>, which <a href="incident-oom.html">counts page cache</a></td><td>Default</td></tr><tr><td>Restarts, and why</td><td><code>k8s.container.restarts</code> by <code>k8s.container.status.last_terminated_reason</code></td><td>Default</td></tr><tr><td>Why a pod was killed</td><td>Kubernetes events, stored as logs</td><td>Default</td></tr><tr><td>Node CPU, memory and disk</td><td><code>k8s.node.*</code></td><td>Default</td></tr><tr><td><strong>CPU throttling</strong></td><td><code>container_cpu_cfs_throttled_periods_total</code></td><td><strong>Lab 3</strong></td></tr><tr><td><strong>Every probe result</strong></td><td><code>prober_probe_total</code></td><td><strong>Lab 3</strong></td></tr><tr><td><strong>The kubelet's own health</strong></td><td><code>kubelet_*</code></td><td><strong>Lab 3</strong></td></tr><tr><td><strong>The API server</strong></td><td><code>apiserver_*</code></td><td><strong>Lab 3</strong></td></tr></tbody>
+</table>
+<p>The defaults come from the kubelet's summary API, which doesn't include these. They're on the kubelet's and the API server's Prometheus endpoints, so this lab scrapes them.</p>
+
+<h2>The scrape jobs</h2>
+<p>All four are in <code>labs/lab3-kubernetes/k8s-infra-values.yaml</code>. This is the one that adds throttling:</p>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code> lines 33–49</span></figcaption><pre><code><span class="ln">33</span>      # cAdvisor, which is built into the kubelet: throttling and OOM events.
+<span class="ln">34</span>      - job_name: cadvisor
+<span class="ln">35</span>        scrape_interval: 30s
+<span class="ln">36</span>        scheme: https
+<span class="ln">37</span>        metrics_path: /metrics/cadvisor
+<span class="ln">38</span>        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
+<span class="ln">39</span>        tls_config: { insecure_skip_verify: true }
+<span class="ln">40</span>        kubernetes_sd_configs: [{ role: node }]
+<span class="ln">41</span>        relabel_configs:
+<span class="ln">42</span>          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
+<span class="ln">43</span>        metric_relabel_configs:
+<span class="ln">44</span>          - source_labels: [__name__]
+<span class="ln">45</span>            action: keep
+<span class="ln">46</span>            regex: container_cpu_cfs_(throttled_)?periods_total|container_cpu_cfs_throttled_seconds_total|container_oom_events_total
+<span class="ln">47</span>          # An empty container label means the pod&#x27;s cgroup or its pause container.
+<span class="ln">48</span>          - { source_labels: [container], action: drop, regex: &quot;&quot; }
+<span class="ln">49</span>          - { action: labeldrop, regex: id|image|name }</code></pre></figure>
+<p>Three things to notice:</p>
+<ul>
+  <li><strong>The keep-list.</strong> <code>action: keep</code> throws away everything else before it reaches SigNoz. This endpoint has about 3,000 series per node, and this job keeps a handful.</li>
+  <li><strong>The cleanup.</strong> Dropping series with an empty <code>container</code> label removes pod-level duplicates. Dropping <code>id</code>, <code>image</code> and <code>name</code> removes long values you don't need.</li>
+  <li><strong>The token.</strong> The kubelet wants proof of who's asking, so the job sends its ServiceAccount token, and that needs permission:</li>
+</ul>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s/metrics-rbac.yaml</code> lines 6–12</span></figcaption><pre><code><span class="ln">6</span>rules:
+<span class="ln">7</span>  # Read-only access to /metrics, /metrics/cadvisor and /metrics/probes on each kubelet.
+<span class="ln">8</span>  - { apiGroups: [&quot;&quot;], resources: [nodes/metrics], verbs: [get] }
+<span class="ln">9</span>  # Discovers the API server&#x27;s addresses.
+<span class="ln">10</span>  - { apiGroups: [&quot;&quot;], resources: [endpoints], verbs: [get, list, watch] }
+<span class="ln">11</span>  # The API server&#x27;s own /metrics.
+<span class="ln">12</span>  - { nonResourceURLs: [/metrics], verbs: [get] }</code></pre></figure>
+
+<h2>On k3s, it's all one process</h2>
+<p>k3s runs the API server, scheduler, controller manager and kubelet in one process, sharing one set of metrics. You can see that in what each endpoint returns:</p>
+<table>
+  <thead><tr><th>Endpoint</th><th>Series</th><th>Metric names</th></tr></thead>
+  <tbody><tr><td>API server <code>/metrics</code></td><td>32,461</td><td>454</td></tr><tr><td>Kubelet <code>/metrics</code> on the server node</td><td>32,429</td><td>454</td></tr><tr><td>Kubelet <code>/metrics</code> on the worker node</td><td>1,797</td><td>227</td></tr></tbody>
+</table>
+<p>The first two are nearly the same data. That makes the keep-list more important here, because a plain scrape of both would store everything twice. It also means the API server's endpoint gives you the scheduler's metrics on k3s, which you wouldn't get on a real cluster.</p>
+<p>You can see this on the dashboards. <strong>Go Routines</strong> reads about 11,600, double the real 5,600 or so, because the <code>kubelet</code> and <code>apiserver</code> jobs both report the same process.</p>
+
+<h3>A real API server</h3>
+<p>The <code>apiserver</code> job finds the API server through the <code>kubernetes</code> Service in <code>default</code>, so the same job works on other clusters, and CI runs it on kind. What changes is everything around it:</p>
+<table>
+  <thead><tr><th>Component</th><th>k3s, as in k3d</th><th>kubeadm clusters, such as kind</th></tr></thead>
+  <tbody><tr><td>API server</td><td><code>/metrics</code> on port 6443</td><td>The same</td></tr><tr><td>Scheduler</td><td>In the API server's metrics</td><td>Its own endpoint on port 10259, bound to localhost by default</td></tr><tr><td>Controller manager</td><td>In the API server's metrics</td><td>Its own endpoint on port 10257, bound to localhost by default</td></tr><tr><td>Datastore</td><td>SQLite, so there's no etcd to scrape</td><td>etcd, with metrics on port 2381, bound to localhost by default</td></tr><tr><td>Kubelet</td><td>Port 10250 on each node</td><td>The same</td></tr></tbody>
+</table>
+<p>To reach those local endpoints on kubeadm, you change their bind address. SigNoz publishes dashboards for them in <a href="https://github.com/SigNoz/dashboards/tree/main/k8s-system-monitoring" target="_blank" rel="noopener">k8s-system-monitoring</a>. Managed services such as EKS and GKE usually hide these components, so check your provider's documentation. <span class="badge untested">Untested</span></p>
+
+<h2>What it costs</h2>
+<p>You asked SigNoz to store more, so it costs something. Measured idle, with all the labs running:</p>
+<table>
+  <thead><tr><th></th><th>Before Lab 3</th><th>With Lab 3</th></tr></thead>
+  <tbody><tr><td>Samples a minute, all of SigNoz</td><td>32,636</td><td>51,493</td></tr><tr><td>ClickHouse CPU</td><td>0.12 to 0.17 core</td><td>0.12 to 0.17 core</td></tr><tr><td>ClickHouse memory</td><td>2.6 GiB</td><td>3.1 GiB</td></tr><tr><td>Cluster collector memory</td><td>67 MiB</td><td>About 220 MiB</td></tr><tr><td>All pods, memory</td><td>4.3 GiB</td><td>5.2 GiB</td></tr></tbody>
+</table>
+<p>The scrape jobs add about 6,000 series. The sample count also includes Lab 3's own two instrumented pods, and the memory figures include those pods and Lab 4's sink. We can't say how much of ClickHouse's rise is new data and how much is caching from opening dashboards.</p>
+<p>Each job started with a shorter keep-list, which left some community dashboard panels empty. Filling them all added 17% more samples, and made no measurable difference to ClickHouse's CPU or memory at this size. So the lab keeps them. On a big cluster these series multiply, so measure before you copy this.</p>
+<ul>
+  <li><strong>Collector memory rises whatever you keep,</strong> because it has to read about 73,000 lines every 30 seconds before throwing most of them away.</li>
+  <li><strong>The API latency histogram is the biggest single item.</strong> It's about 4,250 series, for one panel. It stays because P99 latency is the main measure of API server health. If you don't need it, remove <code>apiserver_request_sli_duration_seconds_(bucket|sum|count)</code> from the keep-list.</li>
+  <li><strong>A switch you might not expect.</strong> Turning on <code>presets.prometheus</code> also starts a job that scrapes SigNoz's own ClickHouse, ZooKeeper and collectors. That added 5,239 series, so this lab limits it to namespace <code>lab3</code>, which turns it off.</li>
+</ul>
+
+<h2>Dashboards</h2>
+<p>The first four are SigNoz's own, unchanged, from <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a>. They're pinned to one commit, so upstream changes can't break the lab.</p>
+<table>
+  <thead><tr><th>Dashboard</th><th>Use it for</th></tr></thead>
+  <tbody><tr><td>Kubernetes Pod Metrics - Detailed</td><td>CPU, memory, network and disk per pod</td></tr><tr><td>Kubernetes Node Metrics - Detailed</td><td>The same, per node</td></tr><tr><td>Kubernetes Kubelet</td><td>Running pods, container runtime operations, pod start time</td></tr><tr><td>Kubernetes API Server</td><td>Requests by verb and status, latency, in-flight requests</td></tr><tr><td><strong>Lab 3: pod failures</strong></td><td>Throttling, limits, restarts and failed probes. No community dashboard covers these, so this lab adds its own</td></tr></tbody>
+</table>
+<div class="note"><p><strong>Pick a namespace.</strong> The Pod dashboard's namespace selector starts on <code>default</code>, which has no pods, so every panel says "No data in this time range". Choose <code>lab3</code> at the top of the page. Nothing is broken.</p></div>
+
+<div class="quiz" data-quiz="k1"><p class="q">Check yourself: Why does average CPU not tell you whether a pod is throttled?</p><button type="button" data-right="false" data-why="In this lab a pod read 0.23 of its limit while being throttled.">It does, because throttling always shows as 100% CPU.</button><button type="button" data-right="true" data-why="That&#x27;s why you need the cfs metrics, which the defaults don&#x27;t collect.">Throttling happens within 100 ms periods, and averages hide that.</button><button type="button" data-right="false" data-why="Memory limits cause OOM kills, not throttling.">Throttling only affects memory.</button></div>
+<div class="quiz" data-quiz="k2"><p class="q">Check yourself: Why does every scrape job here have a keep-list?</p><button type="button" data-right="false" data-why="They work, and that&#x27;s the problem.">Scrape jobs fail without one.</button><button type="button" data-right="true" data-why="On k3s, two endpoints even return nearly the same data.">SigNoz stores everything it&#x27;s sent, and these endpoints expose tens of thousands of series.</button><button type="button" data-right="false" data-why="The kubelet sends everything it has.">The kubelet requires it.</button></div>
+
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

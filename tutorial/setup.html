@@ -26,7 +26,9 @@
     <tr><td><strong>Instrumentation</strong></td><td>Tells the Operator how to instrument each lab</td><td><code>labs/*/k8s/instrumentation.yaml</code></td></tr>
     <tr><td><strong>Ingress</strong></td><td>Serves the UI at <code>signoz.localhost:8080</code></td><td><code>signoz/ingress.yaml</code></td></tr>
     <tr><td><strong>First admin</strong></td><td>Created automatically. The collector opens no OTLP ports until an organization exists</td><td><code>scripts/bootstrap_signoz.py</code></td></tr>
-    <tr><td><strong>Dashboard</strong></td><td>The lab's one dashboard</td><td><code>labs/lab2-custom-dimensions/dashboard.json</code></td></tr>
+    <tr><td><strong>Dashboards</strong></td><td>One for Lab 2, and five for Lab 3</td><td><code>labs/*/dashboard.json</code>, <code>scripts/create_dashboard.py</code></td></tr>
+    <tr><td><strong>Scrape jobs</strong></td><td>Lab 3's kubelet, cAdvisor and API server metrics</td><td><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code></td></tr>
+    <tr><td><strong>Alerts</strong></td><td>Lab 4's channel and rules</td><td><code>labs/lab4-alerts/alerts.json</code></td></tr>
   </tbody>
 </table>
 
@@ -51,12 +53,12 @@
 
 <h2>Dashboards and views</h2>
 <p><strong>Lab 1 uses only what's built into SigNoz.</strong> Services, Traces, Logs, Exceptions, Service Map, Metrics Explorer and Infra Monitoring all work with no setup, so <code>make up</code> creates no dashboards or saved views.</p>
-<p>The Dashboards page itself starts empty. This lab adds exactly one dashboard, in Lab 2: <strong>Lab 2: custom dimensions</strong>. <code>make lab2</code> creates it through the API with <code>scripts/create_dashboard.py</code>, and leaves it alone if it already exists. To change it, edit it in the SigNoz UI, or change the JSON file and delete the dashboard before rerunning.</p>
+<p>The Dashboards page itself starts empty. Lab 1 needs none. <code>make lab2</code> adds one, <strong>Lab 2: custom dimensions</strong>, and <code>make lab3</code> adds five: its own <strong>Lab 3: pod failures</strong>, and four of SigNoz's. <code>scripts/create_dashboard.py</code> creates them through the API, and leaves them alone if they already exist. To change one, edit it in the SigNoz UI, or change the JSON file and delete the dashboard before rerunning.</p>
 <p>A panel's <code>groupBy</code> must declare the right type. <code>cache.hit</code> is a boolean, and declaring it as a string makes the panel silently empty.</p>
-<p>SigNoz publishes ready-made dashboards at <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a>, including <code>k8s-infra-metrics</code> and <code>apm</code>. To add one, use Dashboards, then New dashboard, then Import JSON in SigNoz. The lab doesn't import any, so how well they fit this data is untested.</p>
+<p>SigNoz publishes ready-made dashboards at <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a>, including <code>k8s-infra-metrics</code> and <code>apm</code>. To add one yourself, use Dashboards, then New dashboard, then Import JSON in SigNoz.</p>
 
 <h2>Alerts, channels and log pipelines</h2>
-<p>There are none in Labs 1 and 2. SigNoz starts with none, and those labs add none.</p>
+<p>SigNoz starts with none, and Labs 1 to 3 add none. <a href="lab4.html">Lab 4</a> adds one channel and eight rules, all defined in <code>labs/lab4-alerts/alerts.json</code>. No lab adds log pipelines.</p>
 
 <h2>How much it uses</h2>
 <p>Measured on this lab, with both labs running on k3d:</p>

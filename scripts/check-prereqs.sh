@@ -38,11 +38,11 @@ else
   bad "Python 3.9 or newer is required"
 fi
 
-if python3 -c 'import socket; [socket.gethostbyname(h) for h in ("lab1.localhost", "lab2.localhost", "signoz.localhost")]' 2>/dev/null; then
+if python3 -c 'import socket; [socket.gethostbyname(h) for h in ("lab1.localhost", "lab2.localhost", "lab3.localhost", "lab4.localhost", "signoz.localhost")]' 2>/dev/null; then
   ok "*.localhost names resolve"
 else
   bad "*.localhost names do not resolve. Run:
-        echo '127.0.0.1 lab1.localhost lab2.localhost signoz.localhost' | sudo tee -a /etc/hosts"
+        echo '127.0.0.1 lab1.localhost lab2.localhost lab3.localhost lab4.localhost signoz.localhost' | sudo tee -a /etc/hosts"
 fi
 
 cluster_exists=no

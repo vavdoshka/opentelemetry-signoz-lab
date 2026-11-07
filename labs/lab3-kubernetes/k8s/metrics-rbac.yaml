@@ -1,0 +1,19 @@
+# What the extra scrape jobs in ../k8s-infra-values.yaml need, and nothing more.
+# The chart's cluster collector has none of these by default.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: { name: lab3-metrics-reader }
+rules:
+  # Read-only access to /metrics, /metrics/cadvisor and /metrics/probes on each kubelet.
+  - { apiGroups: [""], resources: [nodes/metrics], verbs: [get] }
+  # Discovers the API server's addresses.
+  - { apiGroups: [""], resources: [endpoints], verbs: [get, list, watch] }
+  # The API server's own /metrics.
+  - { nonResourceURLs: [/metrics], verbs: [get] }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: { name: lab3-metrics-reader }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: lab3-metrics-reader }
+subjects:
+  - { kind: ServiceAccount, name: k8s-infra-otel-deployment, namespace: signoz }

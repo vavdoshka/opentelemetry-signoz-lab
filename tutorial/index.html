@@ -14,7 +14,7 @@
 <main id="main">
 <p class="eyebrow">Hands-on tutorial</p>
 <h1>Learn telemetry by breaking a real app</h1>
-<p class="lead">This tutorial teaches you what OpenTelemetry can do for an app with no code at all, how to add detail only where you need it, and how to use SigNoz to find out what went wrong. You work on a small Python app that fails on demand.</p>
+<p class="lead">This tutorial teaches you what OpenTelemetry can do for an app with no code at all, how to add detail only where you need it, how to watch the Kubernetes underneath, and how to get alerted. You work on small Python apps that fail on demand.</p>
 
 <div class="flow" aria-label="The lab app">
   <span class="box">Your browser</span><span class="arrow">→</span>
@@ -23,7 +23,7 @@
   <span class="box">Postgres</span>
 </div>
 
-<h2>Two labs, in order</h2>
+<h2>Four labs, in order</h2>
 <table>
   <thead><tr><th></th><th>Lab 1: hands-off</th><th>Lab 2: custom dimensions</th></tr></thead>
   <tbody>
@@ -34,6 +34,14 @@
   </tbody>
 </table>
 <p>You move from Lab 1 to Lab 2 only for the cases that need it. You keep the hands-off setup, and nothing gets re-instrumented. Both labs run side by side and send to the same SigNoz, so you can compare them. <code>make compare</code> sends both the same requests and shows what each one captured.</p>
+<table>
+  <thead><tr><th></th><th>Lab 3: Kubernetes</th><th>Lab 4: alerts</th></tr></thead>
+  <tbody>
+    <tr><td><strong>What it adds</strong></td><td>A workload with real limits and probes, plus scrape jobs for the kubelet, cAdvisor and the API server</td><td>Eight alert rules, and a place to receive them</td></tr>
+    <tr><td><strong>You learn</strong></td><td>How to debug throttling, OOM kills and failed probes, and which metrics quietly miss them</td><td>How to write alerts that fire for real failures, and how long they take</td></tr>
+    <tr><td><strong>Start it with</strong></td><td><code>make lab3</code></td><td><code>make lab4</code></td></tr>
+  </tbody>
+</table>
 
 <h2>What you will be able to do</h2>
 <ul>
@@ -42,13 +50,15 @@
   <li>Work through six incidents using that telemetry alone, from symptom to root cause to fix.</li>
   <li>Add a dimension where you need one: first a field on a log line, then an attribute on a span, then a metric.</li>
   <li>Work through four incidents that show what those dimensions buy you.</li>
+  <li>Debug throttling, OOM kills, failed probes, and node and API server problems.</li>
+  <li>Write alerts on metrics, traces and logs, and prove that they reach you.</li>
   <li>Write SigNoz searches for traces, logs and metrics.</li>
   <li>Spot what a plain install leaves out, including the places where SigNoz can mislead you.</li>
 </ul>
 
 <h2>Before you start</h2>
 <ol>
-  <li>Run <code>make up</code>. That is all you need for Lab 1. Run <code>make lab2</code> when you reach Lab 2.</li>
+  <li>Run <code>make up</code>. That is all you need for Lab 1. Run <code>make lab2</code>, <code>make lab3</code> and <code>make lab4</code> when you reach each one.</li>
   <li>Log in to <a href="http://signoz.localhost:8080" target="_blank" rel="noopener">SigNoz</a> in another tab. The login is in <code>.lab-credentials</code>. Links in this tutorial land on the login page if you skip this.</li>
   <li>Start some background traffic, so that charts have data. Stop it when you finish.</li>
 </ol>

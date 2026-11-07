@@ -4,7 +4,8 @@
 
 A hands-on lab for learning OpenTelemetry on Kubernetes with SigNoz, the open source observability
 platform. Get traces, metrics and logs from an app with no code changes, debug real incidents, then
-add custom dimensions only where you need them. One command, on k3d or kind.
+add custom dimensions only where you need them, monitor the Kubernetes underneath, and get alerted.
+One command, on k3d or kind.
 
 ![Sneak peek: the tutorial, the lab app, a live incident, a trace down to the failing SQL, and a dashboard](docs/images/sneak-peek.gif)
 
@@ -14,8 +15,13 @@ add custom dimensions only where you need them. One command, on k3d or kind.
 | **Telemetry comes from** | The OpenTelemetry Operator, at pod start | The same agent, plus what your code adds |
 | **You learn** | How much you get for free, and how to debug six incidents with it | How to slice telemetry by things only your code knows |
 
-You don't have to choose. Lab 2 keeps Lab 1's setup, and adds detail only where it's worth it. Both
-run side by side on a local two-node cluster and send to the same SigNoz, and an interactive tutorial
+| | Lab 3: Kubernetes | Lab 4: alerts |
+|---|---|---|
+| **What it adds** | A workload with real limits and probes, plus scrape jobs for the kubelet, cAdvisor and the API server | Eight alert rules and a place to receive them |
+| **You learn** | How to debug throttling, OOM kills and failed probes, and which metrics quietly miss them | How to write alerts that fire for real failures, and how long they take |
+
+You don't have to choose. Each lab builds on the one before and adds only what it needs. They run
+side by side on a local two-node cluster and send to the same SigNoz, and an interactive tutorial
 walks you through them.
 
 ## What you'll learn
@@ -40,6 +46,20 @@ walks you through them.
   errors, and random-looking slowness
 - Give users a trace ID they can quote to support
 - Build a SigNoz dashboard around your own dimensions
+
+**Lab 3: watch what your app runs on**
+
+- See CPU throttling, which average CPU hides, and how it can get a healthy pod killed
+- Find an OOM kill, when the metric named after it reads 0
+- Read pod, node, kubelet and API server metrics, and tell a pod problem from a node problem
+- Scrape Prometheus endpoints into SigNoz with a keep-list, and see what that costs
+- How k3s differs from a real API server
+
+**Lab 4: get told when it breaks**
+
+- Write metric, trace and log alerts, including one that fires when data stops arriving
+- Choose a signal that really sees the failure, and a threshold above your normal
+- Send notifications through a webhook, and measure how long they take
 
 **Running it for real**
 
@@ -68,7 +88,8 @@ walks you through them.
 You also need:
 
 - **Memory:** at least 8 GB for Docker, and 10 GB is better. On Docker Desktop, set this in
-  Settings > Resources. The lab uses about 4.5 GiB, mostly ClickHouse.
+  Settings > Resources. Labs 1 and 2 use about 4.5 GiB, mostly ClickHouse, and all four labs use about
+  5.2 GiB.
 - **CPU:** about 0.3 core idle in the cluster, but Docker Desktop's VM can use over 1.5 cores under
   load on a Mac. Stop the load generator when you aren't using it, and run `k3d cluster stop signoz-lab`
   between sessions. `make up` brings it back.
@@ -103,6 +124,13 @@ make lab2      # adds it at http://lab2.localhost:8080
 make compare   # sends both labs the same requests and shows what each captured
 ```
 
+Then Labs 3 and 4:
+
+```bash
+make lab3      # a workload with real limits, at http://lab3.localhost:8080
+make lab4      # alert rules, and a page showing what they send, at http://lab4.localhost:8080
+```
+
 ## Commands
 
 | Command | What it does |
@@ -111,6 +139,8 @@ make compare   # sends both labs the same requests and shows what each captured
 | `make up` | Creates the cluster and deploys SigNoz and Lab 1. Safe to rerun, and recovers the lab after a restart |
 | `make lab2` | Deploys Lab 2 and its SigNoz dashboard, or redeploys it after you change its code |
 | `make lab1` | Redeploys Lab 1 after you change its code |
+| `make lab3` | Deploys Lab 3, its extra scrape jobs and its dashboards |
+| `make lab4` | Deploys Lab 4's alert sink and rules, and proves a notification gets through. Needs Lab 3 |
 | `make compare` | Shows what SigNoz captures from each lab |
 | `make status` | Shows nodes, pods and URLs |
 | `make tutorial` | Runs the interactive tutorial |
@@ -143,6 +173,18 @@ UI has a button for each scenario:
 
 The last three are the point of Lab 2. Both labs have those bugs, but Lab 1 can only show the
 symptoms. Lab 2 adds the dimensions that explain them.
+
+Lab 3 runs a separate workload with real limits and a liveness probe. Each scenario makes Kubernetes
+step in:
+
+| Scenario | What it does |
+|---|---|
+| `throttle` | Burns more CPU than the limit allows, so the kernel throttles the container |
+| `oom` | Leaks memory until the kernel kills the container |
+| `liveness` | Makes `/healthz` fail, so the kubelet restarts the container |
+| `disk` | Writes 512 MiB to the node's disk, then removes it |
+| `api_flood` | Lists pods from the API server up to 20 times a second |
+| `api_denied` | Asks the API server for secrets it isn't allowed to read |
 
 ## What we found
 

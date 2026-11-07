@@ -2,7 +2,7 @@
 # The other commands find the running cluster themselves.
 
 .DEFAULT_GOAL := help
-.PHONY: help check up lab1 lab2 compare status tutorial down
+.PHONY: help check up lab1 lab2 lab3 lab4 compare status tutorial down
 
 help: ## Show the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z0-9]+:.*## / {printf "  make %-10s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -18,6 +18,12 @@ lab1: ## Rebuild and redeploy Lab 1
 
 lab2: ## Deploy Lab 2, or redeploy it after a code change
 	@scripts/deploy-lab.sh 2
+
+lab3: ## Deploy Lab 3 and its extra scrape jobs
+	@scripts/deploy-lab.sh 3
+
+lab4: ## Deploy Lab 4: alert rules and a place to receive them
+	@scripts/deploy-alerts.sh
 
 compare: ## Show what SigNoz captures from each lab
 	@python3 scripts/compare_labs.py

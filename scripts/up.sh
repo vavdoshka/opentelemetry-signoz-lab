@@ -51,8 +51,7 @@ k apply -f signoz/ingress.yaml
 python3 scripts/bootstrap_signoz.py
 
 step "Node agents"
-h upgrade --install k8s-infra signoz/k8s-infra --version "$K8S_INFRA_CHART_VERSION" \
-  --namespace signoz -f signoz/k8s-infra-values.yaml
+install_k8s_infra
 
 step "OpenTelemetry Operator"
 helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts --force-update >/dev/null
@@ -71,4 +70,6 @@ Lab 1 is ready.
   SigNoz    $SIGNOZ_URL  (login in .lab-credentials)
   Tutorial  run: make tutorial
   Lab 2     run: make lab2
+  Lab 3     run: make lab3
+  Lab 4     run: make lab4
 DONE

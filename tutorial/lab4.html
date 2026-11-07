@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alerts that reach you | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="lab4">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 4: alerts</p>
+<h1>Alerts that reach you</h1>
+<p class="lead">A dashboard only helps if someone is looking at it. This lab turns what you learned into eight alerts, and proves each one against the real failure. Six first choices turned out to be wrong, and how they were wrong is the most useful part.</p>
+
+<h2>Start it</h2>
+<p>Run <code>make lab4</code>. It needs Lab 3, because some rules read Lab 3's metrics. It does three things:</p>
+<ol>
+  <li>Deploys a small <strong>alert sink</strong> at <a href="http://lab4.localhost:8080" target="_blank" rel="noopener">lab4.localhost:8080</a>. It stands in for Slack or PagerDuty, so you can see exactly what SigNoz sends.</li>
+  <li>Creates a notification channel and eight rules from <code>labs/lab4-alerts/alerts.json</code>.</li>
+  <li>Sends a test notification and checks that it arrived. A channel that exists proves nothing.</li>
+</ol>
+<div data-alert-feed></div>
+
+<h2>The rules</h2>
+<p>Each rule uses a signal that really sees the failure. You learned in Lab 3 that the obvious one often doesn't.</p>
+<table>
+  <thead><tr><th>Rule</th><th>Signal</th><th>Why this signal</th><th>Fire it</th></tr></thead>
+  <tbody><tr><td><strong>Lab 1: error rate above 20%</strong></td><td>Traces</td><td>A symptom users feel. The default load runs at 10%, so 20% means something changed</td><td>Start Lab 1's load with 60% errors</td></tr><tr><td><strong>Lab 1: slow database queries</strong></td><td>Traces</td><td>The default load has no slow SQL, so one slow query is news</td><td><code>slow_query</code></td></tr><tr><td><strong>Lab 1: error logs</strong></td><td>Logs</td><td>Counts <code>ERROR</code> logs. A burst usually means something is wrong</td><td><code>log_burst</code>, 60 at ERROR</td></tr><tr><td><strong>Lab 3: CPU throttled</strong></td><td>Metrics, a formula</td><td>Average CPU hides throttling. This pod reads 19 to 32% normally, so the threshold is 50%</td><td><code>throttle</code></td></tr><tr><td><strong>Lab 3: container OOM killed</strong></td><td>Metrics</td><td>Reads why the container last exited. The OOM counter stays at 0. It stays firing until the pod is replaced</td><td><code>oom</code></td></tr><tr><td><strong>Lab 3: killed by a liveness probe</strong></td><td>Logs: a Kubernetes event</td><td>A failed probe counter can read 0, so this reads the event</td><td><code>liveness</code></td></tr><tr><td><strong>Lab 3: API calls denied</strong></td><td>Traces</td><td>The API server's request metric doesn't count these</td><td><code>api_denied</code></td></tr><tr><td><strong>Lab 3: telemetry stopped</strong></td><td>Metrics, absent data</td><td>No threshold can catch data that never arrives</td><td>Scale the workload to 0</td></tr></tbody>
+</table>
+<p>Try some. Each one fires a real failure, and the alert appears in the feed above.</p>
+<div data-fire="throttle" data-lab="lab3" data-params='{"seconds":150}' data-hint="Needs Lab 3's load running at 2 requests/s, and takes about two minutes."></div>
+<div data-load-panel="lab3" data-rps="2"></div>
+<div data-fire="liveness" data-lab="lab3" data-hint="The container restarts."></div>
+<div data-fire="oom" data-lab="lab3" data-hint="Takes about 100 seconds to reach the limit."></div>
+<div data-fire="api_denied" data-lab="lab3"></div>
+<div data-fire="slow_query" data-lab="lab1"></div>
+<p>To stop telemetry, run this, wait about seven minutes, then scale back to 1:</p>
+<figure class="code"><pre><code>kubectl --context k3d-signoz-lab -n lab3 scale deployment/lab3-workload --replicas=0</code></pre></figure>
+<p>It arrives as <code>[No data] Lab 3: telemetry stopped</code>. SigNoz adds that prefix to the name, so allow for it if you route or filter alerts by name.</p>
+
+<h2>Inside a rule</h2>
+<p>This is a whole rule, as <code>make lab4</code> sends it to <code>/api/v2/rules</code>:</p>
+<figure class="code"><pre><code>{
+  &quot;alert&quot;: &quot;Lab 3: container OOM killed&quot;,
+  &quot;description&quot;: &quot;Reads why the container last exited. container_oom_events_total stays 0, because the counter dies with the container.&quot;,
+  &quot;alertType&quot;: &quot;METRIC_BASED_ALERT&quot;,
+  &quot;ruleType&quot;: &quot;threshold_rule&quot;,
+  &quot;version&quot;: &quot;v5&quot;,
+  &quot;schemaVersion&quot;: &quot;v2alpha1&quot;,
+  &quot;evaluation&quot;: {
+    &quot;kind&quot;: &quot;rolling&quot;,
+    &quot;spec&quot;: {
+      &quot;evalWindow&quot;: &quot;5m&quot;,
+      &quot;frequency&quot;: &quot;1m&quot;
+    }
+  },
+  &quot;labels&quot;: {
+    &quot;lab&quot;: &quot;lab4&quot;,
+    &quot;severity&quot;: &quot;critical&quot;
+  },
+  &quot;annotations&quot;: {
+    &quot;summary&quot;: &quot;Container OOM killed&quot;,
+    &quot;description&quot;: &quot;{{$k8s.pod.name}} was OOM killed. Restarts so far: {{$value}}&quot;
+  },
+  &quot;condition&quot;: {
+    &quot;compositeQuery&quot;: {
+      &quot;queryType&quot;: &quot;builder&quot;,
+      &quot;panelType&quot;: &quot;graph&quot;,
+      &quot;queries&quot;: [
+        {
+          &quot;type&quot;: &quot;builder_query&quot;,
+          &quot;spec&quot;: {
+            &quot;name&quot;: &quot;A&quot;,
+            &quot;signal&quot;: &quot;metrics&quot;,
+            &quot;stepInterval&quot;: 60,
+            &quot;aggregations&quot;: [
+              {
+                &quot;metricName&quot;: &quot;k8s.container.restarts&quot;,
+                &quot;timeAggregation&quot;: &quot;latest&quot;,
+                &quot;spaceAggregation&quot;: &quot;max&quot;
+              }
+            ],
+            &quot;disabled&quot;: false,
+            &quot;filter&quot;: {
+              &quot;expression&quot;: &quot;k8s.namespace.name = &#x27;lab3&#x27; AND k8s.container.status.last_terminated_reason = &#x27;OOMKilled&#x27;&quot;
+            },
+            &quot;groupBy&quot;: [
+              {
+                &quot;name&quot;: &quot;k8s.pod.name&quot;,
+                &quot;fieldContext&quot;: &quot;resource&quot;,
+                &quot;fieldDataType&quot;: &quot;string&quot;
+              }
+            ]
+          }
+        }
+      ]
+    },
+    &quot;selectedQueryName&quot;: &quot;A&quot;,
+    &quot;thresholds&quot;: {
+      &quot;kind&quot;: &quot;basic&quot;,
+      &quot;spec&quot;: [
+        {
+          &quot;name&quot;: &quot;critical&quot;,
+          &quot;op&quot;: &quot;above&quot;,
+          &quot;target&quot;: 0,
+          &quot;matchType&quot;: &quot;at_least_once&quot;,
+          &quot;channels&quot;: [
+            &quot;Lab 4 webhook&quot;
+          ]
+        }
+      ]
+    }
+  },
+  &quot;notificationSettings&quot;: {
+    &quot;groupBy&quot;: [
+      &quot;k8s.pod.name&quot;
+    ],
+    &quot;renotify&quot;: {
+      &quot;enabled&quot;: false,
+      &quot;interval&quot;: &quot;30m&quot;,
+      &quot;alertStates&quot;: [
+        &quot;firing&quot;
+      ]
+    }
+  }
+}</code></pre></figure>
+<ul>
+  <li><strong><code>condition.compositeQuery</code></strong> is the same query you'd build in the UI.</li>
+  <li><strong><code>thresholds</code></strong> says what counts as a problem, and which channel to tell. <code>matchType</code> decides whether one point is enough, or the whole window must match.</li>
+  <li><strong><code>evaluation</code></strong> says how far back to look, and how often.</li>
+  <li><strong><code>annotations</code></strong> are the words you read at 3 a.m. They can use <code>{{$value}}</code>, <code>{{$threshold}}</code> and any grouped label, such as <code>{{$k8s.pod.name}}</code>. <code>{{$value}}</code> already includes the unit, so don't add your own.</li>
+</ul>
+<p>You can also build all of this in the SigNoz UI, under Alerts. Keeping rules in a file means you can review them and rebuild them. <code>make lab4</code> updates rules that changed, and removes any this lab created that are no longer in the file.</p>
+
+<h2>How long it takes</h2>
+<p>Measured in one run, from causing the failure to the notification arriving at the sink:</p>
+<table>
+  <thead><tr><th>Rule</th><th>Failure to notification</th><th>Failure ended to resolved</th></tr></thead>
+  <tbody><tr><td>Lab 1: error logs</td><td>3m 22s</td><td>12m 32s</td></tr><tr><td>Lab 3: killed by a liveness probe</td><td>3m 42s</td><td>8m 42s</td></tr><tr><td>Lab 3: CPU throttled</td><td>3m 57s</td><td>6m 27s</td></tr><tr><td>Lab 1: slow database queries</td><td>4m 01s</td><td>8m 59s</td></tr><tr><td>Lab 3: API calls denied</td><td>4m 03s</td><td>8m 03s</td></tr><tr><td>Lab 3: container OOM killed</td><td>About 4m 13s</td><td>Stays firing until the pod is replaced</td></tr><tr><td>Lab 1: error rate above 20%</td><td>4m 36s</td><td>7m 06s</td></tr><tr><td>Lab 3: telemetry stopped</td><td><strong>6m 11s</strong></td><td>5m 53s</td></tr></tbody>
+</table>
+<p>So plan for about four minutes. That's a deliberate trade-off, and the time goes here:</p>
+<table>
+  <thead><tr><th>Step</th><th>Time</th><th>Why</th><th>Setting</th></tr></thead>
+  <tbody><tr><td>Evaluation delay</td><td>2 minutes</td><td>Rules read data that's 2 minutes old, so late data has time to land</td><td><code>ruler.eval_delay</code></td></tr><tr><td>Evaluation</td><td>Up to 1 minute</td><td>Each rule runs once a minute</td><td><code>frequency</code> in the rule</td></tr><tr><td>Grouping</td><td>30 to 60 seconds</td><td>Alertmanager waits to group related alerts into one message</td><td><code>group_wait</code>, 30 seconds</td></tr></tbody>
+</table>
+<p>Resolved notifications take longer. The window has to clear first, and then they go out on a 5-minute tick after the alert's last notification (<code>group_interval</code>). In this run, one fired at 19:43:51 and resolved at 19:48:51, and another went from 19:47:12 to 19:52:12.</p>
+<p><strong>Telemetry stopped</strong> is the slowest, because the window must be empty and <code>absentFor</code> then has to pass. It first used a 5-minute window, which needed about 9 minutes of silence, so the rule now uses 1 minute. These are SigNoz's defaults, and this lab doesn't change them.</p>
+
+<h2>What makes a good alert</h2>
+<ul>
+  <li><strong>Prove it fires.</strong> Six of this lab's first choices of signal or threshold turned out wrong, though they all sounded right. Two could never have fired. Cause the failure and watch it arrive.</li>
+  <li><strong>Set the threshold above your normal.</strong> The first throttling threshold was 25%. This pod reads 19 to 32% just serving requests, so it would have flapped forever. Look at the real data first.</li>
+  <li><strong>Prefer symptoms to causes.</strong> Error rate and slow queries are what users feel. Use cause-based rules, like throttling, to explain them.</li>
+  <li><strong>Remember what can't report itself.</strong> A dead pod can't send an error, so watch for missing data, and read its callers.</li>
+</ul>
+
+<h2>Use a real channel</h2>
+<p>To send these to Slack, change <code>channel</code> in <code>labs/lab4-alerts/alerts.json</code> and run <code>make lab4</code> again. The rules name the channel by its <code>displayName</code>, so keep that the same or change them to match:</p>
+<figure class="code"><pre><code>"config": {
+  "kind": "slack",
+  "spec": {
+    "apiUrl": "https://hooks.slack.com/services/T000/B000/XXXXXXXX",
+    "channel": "#alerts",
+    "sendResolved": true
+  }
+}</code></pre></figure>
+<p>Keep <code>sendResolved</code>: it's off by default for Slack, so you'd never hear that an alert cleared. This shape comes from SigNoz's API reference, and hasn't been tried here. <span class="badge untested">Untested</span> The same reference, <code>docs/api/openapi.yml</code> in SigNoz's repo, has examples for PagerDuty, Opsgenie, email and others.</p>
+
+<h2>Not covered</h2>
+<p>SigNoz can also route alerts by label, schedule planned downtime, and detect anomalies. This lab doesn't use those.</p>
+
+<div class="quiz" data-quiz="al1"><p class="q">Check yourself: Why does the OOM rule read k8s.container.restarts and not container_oom_events_total?</p><button type="button" data-right="false" data-why="Speed isn&#x27;t the reason.">Because it&#x27;s faster.</button><button type="button" data-right="true" data-why="A rule on it would never fire. Always prove a rule against the real failure.">Because the OOM counter stayed at 0 during a real OOM kill.</button><button type="button" data-right="false" data-why="It can, and Lab 3 does.">Because SigNoz can&#x27;t read cAdvisor metrics.</button></div>
+<div class="quiz" data-quiz="al2"><p class="q">Check yourself: A pod stops completely. Which rule notices?</p><button type="button" data-right="false" data-why="A stopped pod sends no spans at all, so there&#x27;s nothing to count.">A high error rate rule.</button><button type="button" data-right="true" data-why="alertOnAbsent fires when data stops arriving.">A rule on absent data.</button><button type="button" data-right="false" data-why="A threshold needs data to compare.">Any threshold rule.</button></div>
+
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

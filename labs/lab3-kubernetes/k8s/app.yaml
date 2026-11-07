@@ -1,0 +1,106 @@
+# Lab 3's workload. Unlike Labs 1 and 2 it sets limits and a liveness probe,
+# because those are what give Kubernetes a reason to step in.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: workload, namespace: lab3 }
+---
+# Only used by the api_flood and api_denied scenarios.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: { name: list-pods, namespace: lab3 }
+rules:
+  - { apiGroups: [""], resources: [pods], verbs: [list] }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: { name: workload-list-pods, namespace: lab3 }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: list-pods }
+subjects:
+  - { kind: ServiceAccount, name: workload, namespace: lab3 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lab3-workload
+  namespace: lab3
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: workload } }
+  template:
+    metadata: { labels: { app: workload } }
+    spec:
+      serviceAccountName: workload
+      containers:
+        - name: workload
+          image: telemetry-lab3:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: POD_NAMESPACE, valueFrom: { fieldRef: { fieldPath: metadata.namespace } } }
+          ports: [{ containerPort: 8000 }]
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            # CPU above this limit is throttled. Memory above it is an OOM kill.
+            limits: { cpu: 200m, memory: 256Mi }
+          # Start-up is slow under a CPU limit, because the agent has a lot to
+          # import. This holds off the liveness probe until the app is up.
+          startupProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5, failureThreshold: 24 }
+          # Three failures 5 seconds apart, and the kubelet restarts the container.
+          livenessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5, timeoutSeconds: 3, failureThreshold: 3 }
+          readinessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5, timeoutSeconds: 3 }
+          volumeMounts: [{ name: scratch, mountPath: /scratch }]
+      volumes:
+        # Lives on the node's disk, which is what the disk scenario fills.
+        - name: scratch
+          emptyDir: { sizeLimit: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: workload, namespace: lab3 }
+spec:
+  selector: { app: workload }
+  ports: [{ port: 8000 }]
+---
+# A separate Deployment, so the load keeps coming while the workload restarts.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lab3-loadgen
+  namespace: lab3
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: loadgen } }
+  template:
+    metadata: { labels: { app: loadgen } }
+    spec:
+      containers:
+        - name: loadgen
+          image: telemetry-lab3:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: LOADGEN_TARGET, value: "http://workload:8000" }
+          ports: [{ containerPort: 8000 }]
+          readinessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5 }
+          resources: { requests: { cpu: 50m, memory: 128Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: loadgen, namespace: lab3 }
+spec:
+  selector: { app: loadgen }
+  ports: [{ port: 8000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: { name: workload, namespace: lab3 }
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: lab3.localhost
+      http:
+        paths:
+          - path: /api/load
+            pathType: Prefix
+            backend: { service: { name: loadgen, port: { number: 8000 } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: workload, port: { number: 8000 } } }

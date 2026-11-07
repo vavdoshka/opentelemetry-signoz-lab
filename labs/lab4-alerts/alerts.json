@@ -1,0 +1,701 @@
+{
+  "channel": {
+    "name": "lab4-webhook",
+    "displayName": "Lab 4 webhook",
+    "config": {
+      "kind": "webhook",
+      "spec": {
+        "url": "http://alert-sink.lab4.svc.cluster.local:8000/webhook"
+      }
+    }
+  },
+  "rules": [
+    {
+      "alert": "Lab 1: error rate above 20%",
+      "description": "A symptom users feel. Share of server spans marked as errors. The default load generator runs at 10%, so 20% means something changed.",
+      "alertType": "TRACES_BASED_ALERT",
+      "ruleType": "threshold_rule",
+      "version": "v5",
+      "schemaVersion": "v2alpha1",
+      "evaluation": {
+        "kind": "rolling",
+        "spec": {
+          "evalWindow": "2m",
+          "frequency": "1m"
+        }
+      },
+      "labels": {
+        "lab": "lab4",
+        "severity": "critical"
+      },
+      "annotations": {
+        "summary": "Error rate above {{$threshold}}",
+        "description": "lab1-frontend error rate is {{$value}}"
+      },
+      "condition": {
+        "compositeQuery": {
+          "queryType": "builder",
+          "panelType": "graph",
+          "queries": [
+            {
+              "type": "builder_query",
+              "spec": {
+                "name": "A",
+                "signal": "traces",
+                "stepInterval": 60,
+                "aggregations": [
+                  {
+                    "expression": "count()"
+                  }
+                ],
+                "disabled": false,
+                "filter": {
+                  "expression": "service.name = 'lab1-frontend' AND kind_string = 'Server' AND has_error = true"
+                },
+                "groupBy": []
+              }
+            },
+            {
+              "type": "builder_query",
+              "spec": {
+                "name": "B",
+                "signal": "traces",
+                "stepInterval": 60,
+                "aggregations": [
+                  {
+                    "expression": "count()"
+                  }
+                ],
+                "disabled": false,
+                "filter": {
+                  "expression": "service.name = 'lab1-frontend' AND kind_string = 'Server'"
+                },
+                "groupBy": []
+              }
+            },
+            {
+              "type": "builder_formula",
+              "spec": {
+                "name": "F1",
+                "expression": "(A / B) * 100"
+              }
+            }
+          ],
+          "unit": "percent"
+        },
+        "selectedQueryName": "F1",
+        "thresholds": {
+          "kind": "basic",
+          "spec": [
+            {
+              "name": "critical",
+              "op": "above",
+              "target": 20,
+              "matchType": "on_average",
+              "channels": [
+                "Lab 4 webhook"
+              ]
+            }
+          ]
+        }
+      },
+      "notificationSettings": {
+        "groupBy": [],
+        "renotify": {
+          "enabled": false,
+          "interval": "30m",
+          "alertStates": [
+            "firing"
+          ]
+        }
+      }
+    },
+    {
+      "alert": "Lab 1: slow database queries",
+      "description": "Slowest Postgres call in the window. The default load generator has none this slow, so firing means something changed.",
+      "alertType": "TRACES_BASED_ALERT",
+      "ruleType": "threshold_rule",
+      "version": "v5",
+      "schemaVersion": "v2alpha1",
+      "evaluation": {
+        "kind": "rolling",
+        "spec": {
+          "evalWindow": "5m",
+          "frequency": "1m"
+        }
+      },
+      "labels": {
+        "lab": "lab4",
+        "severity": "warning"
+      },
+      "annotations": {
+        "summary": "Slow database query",
+        "description": "lab1-backend's slowest Postgres call took {{$value}}"
+      },
+      "condition": {
+        "compositeQuery": {
+          "queryType": "builder",
+          "panelType": "graph",
+          "queries": [
+            {
+              "type": "builder_query",
+              "spec": {
+                "name": "A",
+                "signal": "traces",
+                "stepInterval": 60,
+                "aggregations": [
+                  {
+                    "expression": "max(duration_nano)"
+                  }
+                ],
+                "disabled": false,
+                "filter": {
+                  "expression": "service.name = 'lab1-backend' AND db.system = 'postgresql'"
+                },
+                "groupBy": []
+              }
+            }
+          ],
+          "unit": "ns"
+        },
+        "selectedQueryName": "A",
+        "thresholds": {
+          "kind": "basic",
+          "spec": [
+            {
+              "name": "warning",
+              "op": "above",
+              "target": 1000,
+              "matchType": "at_least_once",
+              "channels": [
+                "Lab 4 webhook"
+              ],
+              "targetUnit": "ms"
+            }
+          ]
+        }
+      },
+      "notificationSettings": {
+        "groupBy": [],
+        "renotify": {
+          "enabled": false,
+          "interval": "30m",
+          "alertStates": [
+            "firing"
+          ]
+        }
+      }
+    },
+    {
+      "alert": "Lab 1: error logs",
+      "description": "Log-based. Counts ERROR logs from any service in Lab 1.",
+      "alertType": "LOGS_BASED_ALERT",
+      "ruleType": "threshold_rule",
+      "version": "v5",
+      "schemaVersion": "v2alpha1",
+      "evaluation": {
+        "kind": "rolling",
+        "spec": {
+          "evalWindow": "5m",
+          "frequency": "1m"
+        }
+      },
+      "labels": {
+        "lab": "lab4",
+        "severity": "warning"
+      },
+      "annotations": {
+        "summary": "Error logs in Lab 1",
+        "description": "Lab 1 wrote {{$value}} error logs"
+      },
+      "condition": {
+        "compositeQuery": {
+          "queryType": "builder",
+          "panelType": "graph",
+          "queries": [
+            {
+              "type": "builder_query",
+              "spec": {
+                "name": "A",
+                "signal": "logs",
+                "stepInterval": 60,
+                "aggregations": [
+                  {
+                    "expression": "count()"
+                  }
+                ],
+                "disabled": false,
+                "filter": {
+                  "expression": "k8s.namespace.name = 'lab1' AND severity_text = 'ERROR'"
+                },
+                "groupBy": []
+              }
+            }
+          ]
+        },
+        "selectedQueryName": "A",
+        "thresholds": {
+          "kind": "basic",
+          "spec": [
+            {
+              "name": "warning",
+              "op": "above",
+              "target": 50,
+              "matchType": "in_total",
+              "channels": [
+                "Lab 4 webhook"
+              ]
+            }
+          ]
+        }
+      },
+      "notificationSettings": {
+        "groupBy": [],
+        "renotify": {
+          "enabled": false,
+          "interval": "30m",
+          "alertStates": [
+            "firing"
+          ]
+        }
+      }
+    },
+    {
+      "alert": "Lab 3: CPU throttled",
+      "description": "Share of CFS periods in which the container ran out of quota. This pod reads 20 to 30% in normal use, so 50% is above its baseline. Needs Lab 3's scrape jobs.",
+      "alertType": "METRIC_BASED_ALERT",
+      "ruleType": "threshold_rule",
+      "version": "v5",
+      "schemaVersion": "v2alpha1",
+      "evaluation": {
+        "kind": "rolling",
+        "spec": {
+          "evalWindow": "2m",
+          "frequency": "1m"
+        }
+      },
+      "labels": {
+        "lab": "lab4",
+        "severity": "warning"
+      },
+      "annotations": {
+        "summary": "CPU throttled above {{$threshold}}",
+        "description": "{{$pod}} was throttled in {{$value}} of CPU periods"
+      },
+      "condition": {
+        "compositeQuery": {
+          "queryType": "builder",
+          "panelType": "graph",
+          "queries": [
+            {
+              "type": "builder_query",
+              "spec": {
+                "name": "A",
+                "signal": "metrics",
+                "stepInterval": 60,
+                "aggregations": [
+                  {
+                    "metricName": "container_cpu_cfs_throttled_periods_total",
+                    "timeAggregation": "rate",
+                    "spaceAggregation": "sum"
+                  }
+                ],
+                "disabled": true,
+                "filter": {
+                  "expression": "namespace = 'lab3'"
+                },
+                "groupBy": [
+                  {
+                    "name": "pod",
+                    "fieldContext": "attribute",
+                    "fieldDataType": "string"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "builder_query",
+              "spec": {
+                "name": "B",
+                "signal": "metrics",
+                "stepInterval": 60,
+                "aggregations": [
+                  {
+                    "metricName": "container_cpu_cfs_periods_total",
+                    "timeAggregation": "rate",
+                    "spaceAggregation": "sum"
+                  }
+                ],
+                "disabled": true,
+                "filter": {
+                  "expression": "namespace = 'lab3'"
+                },
+                "groupBy": [
+                  {
+                    "name": "pod",
+                    "fieldContext": "attribute",
+                    "fieldDataType": "string"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "builder_formula",
+              "spec": {
+                "name": "F1",
+                "expression": "(A / B) * 100",
+                "legend": "{{pod}}"
+              }
+            }
+          ],
+          "unit": "percent"
+        },
+        "selectedQueryName": "F1",
+        "thresholds": {
+          "kind": "basic",
+          "spec": [
+            {
+              "name": "warning",
+              "op": "above",
+              "target": 50,
+              "matchType": "on_average",
+              "channels": [
+                "Lab 4 webhook"
+              ]
+            }
+          ]
+        }
+      },
+      "notificationSettings": {
+        "groupBy": [
+          "pod"
+        ],
+        "renotify": {
+          "enabled": false,
+          "interval": "30m",
+          "alertStates": [
+            "firing"
+          ]
+        }
+      }
+    },
+    {
+      "alert": "Lab 3: container OOM killed",
+      "description": "Reads why the container last exited. container_oom_events_total stays 0, because the counter dies with the container.",
+      "alertType": "METRIC_BASED_ALERT",
+      "ruleType": "threshold_rule",
+      "version": "v5",
+      "schemaVersion": "v2alpha1",
+      "evaluation": {
+        "kind": "rolling",
+        "spec": {
+          "evalWindow": "5m",
+          "frequency": "1m"
+        }
+      },
+      "labels": {
+        "lab": "lab4",
+        "severity": "critical"
+      },
+      "annotations": {
+        "summary": "Container OOM killed",
+        "description": "{{$k8s.pod.name}} was OOM killed. Restarts so far: {{$value}}"
+      },
+      "condition": {
+        "compositeQuery": {
+          "queryType": "builder",
+          "panelType": "graph",
+          "queries": [
+            {
+              "type": "builder_query",
+              "spec": {
+                "name": "A",
+                "signal": "metrics",
+                "stepInterval": 60,
+                "aggregations": [
+                  {
+                    "metricName": "k8s.container.restarts",
+                    "timeAggregation": "latest",
+                    "spaceAggregation": "max"
+                  }
+                ],
+                "disabled": false,
+                "filter": {
+                  "expression": "k8s.namespace.name = 'lab3' AND k8s.container.status.last_terminated_reason = 'OOMKilled'"
+                },
+                "groupBy": [
+                  {
+                    "name": "k8s.pod.name",
+                    "fieldContext": "resource",
+                    "fieldDataType": "string"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "selectedQueryName": "A",
+        "thresholds": {
+          "kind": "basic",
+          "spec": [
+            {
+              "name": "critical",
+              "op": "above",
+              "target": 0,
+              "matchType": "at_least_once",
+              "channels": [
+                "Lab 4 webhook"
+              ]
+            }
+          ]
+        }
+      },
+      "notificationSettings": {
+        "groupBy": [
+          "k8s.pod.name"
+        ],
+        "renotify": {
+          "enabled": false,
+          "interval": "30m",
+          "alertStates": [
+            "firing"
+          ]
+        }
+      }
+    },
+    {
+      "alert": "Lab 3: killed by a liveness probe",
+      "description": "Reads the Kubernetes event, because a failed probe counter that starts above zero shows no increase.",
+      "alertType": "LOGS_BASED_ALERT",
+      "ruleType": "threshold_rule",
+      "version": "v5",
+      "schemaVersion": "v2alpha1",
+      "evaluation": {
+        "kind": "rolling",
+        "spec": {
+          "evalWindow": "5m",
+          "frequency": "1m"
+        }
+      },
+      "labels": {
+        "lab": "lab4",
+        "severity": "warning"
+      },
+      "annotations": {
+        "summary": "Killed by a liveness probe",
+        "description": "{{$k8s.object.name}} failed its liveness probe and was restarted"
+      },
+      "condition": {
+        "compositeQuery": {
+          "queryType": "builder",
+          "panelType": "graph",
+          "queries": [
+            {
+              "type": "builder_query",
+              "spec": {
+                "name": "A",
+                "signal": "logs",
+                "stepInterval": 60,
+                "aggregations": [
+                  {
+                    "expression": "count()"
+                  }
+                ],
+                "disabled": false,
+                "filter": {
+                  "expression": "attribute.k8s.namespace.name = 'lab3' AND k8s.event.reason = 'Killing' AND body CONTAINS 'failed liveness probe'"
+                },
+                "groupBy": [
+                  {
+                    "name": "k8s.object.name",
+                    "fieldContext": "resource",
+                    "fieldDataType": "string"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "selectedQueryName": "A",
+        "thresholds": {
+          "kind": "basic",
+          "spec": [
+            {
+              "name": "warning",
+              "op": "above",
+              "target": 0,
+              "matchType": "at_least_once",
+              "channels": [
+                "Lab 4 webhook"
+              ]
+            }
+          ]
+        }
+      },
+      "notificationSettings": {
+        "groupBy": [
+          "k8s.object.name"
+        ],
+        "renotify": {
+          "enabled": false,
+          "interval": "30m",
+          "alertStates": [
+            "firing"
+          ]
+        }
+      }
+    },
+    {
+      "alert": "Lab 3: API calls denied",
+      "description": "Reads the client's spans, because the API server's request metric doesn't count requests refused at authorization.",
+      "alertType": "TRACES_BASED_ALERT",
+      "ruleType": "threshold_rule",
+      "version": "v5",
+      "schemaVersion": "v2alpha1",
+      "evaluation": {
+        "kind": "rolling",
+        "spec": {
+          "evalWindow": "2m",
+          "frequency": "1m"
+        }
+      },
+      "labels": {
+        "lab": "lab4",
+        "severity": "warning"
+      },
+      "annotations": {
+        "summary": "API calls denied",
+        "description": "lab3-workload had {{$value}} API calls denied"
+      },
+      "condition": {
+        "compositeQuery": {
+          "queryType": "builder",
+          "panelType": "graph",
+          "queries": [
+            {
+              "type": "builder_query",
+              "spec": {
+                "name": "A",
+                "signal": "traces",
+                "stepInterval": 60,
+                "aggregations": [
+                  {
+                    "expression": "count()"
+                  }
+                ],
+                "disabled": false,
+                "filter": {
+                  "expression": "service.name = 'lab3-workload' AND kind_string = 'Client' AND response_status_code = '403'"
+                },
+                "groupBy": []
+              }
+            }
+          ]
+        },
+        "selectedQueryName": "A",
+        "thresholds": {
+          "kind": "basic",
+          "spec": [
+            {
+              "name": "warning",
+              "op": "above",
+              "target": 10,
+              "matchType": "in_total",
+              "channels": [
+                "Lab 4 webhook"
+              ]
+            }
+          ]
+        }
+      },
+      "notificationSettings": {
+        "groupBy": [],
+        "renotify": {
+          "enabled": false,
+          "interval": "30m",
+          "alertStates": [
+            "firing"
+          ]
+        }
+      }
+    },
+    {
+      "alert": "Lab 3: telemetry stopped",
+      "description": "Fires when data stops arriving, which no threshold can catch. process.memory.usage is sent every 10 seconds whatever the traffic. The window is short, because the whole window has to be empty before absentFor starts counting.",
+      "alertType": "METRIC_BASED_ALERT",
+      "ruleType": "threshold_rule",
+      "version": "v5",
+      "schemaVersion": "v2alpha1",
+      "evaluation": {
+        "kind": "rolling",
+        "spec": {
+          "evalWindow": "1m",
+          "frequency": "1m"
+        }
+      },
+      "labels": {
+        "lab": "lab4",
+        "severity": "critical"
+      },
+      "annotations": {
+        "summary": "No telemetry from lab3-workload",
+        "description": "lab3-workload has sent no metrics for 2 minutes"
+      },
+      "condition": {
+        "compositeQuery": {
+          "queryType": "builder",
+          "panelType": "graph",
+          "queries": [
+            {
+              "type": "builder_query",
+              "spec": {
+                "name": "A",
+                "signal": "metrics",
+                "stepInterval": 60,
+                "aggregations": [
+                  {
+                    "metricName": "process.memory.usage",
+                    "timeAggregation": "latest",
+                    "spaceAggregation": "max"
+                  }
+                ],
+                "disabled": false,
+                "filter": {
+                  "expression": "service.name = 'lab3-workload'"
+                },
+                "groupBy": []
+              }
+            }
+          ]
+        },
+        "selectedQueryName": "A",
+        "thresholds": {
+          "kind": "basic",
+          "spec": [
+            {
+              "name": "critical",
+              "op": "below",
+              "target": 0,
+              "matchType": "at_least_once",
+              "channels": [
+                "Lab 4 webhook"
+              ]
+            }
+          ]
+        },
+        "alertOnAbsent": true,
+        "absentFor": 2
+      },
+      "notificationSettings": {
+        "groupBy": [],
+        "renotify": {
+          "enabled": false,
+          "interval": "30m",
+          "alertStates": [
+            "firing"
+          ]
+        }
+      }
+    }
+  ]
+}

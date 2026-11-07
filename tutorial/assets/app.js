@@ -22,6 +22,13 @@
     { id: 'freeorders', href: 'incident-free-orders.html', title: 'Revenue dropped with no errors', group: 'Lab 2: custom dimensions' },
     { id: 'cachemiss', href: 'incident-cache-miss.html', title: 'Slow for no visible reason', group: 'Lab 2: custom dimensions' },
     { id: 'traceid', href: 'incident-trace-id.html', title: 'A customer quotes a trace ID', group: 'Lab 2: custom dimensions' },
+    { id: 'lab3', href: 'lab3.html', title: 'What Kubernetes tells you', group: 'Lab 3: Kubernetes' },
+    { id: 'throttling', href: 'incident-throttling.html', title: 'Slow, then restarted', group: 'Lab 3: Kubernetes' },
+    { id: 'oom', href: 'incident-oom.html', title: 'A container that disappears', group: 'Lab 3: Kubernetes' },
+    { id: 'liveness', href: 'incident-liveness.html', title: 'A failing health check', group: 'Lab 3: Kubernetes' },
+    { id: 'node', href: 'incident-node.html', title: 'Is it the pod or the node?', group: 'Lab 3: Kubernetes' },
+    { id: 'apiserver', href: 'incident-apiserver.html', title: 'The API server', group: 'Lab 3: Kubernetes' },
+    { id: 'lab4', href: 'lab4.html', title: 'Alerts that reach you', group: 'Lab 4: alerts' },
     { id: 'queries', href: 'queries.html', title: 'Search query reference', group: 'Reference' },
     { id: 'setup', href: 'setup.html', title: 'How SigNoz is configured', group: 'Reference' },
     { id: 'gaps', href: 'gaps.html', title: 'What is missing, and fixes', group: 'Reference' },
@@ -29,9 +36,9 @@
 
   const SIGNOZ = 'http://signoz.localhost:8080';
   const STORE = 'telemetry-tutorial-v1';
-  const LAB_NAMES = { lab1: 'Lab 1', lab2: 'Lab 2' };
-  const LAB_START = { lab1: 'make up', lab2: 'make lab2' };
-  const LAB_FRONTEND = { lab1: 'lab1-frontend', lab2: 'frontend' };
+  const LAB_NAMES = { lab1: 'Lab 1', lab2: 'Lab 2', lab3: 'Lab 3' };
+  const LAB_START = { lab1: 'make up', lab2: 'make lab2', lab3: 'make lab3' };
+  const LAB_FRONTEND = { lab1: 'lab1-frontend', lab2: 'frontend', lab3: 'lab3-workload' };
   const SPAN_ARRIVAL_WAIT_MS = 2000;
   const SPAN_RETRY_WAIT_MS = 3000;
   const SPAN_RETRIES = 8;
@@ -301,7 +308,7 @@
   function renderBanner() {
     const main = document.getElementById('main');
     let banner = document.getElementById('lab-banner');
-    const down = lab && (lab.bridge === false || !labUp('lab1') || !labUp('lab2') || !lab.signoz.up);
+    const down = lab && (lab.bridge === false || Object.keys(LAB_NAMES).some((labId) => !labUp(labId)) || !lab.signoz.up);
     if (!down) {
       if (banner) banner.remove();
       return;
@@ -310,9 +317,9 @@
       banner = el('div', { id: 'lab-banner', role: 'status' });
       main.prepend(banner);
     }
-    /* make up deploys only Lab 1, so Lab 2 being absent is normal, not a fault. */
-    const onlyLab2 = lab.bridge !== false && labUp('lab1') && lab.signoz.up;
-    banner.classList.toggle('info', onlyLab2);
+    /* make up deploys only Lab 1, so the later labs being absent is normal, not a fault. */
+    const onlyLaterLabs = lab.bridge !== false && labUp('lab1') && lab.signoz.up;
+    banner.classList.toggle('info', onlyLaterLabs);
     banner.textContent = bannerText();
   }
 
@@ -676,7 +683,11 @@
     const labId = host.dataset.loadPanel || 'lab1';
     host.classList.add('panel');
     const rps = el('input', { type: 'number', min: 0.5, max: 20, step: 0.5, value: 5, 'aria-label': 'Requests per second in ' + LAB_NAMES[labId] });
-    const pct = el('input', { type: 'number', min: 0, max: 100, value: 10, 'aria-label': 'Error percentage in ' + LAB_NAMES[labId] });
+    /* Lab 3's load is plain requests. Its failures come from Kubernetes, not bad input. */
+    const hasErrors = labId !== 'lab3';
+    const rpsDefault = Number(host.dataset.rps || 5);
+    rps.value = rpsDefault;
+    const pct = el('input', { type: 'number', min: 0, max: 100, value: hasErrors ? 10 : 0, 'aria-label': 'Error percentage in ' + LAB_NAMES[labId] });
     const start = el('button', { class: 'go', text: 'Start load' });
     const stop = el('button', { class: 'alt', text: 'Stop load' });
     const status = el('p', { class: 'meta', style: 'color:var(--muted);font-size:.88rem;margin:.5rem 0 0', role: 'status' });
@@ -686,7 +697,7 @@
         return;
       }
       status.textContent = load.running
-        ? 'Running at ' + load.rps + ' requests/s with ' + load.error_pct + '% errors. Sent ' + load.sent + '. Please stop it when you finish.'
+        ? 'Running at ' + load.rps + ' requests/s' + (hasErrors ? ' with ' + load.error_pct + '% errors' : '') + '. Sent ' + load.sent + '. Please stop it when you finish.'
         : 'Stopped.';
     };
     const update = () => {
@@ -716,9 +727,43 @@
       el('h4', { text: 'Background traffic in ' + LAB_NAMES[labId] }),
       el('div', { class: 'row' },
         el('label', { style: 'font-size:.9rem' }, 'Requests/s ', rps),
-        el('label', { style: 'font-size:.9rem' }, 'Error % ', pct),
+        hasErrors ? el('label', { style: 'font-size:.9rem' }, 'Error % ', pct) : null,
         start, stop),
       status);
+  }
+
+  /* ---------- alerts received by Lab 4's sink ---------- */
+
+  function renderAlertFeed(host) {
+    host.classList.add('panel');
+    const status = el('p', { class: 'meta', style: 'color:var(--muted);font-size:.88rem;margin:.25rem 0 .5rem', role: 'status' });
+    const box = el('div', { class: 'table-scroll' });
+    const show = (alerts) => {
+      box.textContent = '';
+      status.textContent = alerts.length
+        ? 'Refreshes every 5 seconds. Times are UTC. Showing the newest ' + Math.min(alerts.length, 12) + ' of ' + alerts.length + '.'
+        : 'Nothing received yet. Refreshes every 5 seconds.';
+      if (!alerts.length) return;
+      box.append(el('table', {},
+        el('thead', {}, el('tr', {}, ['Received', 'Status', 'Alert', 'Detail'].map((name) => el('th', { text: name })))),
+        el('tbody', {}, alerts.slice(0, 12).map((alert) => el('tr', {},
+          el('td', { text: alert.received }),
+          el('td', { text: alert.status }),
+          el('td', { text: alert.labels.alertname || '' }),
+          el('td', { text: alert.annotations.description || '' }))))));
+    };
+    const refresh = async () => {
+      try {
+        const { status: code, body } = await getJSON('/live/alerts');
+        if (code === 200 && Array.isArray(body)) show(body);
+        else status.textContent = 'Lab 4 is not running. Start it with: make lab4';
+      } catch (error) {
+        status.textContent = 'Lab 4 is not running. Start it with: make lab4';
+      }
+    };
+    host.append(el('h4', { text: 'Alerts received' }), status, box);
+    refresh();
+    setInterval(refresh, 5000);
   }
 
   /* ---------- query cards ---------- */
@@ -1138,6 +1183,7 @@
   document.querySelectorAll('[data-evidence]').forEach(renderEvidence);
   document.querySelectorAll('[data-fire]').forEach(renderFire);
   document.querySelectorAll('[data-load-panel]').forEach(renderLoad);
+  document.querySelectorAll('[data-alert-feed]').forEach(renderAlertFeed);
   document.querySelectorAll('[data-query]').forEach(renderQuery);
   document.querySelectorAll('[data-query-index]').forEach(renderQueryIndex);
   document.querySelectorAll('[data-ch]').forEach(renderClickHouse);

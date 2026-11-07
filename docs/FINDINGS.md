@@ -172,11 +172,11 @@ A fresh install has 0 dashboards, 0 alert rules, 0 notification channels, 0 log 
 - **Dashboards:** [SigNoz/dashboards](https://github.com/SigNoz/dashboards) has 121 folders and was
   updated 2026-10-23. Most relevant here: `apm/` (APM, DB calls, HTTP API), `k8s-infra-metrics/`
   (cluster, nodes, pods, PVCs, events), `postgresql/`, `hostmetrics/`, `opentelemetry-collector/`,
-  `signoz-ingestion-analysis/`. None were imported, so whether they suit this data is **Untested**.
+  `signoz-ingestion-analysis/`. Lab 3 imports four Kubernetes ones. The others are **Untested** here.
 - **Built-in integrations:** 8 are available, none installed: PostgreSQL, Redis, Mongo, Nginx,
   ClickHouse and 3 AWS ones.
 - **Alerts:** that repo contains no alert definitions. I did not find a ready-made alert pack, but
-  that search was limited. Expect to write your own rules.
+  that search was limited. Expect to write your own rules, as Lab 4 does.
 
 ### 6. Smaller issues
 
@@ -337,25 +337,128 @@ Same load each time. All setups listed `backend` in every last-60-seconds check.
 
 ## Kubernetes coverage
 
-What `k8s-infra` collects with its defaults, checked in this lab on 2026-11-07:
+Checked in this lab on 2026-11-07, on k3s 1.26.4, by causing each failure in Lab 3:
 
-| Signal | Collected? | Where |
+| Signal | With `k8s-infra` defaults | With Lab 3's scrape jobs |
 |---|---|---|
-| Pod CPU and memory | Yes | `k8s.pod.cpu.usage`, `k8s.pod.memory.working_set` |
-| Usage against requests | Yes | `k8s.pod.memory_request_utilization`, `k8s.pod.cpu_request_utilization` |
-| Usage against limits | Only for pods with limits | `k8s.pod.memory_limit_utilization` |
-| CPU throttling | **No** | Needs cAdvisor metrics from the kubelet |
-| Container restarts and readiness | Yes | `k8s.container.restarts`, `k8s.container.ready` |
-| Probe failures | Yes, as events | `Unhealthy` Kubernetes events |
-| OOM kills | Probably, **untested** | `k8s.container.status.reason`, `k8s.container.restarts` |
-| Node CPU, memory and disk | Yes, both nodes | `k8s.node.*`, `system.*` |
-| Node conditions | Yes | `k8s.node.condition_ready`, and the memory, disk and PID pressure metrics |
-| The kubelet's own health | **No** | Needs a scrape of the kubelet's `/metrics` |
-| containerd and node services | **No** | Needs extra receivers, and k3d nodes have no systemd |
+| Pod CPU and memory | `k8s.pod.cpu.usage`, `k8s.pod.memory.working_set` | |
+| Usage against limits | `k8s.container.cpu_limit_utilization`, `k8s.container.memory_limit_utilization` | |
+| Restarts, and why | `k8s.container.restarts` by `k8s.container.status.last_terminated_reason` | |
+| Why a pod was killed | Kubernetes events, stored as logs | |
+| Node CPU, memory and disk | `k8s.node.*` | |
+| Node conditions | `k8s.node.condition_ready`, and memory, disk and PID pressure | |
+| CPU throttling | **No** | `container_cpu_cfs_throttled_periods_total` |
+| Probe results | Only as events | `prober_probe_total` |
+| The kubelet's own health | **No** | `kubelet_*` |
+| The API server | **No** | `apiserver_*` |
+| containerd and node services | **No** | **No.** k3d nodes have no systemd. `kubelet_runtime_operations_errors_total` is the closest signal |
 
-The lab's apps set no CPU or memory limits, and only readiness probes, so throttling, OOM kills and
-liveness failures can't happen here yet. On k3d, `system.*` metrics describe the Docker VM both nodes
-share, so they aren't truly per node. The lab has no dashboard for any of this yet.
+On k3d, `system.*` metrics describe the Docker VM both nodes share, so they aren't truly per node.
+
+### What each failure really showed
+
+**Average CPU hides throttling.** At 2 requests/s, `k8s.container.cpu_limit_utilization` read about
+0.23 while 19 to 32% of CPU periods were throttled. A 200m limit allows 20 ms per 100 ms period, and
+one request needs about that much.
+
+**Throttling can get a healthy pod killed.** The same burn gave two outcomes:
+
+| Load | P50 before | P50 during | Slowest | Outcome |
+|---|---|---|---|---|
+| 2 requests/s | About 45 ms | About 330 ms | 1 s | Survived, no restart |
+| 5 requests/s | About 40 ms | 12.2 s | 18.8 s | Killed by liveness after 24 seconds |
+
+At 5 requests/s a queue built up and `/healthz` passed its 3-second timeout. Kubernetes recorded the
+exit as `Completed`, so only the events show why.
+
+**Most signals missed a real OOM kill:**
+
+| Signal | Showed |
+|---|---|
+| `container_oom_events_total` | 0, in SigNoz and straight from cAdvisor |
+| `k8s.container.status.reason` | 0 for `OOMKilled`. It's the current state, and the container was running again |
+| Kubernetes events | A generic `BackOff`, with no mention of memory |
+| `k8s.container.memory_limit_utilization` | Peaked at 0.863 |
+| `k8s.pod.memory.working_set` | Climbed to 224 MiB: an early warning, not proof |
+| `k8s.container.restarts` by `last_terminated_reason` | **`OOMKilled`**, the one that works |
+
+The likely reason for the first is that the counter belongs to the cgroup the kill destroys. The app's
+last log arrived 2 seconds before the kill, and it reported nothing else. The caller did: the load
+generator recorded 38 failed calls.
+
+**`k8s.container.memory_limit_utilization` misleads both ways.** It counts page cache and is sampled
+every 30 seconds:
+
+| Moment | Share of limit | Working set | RSS | In danger? |
+|---|---|---|---|---|
+| Just before the OOM kill | 0.863 | 224 MiB | 215 MiB | Yes |
+| Writing a file in the `disk` scenario | 0.995 | 61 MiB | 51 MiB | No |
+
+The lab's dashboard therefore charts working set.
+
+**A failure counter can read 0 during a failure.** `prober_probe_total{result="failed"}` doesn't exist
+until the first failure, so it first appears at 3. With no earlier value, `rate` and `increase` read 0
+while `latest` reads 3. The alert uses the Kubernetes event instead.
+
+**`apiserver_request_total` doesn't count requests refused at authorization.** 549 requests got a
+403, and no `code="403"` series existed, in SigNoz or straight from the API server. Client spans
+(`response_status_code = '403'`) found all 549. That's measured on k3s 1.26.4, and newer versions are
+**Untested**.
+
+**The API server can't say who's calling.** `apiserver_request_total` has no client or user label. An
+app's own client spans can, for that app. Otherwise you need the audit log, which is off by default.
+
+**Disk shows on the node, not the pod.** Writing 512 MiB to an `emptyDir` raised
+`k8s.node.filesystem.usage` by about 467 MiB, on both nodes, because k3d nodes share a disk.
+`k8s.pod.filesystem.usage` didn't move.
+
+### The dashboards
+
+All four community dashboards imported unchanged. Their Pod dashboard's namespace selector defaulted
+to `default`, which has no pods, so every panel read "No data in this time range" until `lab3` was
+selected.
+
+## Alerts
+
+Tested 2026-11-07. Lab 4's eight rules each ran against the real failure, on k3d. Times are from
+causing the failure to the notification arriving at the sink.
+
+| Rule | Signal | Failure to notification | Failure ended to resolved |
+|---|---|---|---|
+| Lab 1: error logs | Logs | 3m 22s | 12m 32s |
+| Lab 3: killed by a liveness probe | Logs (Kubernetes event) | 3m 42s | 8m 42s |
+| Lab 3: CPU throttled | Metrics, formula | 3m 57s | 6m 27s |
+| Lab 1: slow database queries | Traces | 4m 01s | 8m 59s |
+| Lab 3: API calls denied | Traces | 4m 03s | 8m 03s |
+| Lab 3: container OOM killed | Metrics | About 4m 13s | Stays firing until the pod is replaced |
+| Lab 1: error rate above 20% | Traces, formula | 4m 36s | 7m 06s |
+| Lab 3: telemetry stopped | Absent metric | 6m 11s | 5m 53s |
+
+**Where the time goes,** from SigNoz v0.149.0's source and the rule history:
+
+- **`ruler.eval_delay`, 2 minutes.** Rules look at data that's 2 minutes old, so late data can land.
+- **Evaluation every minute.** Rules entered `firing` 3 to 3.5 minutes after the failure.
+- **`group_wait`, 30 seconds.** The notification followed 30 to 60 seconds later.
+- **`group_interval`, 5 minutes.** Resolved notifications arrive on a 5-minute tick after the alert's
+  last notification: 19:43:51 to 19:48:51, 19:47:12 to 19:52:12, 19:49:49 to 19:54:49.
+
+**First choices that sounded right, and were wrong:**
+
+| Choice | Problem | Fix |
+|---|---|---|
+| OOM alert on `container_oom_events_total` | Would never fire: it reads 0 | Restarts by `last_terminated_reason` |
+| Liveness alert on the rate of `prober_probe_total` | Reads 0 for a pod's first failures | The Kubernetes event |
+| 403s from `apiserver_request_total` | Would never fire: no such series | Client spans |
+| Throttling above 25% | This pod's normal is 19 to 32%, so it never resolved | 50% |
+| Error rate above 5%, P95 above 1 second | Always firing under the default load | 20%, and the slowest SQL call |
+| Absent data with a 5-minute window | The window must empty first, so it needed about 9 minutes of silence | A 1-minute window |
+
+**Absent-data alerts are renamed.** The rule `Lab 3: telemetry stopped` arrives as
+`[No data] Lab 3: telemetry stopped`, with `nodata: true`. Anything that routes or filters by alert
+name has to allow for that. A test that matched the exact name reported that this alert never fired.
+
+**`eval_window` in SigNoz's log is misleading.** It logs 300000 for every rule, because that's a legacy
+field that defaults to 5 minutes. The query uses `evaluation.spec.evalWindow`, as the timings confirm.
 
 ## Resource use
 
@@ -373,6 +476,31 @@ Measured 2026-11-07 with both labs running on k3d, after the tuning below:
 - **The Docker VM costs more than the pods,** because of virtualization.
 - **Other projects share that VM.** Containers from other work on the same machine were using up to
   a whole core during these tests, so the VM figures are approximate.
+
+### What Lab 3 adds
+
+| | Before Lab 3 | With Lab 3 |
+|---|---|---|
+| Samples a minute, all of SigNoz | 32,636 | 51,493 |
+| ClickHouse CPU, idle | 0.12 to 0.17 core | 0.12 to 0.17 core |
+| ClickHouse memory | 2.6 GiB | 3.1 GiB |
+| Cluster collector memory | 67 MiB | About 220 MiB |
+| All pods, memory | 4.3 GiB | 5.2 GiB |
+
+- **The scrape jobs add about 6,000 series.** The sample count also includes Lab 3's own two pods.
+- **The endpoints are far bigger than what's kept.** The API server exposes 32,461 series. On k3s the
+  server node's kubelet returns almost the same 32,429, because k3s runs everything in one process
+  with one metrics registry. The collector reads about 73,000 lines every 30 seconds, which is why its
+  memory rose.
+- **The keep-list was measured, not guessed.** A shorter one left community dashboard panels empty.
+  Filling them added 17% more samples (43,848 to 51,493) with no measurable change in ClickHouse CPU
+  or memory, so the lab keeps them. `apiserver_request_sli_duration_seconds` is the biggest item, at
+  about 4,250 series.
+- **`presets.prometheus.enabled` scrapes more than you asked for.** It also started scraping SigNoz's
+  own pods, adding 5,239 series, more than double the jobs at the time. Lab 3 limits that job to
+  `lab3`, which turns it off.
+- **The cause of ClickHouse's memory rise isn't isolated.** It could be new data, or caching from
+  opening dashboards.
 
 ### Reducing ClickHouse's own load
 
@@ -403,14 +531,14 @@ Two changes, both in `signoz/signoz-values.yaml`:
 
 ## Next steps
 
-Suggested order. Nothing here has been applied.
+Suggested order. Nothing here has been applied. Alerts and Kubernetes dashboards were on this list,
+and are now Labs 3 and 4.
 
 1. Remove the noisy ASGI spans. This saves more than half of stored spans and loses nothing.
 2. Try trace-ID load balancing, to restore map accuracy with two collectors.
 3. Add `memory_limiter`, and send the collectors' own metrics to SigNoz.
 4. Remove duplicate logs (gap 4).
-5. Import dashboards from `apm/`, `k8s-infra-metrics/` and `postgresql/`.
-6. Write alerts, for example error rate, P99 latency and pod CPU, plus a notification channel.
-7. Decide how far HA should go: ClickHouse, ZooKeeper, Postgres and the control plane.
+5. Import dashboards from `apm/` and `postgresql/`. Lab 3 already imports the Kubernetes ones.
+6. Decide how far HA should go: ClickHouse, ZooKeeper, Postgres and the control plane.
 
 `BENCHMARK.md` explains this order, and why sampling is not on the list yet.

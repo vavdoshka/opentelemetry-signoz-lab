@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A failing health check | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="liveness">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 3: incident 3 of 5</p>
+<h1>A failing health check</h1>
+<p class="lead">Kubernetes restarts a working app because its health check says so. This incident shows where that decision is recorded, and why the obvious chart reads zero.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#evidence">4. Evidence</a></li><li><a href="#cause">5. Root cause</a></li><li><a href="#fix">6. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p><code>liveness</code> makes <code>/healthz</code> return 503 from now on. Nothing else about the app changes: it still serves requests.</p>
+<div data-fire="liveness" data-lab="lab3" data-hint="The container restarts about 15 seconds later."></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>A working app restarts. Requests fail briefly, then everything looks fine again. The restart count goes up by one.</p>
+
+<h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
+<ol>
+  <li><strong>Lab 3: pod failures</strong>, the <strong>Failed probes</strong> and <strong>Container restarts</strong> panels.</li>
+  <li>The Kubernetes events, which give the actual reason:</li>
+</ol>
+<figure class="code"><pre><code>attribute.k8s.namespace.name = 'lab3' AND k8s.event.reason = 'Killing'</code></pre></figure>
+<p>That search also finds ordinary rollouts, which say <code>Stopping container</code>. To see only health check failures, add <code>AND body CONTAINS 'failed liveness probe'</code>.</p>
+
+<h2 class="step" id="evidence"><span class="n">4</span>Evidence</h2>
+<p>The events from this run, in order:</p>
+<figure class="code"><pre><code>Warning  Liveness probe failed: HTTP probe failed with statuscode: 503
+Warning  Readiness probe failed: HTTP probe failed with statuscode: 503
+Normal   Container workload failed liveness probe, will be restarted</code></pre></figure>
+
+<h3>The counter trap</h3>
+<p><code>prober_probe_total</code> counts probe results, so the natural chart is its rate of failures. During the first restart, that chart read <strong>0</strong>, even though the kubelet had counted 3 failures:</p>
+<table>
+  <thead><tr><th>Query on failed Liveness probes</th><th>Result</th></tr></thead>
+  <tbody><tr><td><code>increase</code> or <code>rate</code></td><td><strong>0</strong></td></tr><tr><td><code>latest</code></td><td><strong>3</strong></td></tr><tr><td>Straight from the kubelet</td><td>3</td></tr></tbody>
+</table>
+<p>A <code>result="failed"</code> series doesn't exist until the first failure. Its first value is already 3, and with no earlier value to compare, the increase is 0. Later failures count, but a pod's first ones don't. That's the failure you most want to see, so the dashboard shows a running total and the alert uses the event.</p>
+<div class="note"><p>This isn't specific to SigNoz. Any counter that appears for the first time already above zero behaves this way.</p></div>
+
+<h2 class="step" id="cause"><span class="n">5</span>Root cause</h2>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s/app.yaml</code> lines 47–48</span></figcaption><pre><code><span class="ln">47</span>          # Three failures 5 seconds apart, and the kubelet restarts the container.
+<span class="ln">48</span>          livenessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5, timeoutSeconds: 3, failureThreshold: 3 }</code></pre></figure>
+<p>Three failures, 5 seconds apart, is about 15 seconds. The kubelet doesn't know why the probe failed. It only knows the rule you gave it.</p>
+
+<h2 class="step" id="fix"><span class="n">6</span>Resolution</h2>
+<ul>
+  <li><strong>Check only what a restart can fix.</strong> Don't make liveness depend on a database or another service. If that's down, restarting this pod won't help, and every replica fails at once.</li>
+  <li><strong>Use readiness for "not right now".</strong> A failed readiness probe stops traffic without killing anything.</li>
+  <li><strong>Use a startup probe for slow starts,</strong> as this workload does, so liveness doesn't kill an app that's still starting.</li>
+</ul>
+
+<div class="quiz" data-quiz="l1"><p class="q">Check yourself: Why did the rate of failed liveness probes read 0 during a real failure?</p><button type="button" data-right="false" data-why="The kubelet counted 3 failures.">The probes didn&#x27;t fail.</button><button type="button" data-right="true" data-why="A rate needs two samples. Use latest, or the Kubernetes event.">The series first appeared at 3, so there was no earlier value to compare.</button><button type="button" data-right="false" data-why="It does. This happens with any counter that first appears above zero.">SigNoz doesn&#x27;t support rates.</button></div>
+<div class="quiz" data-quiz="l2"><p class="q">Check yourself: Your liveness probe checks the database, and the database goes down. What happens?</p><button type="button" data-right="false" data-why="Every replica fails the same check.">Only the pods that use it most restart.</button><button type="button" data-right="true" data-why="Restarting can&#x27;t fix a database. Check dependencies with readiness instead, if at all.">Every replica restarts, and none of that helps.</button><button type="button" data-right="false" data-why="A probe does whatever your endpoint does.">Nothing, because probes ignore dependencies.</button></div>
+
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

@@ -24,6 +24,9 @@ the HTML files directly, because the pages load their saved examples through it.
 | `incident-error.html`, `-latency`, `-cross-service`, `-slow-sql`, `-timeout`, `-cpu` | Lab 1: six incidents, solved with no code |
 | `instrumentation.html` | Lab 2: the whole difference from Lab 1, quoted with file and line numbers |
 | `incident-slow-item.html`, `-free-orders`, `-cache-miss`, `-trace-id` | Lab 2: four incidents, each shown in both labs |
+| `lab3.html` | Lab 3: what Kubernetes tells you, and the extra scrape jobs |
+| `incident-throttling.html`, `-oom`, `-liveness`, `-node`, `-apiserver` | Lab 3: five failures at the pod, node and API server level |
+| `lab4.html` | Lab 4: alert rules, each proved against a real failure |
 | `queries.html` | Working searches for traces, logs and metrics, labelled by lab, plus ClickHouse SQL |
 | `gaps.html` | What a plain install leaves out, and possible fixes |
 
@@ -32,7 +35,8 @@ the HTML files directly, because the pages load their saved examples through it.
 The app sends no CORS headers and SigNoz needs a login, so `server.py` sits between the pages and
 the lab. The bridge is narrow:
 
-- It runs the known scenarios on either lab, and controls each lab's load generator.
+- It runs the known scenarios on any lab, controls each lab's load generator, and reads the alerts
+  Lab 4 received.
 - It runs read-only searches: the saved catalogue in `data/queries.json`, a lookup of one trace by
   ID, and a fixed search for the trace of a scenario it has just fired.
 - It reads `.lab-credentials` when it starts a session. The password stays in the server and is

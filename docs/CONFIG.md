@@ -65,8 +65,7 @@ There is no SDK setup, and its manifest has no OpenTelemetry settings. The code 
 `labs/lab2-custom-dimensions/app/` uses only the OpenTelemetry API. Its requirements add
 `opentelemetry-api`, and API calls do nothing if the agent isn't there.
 
-`labs/lab2-custom-dimensions/dashboard.json` is the SigNoz dashboard `make lab2` creates. It is the
-only dashboard in the lab.
+`labs/lab2-custom-dimensions/dashboard.json` is the SigNoz dashboard `make lab2` creates.
 
 ### High availability
 
@@ -81,6 +80,50 @@ All in `labs/lab2-custom-dimensions/k8s/app.yaml`. Lab 1 runs one replica of eac
 | Separate `loadgen` Deployment, `LOADGEN_TARGET` env var, Ingress path `/api/load` | Its state is in-process, so it can't sit behind two replicas. One replica, so it is not HA |
 
 Postgres stays at one replica with no persistent volume, so test orders are lost on restart.
+
+## Lab 3: Kubernetes
+
+The workload in `labs/lab3-kubernetes/app/` has no OpenTelemetry code, and uses the same injection as
+Lab 1. `k8s/app.yaml` sets what Labs 1 and 2 don't, because these give Kubernetes a reason to act:
+
+| What | Why |
+|---|---|
+| `limits: { cpu: 200m, memory: 256Mi }` | CPU above the limit is throttled, and memory above it is an OOM kill |
+| `livenessProbe`, 5-second period, 3-second timeout, 3 failures | Lets the kubelet restart the container |
+| `startupProbe` | Start-up is slow under a CPU limit. Holds off liveness until the app is up |
+| `emptyDir` with `sizeLimit: 1Gi` | Puts the `disk` scenario's file on the node's disk, with a cap |
+| `Role` allowing `list pods` in `lab3` | Only used by the `api_flood` and `api_denied` scenarios |
+| Separate `lab3-loadgen` Deployment | Load keeps coming while the workload restarts |
+
+`labs/lab3-kubernetes/k8s-infra-values.yaml` adds four scrape jobs to the `k8s-infra` cluster
+collector, and `k8s/metrics-rbac.yaml` gives that collector permission to read them:
+
+| Job | Endpoint | What it adds |
+|---|---|---|
+| `kubelet` | each node's `:10250/metrics` | kubelet health, and its view of the container runtime |
+| `cadvisor` | each node's `:10250/metrics/cadvisor` | CPU throttling |
+| `kubelet-probes` | each node's `:10250/metrics/probes` | Every probe result |
+| `apiserver` | the API server's `/metrics` | Requests, latency and storage objects |
+
+- **Each job has a keep-list,** because SigNoz stores everything it's sent. See `FINDINGS.md`.
+- **`presets.prometheus.namespaces: [lab3]` matters.** `presets.prometheus.enabled` also turns on an
+  annotation job that scrapes SigNoz's own pods. Limiting it to `lab3` turns it off.
+- **`make up` keeps these jobs.** `install_k8s_infra` in `scripts/lib.sh` adds this values file when
+  namespace `lab3` exists. Without that, rerunning `make up` would remove them with no error.
+- **Dashboards:** `make lab3` creates `labs/lab3-kubernetes/dashboard.json`, and imports four from
+  [SigNoz/dashboards](https://github.com/SigNoz/dashboards) (Apache-2.0), pinned to one commit in
+  `scripts/create_dashboard.py`.
+
+## Lab 4: alerts
+
+`labs/lab4-alerts/alerts.json` defines one notification channel and eight rules. `make lab4` applies
+it through `/api/v2/notification_channels` and `/api/v2/rules`, then sends a test notification and
+checks that it arrived. The file is the source of truth: rerunning updates rules, and removes any
+labelled `lab: lab4` that it no longer lists.
+
+`labs/lab4-alerts/app/sink.py` stands in for Slack or PagerDuty. It stores what SigNoz sends and
+shows it at `lab4.localhost:8080`. To use a real service, change the channel's `config` in
+`alerts.json`. SigNoz's OpenAPI file (`docs/api/openapi.yml` in its repo) has an example for each one.
 
 ## k8s-infra
 
@@ -106,7 +149,8 @@ The script marks `/` as shared inside each node container. It is lost when a nod
 
 The gap 2 and gap 3 fixes are applied. The other fixes in `FINDINGS.md` are not:
 
-- No community dashboards imported, and no alerts, channels or log pipelines created.
+- Labs 1 and 2 import no community dashboards and create no alerts. Labs 3 and 4 do, and no lab creates
+  log pipelines.
 - ASGI `send`/`receive` spans still exported.
 - Duplicate logs still present.
 - No trace-ID load balancing between agents and collectors.

@@ -10,9 +10,9 @@ It does two jobs:
      headers and SigNoz needs a login. The browser only ever talks to this
      server, and the SigNoz password never leaves it.
 
-The bridge is deliberately narrow. It can run the known scenarios on either
-lab, start and stop each lab's load generator, and run read-only searches. It
-cannot reach any other path on the apps or on SigNoz. Searches are limited to
+The bridge is deliberately narrow. It can run the known scenarios on any lab,
+start and stop each lab's load generator, read the alerts Lab 4 received, and
+run read-only searches. It cannot reach any other path on the apps or on SigNoz. Searches are limited to
 the saved catalogue in data/queries.json, a lookup of one trace by ID, and a
 fixed search for the trace of a scenario this bridge has just fired.
 
@@ -21,11 +21,11 @@ API returns no trace ID. The bridge sends scenarios with its own User-Agent, so
 it can tell its own request from load generator traffic on the same route.
 
 Each lab is checked on its own. `make up` deploys only Lab 1, so Lab 1 must keep
-working when Lab 2 is not there. If a lab is down, pages still load and show the
+working when the later labs are not there. If a lab is down, pages still load and show the
 saved examples.
 
 Optional environment variables: TUTORIAL_PORT, TUTORIAL_LAB1_URL,
-TUTORIAL_LAB2_URL, TUTORIAL_SIGNOZ_URL.
+TUTORIAL_LAB2_URL, TUTORIAL_LAB3_URL, TUTORIAL_LAB4_URL, TUTORIAL_SIGNOZ_URL.
 """
 
 import http.client
@@ -47,6 +47,7 @@ CREDENTIALS = HERE.parent / ".lab-credentials"
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("TUTORIAL_PORT", "8765"))
 SIGNOZ_URL = os.environ.get("TUTORIAL_SIGNOZ_URL", "http://signoz.localhost:8080").rstrip("/")
+ALERT_SINK_URL = os.environ.get("TUTORIAL_LAB4_URL", "http://lab4.localhost:8080").rstrip("/")
 
 LABS = {
     "lab1": {
@@ -61,10 +62,17 @@ LABS = {
         "frontend": "frontend",
         "start": "make lab2",
     },
+    "lab3": {
+        "name": "Lab 3",
+        "url": os.environ.get("TUTORIAL_LAB3_URL", "http://lab3.localhost:8080").rstrip("/"),
+        "frontend": "lab3-workload",
+        "start": "make lab3",
+    },
 }
 SCENARIOS = {
     "order", "list", "slow", "bad_input", "crash", "backend_500", "timeout",
     "slow_query", "db_error", "cpu_burn", "log_burst", "slow_item", "free_orders", "cache_miss",
+    "throttle", "oom", "liveness", "disk", "api_flood", "api_denied",
 }
 LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 MAX_BURN_SECONDS = 120
@@ -336,6 +344,8 @@ def clean_scenario_body(name, body):
             "count": max(1, min(int(body.get("count", 20)), 1000)),
             "level": level if level in LOG_LEVELS else "INFO",
         }
+    if name == "throttle":
+        return {"seconds": max(10, min(int(body.get("seconds", 120)), 300))}
     return {}
 
 
@@ -434,6 +444,11 @@ class Handler(BaseHTTPRequestHandler):
             if not signoz.available():
                 return self.send_json(503, {"error": ".lab-credentials not found"})
             return self.send_json(*find_trace(lab_id, parts[2], int(since)))
+        if method == "GET" and parts == ["alerts"]:
+            try:
+                return self.send_json(*http_call("GET", f"{ALERT_SINK_URL}/api/alerts", timeout=3))
+            except UNREACHABLE:
+                return self.send_json(503, {"error": "Lab 4 is not running. Start it with: make lab4"})
         if parts[:1] == ["load"] and len(parts) == 2 and method in ("GET", "POST", "DELETE"):
             if lab_id not in LABS:
                 return self.send_json(404, {"error": "unknown lab"})

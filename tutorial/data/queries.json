@@ -7171,6 +7171,918 @@
     "end": "2026-11-07T11:21:03Z"
    },
    "verified": "api"
+  },
+  {
+   "id": "m-lab3-throttled",
+   "group": "Lab 3: metrics",
+   "lab": "lab3",
+   "signal": "metrics",
+   "title": "CPU periods throttled",
+   "why": "From cAdvisor, through Lab 3's scrape job. Compare with container_cpu_cfs_periods_total to get a percentage.",
+   "expr": "namespace = 'lab3'",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "pod"
+   ],
+   "metric": {
+    "metricName": "container_cpu_cfs_throttled_periods_total",
+    "timeAggregation": "rate",
+    "spaceAggregation": "sum"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "time_series",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "container_cpu_cfs_throttled_periods_total",
+      "timeAggregation": "rate",
+      "spaceAggregation": "sum"
+     }
+    ],
+    "stepInterval": 60,
+    "filter": {
+     "expression": "namespace = 'lab3'"
+    },
+    "groupBy": [
+     {
+      "name": "pod"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "pod": "lab3-workload-698fc4b87d-lxn4x"
+      },
+      "points": 22,
+      "last": 0,
+      "peak": 11.133,
+      "peak_at": "19:19 UTC"
+     },
+     {
+      "labels": {
+       "pod": "lab3-workload-6b8f4846ff-sh58d"
+      },
+      "points": 15,
+      "last": 1.717,
+      "peak": 10,
+      "peak_at": "19:40 UTC"
+     },
+     {
+      "labels": {
+       "pod": "lab3-workload-6bb99664b7-5rkcz"
+      },
+      "points": 2,
+      "last": 0.0333,
+      "peak": 0.0333,
+      "peak_at": "19:11 UTC"
+     },
+     {
+      "labels": {
+       "pod": "lab3-workload-6b8f4846ff-q4pq7"
+      },
+      "points": 4,
+      "last": 0.0167,
+      "peak": 0.0167,
+      "peak_at": "19:55 UTC"
+     }
+    ],
+    "total_series": 4,
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-07T19:10:00Z",
+    "end": "2026-11-07T19:59:30Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-lab3-restarts",
+   "group": "Lab 3: metrics",
+   "lab": "lab3",
+   "signal": "metrics",
+   "title": "Restarts, by why the container last exited",
+   "why": "The signal that really shows an OOM kill. Comes with k8s-infra.",
+   "expr": "k8s.namespace.name = 'lab3'",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "k8s.container.status.last_terminated_reason"
+   ],
+   "metric": {
+    "metricName": "k8s.container.restarts",
+    "timeAggregation": "latest",
+    "spaceAggregation": "max"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "time_series",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "k8s.container.restarts",
+      "timeAggregation": "latest",
+      "spaceAggregation": "max"
+     }
+    ],
+    "stepInterval": 60,
+    "filter": {
+     "expression": "k8s.namespace.name = 'lab3'"
+    },
+    "groupBy": [
+     {
+      "name": "k8s.container.status.last_terminated_reason"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "k8s.container.status.last_terminated_reason": "OOMKilled"
+      },
+      "points": 12,
+      "last": 2,
+      "peak": 3,
+      "peak_at": "19:24 UTC"
+     },
+     {
+      "labels": {
+       "k8s.container.status.last_terminated_reason": "Completed"
+      },
+      "points": 16,
+      "last": 1,
+      "peak": 2,
+      "peak_at": "19:21 UTC"
+     },
+     {
+      "labels": {
+       "k8s.container.status.last_terminated_reason": ""
+      },
+      "points": 49,
+      "last": 0,
+      "peak": 0,
+      "peak_at": "19:10 UTC"
+     }
+    ],
+    "total_series": 3,
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-07T19:10:00Z",
+    "end": "2026-11-07T19:59:30Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-lab3-memory",
+   "group": "Lab 3: metrics",
+   "lab": "lab3",
+   "signal": "metrics",
+   "title": "Memory used, as a share of the limit",
+   "why": "Sampled every 30 seconds, so it rarely shows 1, even just before a kill.",
+   "expr": "k8s.namespace.name = 'lab3'",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "k8s.pod.name"
+   ],
+   "metric": {
+    "metricName": "k8s.container.memory_limit_utilization",
+    "timeAggregation": "max",
+    "spaceAggregation": "max"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "time_series",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "k8s.container.memory_limit_utilization",
+      "timeAggregation": "max",
+      "spaceAggregation": "max"
+     }
+    ],
+    "stepInterval": 60,
+    "filter": {
+     "expression": "k8s.namespace.name = 'lab3'"
+    },
+    "groupBy": [
+     {
+      "name": "k8s.pod.name"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "k8s.pod.name": "lab3-workload-698fc4b87d-lxn4x"
+      },
+      "points": 22,
+      "last": 0.215,
+      "peak": 0.995,
+      "peak_at": "19:26 UTC"
+     },
+     {
+      "labels": {
+       "k8s.pod.name": "lab3-workload-6b8f4846ff-sh58d"
+      },
+      "points": 17,
+      "last": 0.229,
+      "peak": 0.914,
+      "peak_at": "19:49 UTC"
+     },
+     {
+      "labels": {
+       "k8s.pod.name": "lab3-workload-6bb99664b7-5rkcz"
+      },
+      "points": 2,
+      "last": 0.234,
+      "peak": 0.234,
+      "peak_at": "19:11 UTC"
+     },
+     {
+      "labels": {
+       "k8s.pod.name": "lab3-workload-6b8f4846ff-q4pq7"
+      },
+      "points": 4,
+      "last": 0.221,
+      "peak": 0.221,
+      "peak_at": "19:55 UTC"
+     }
+    ],
+    "total_series": 4,
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-07T19:10:00Z",
+    "end": "2026-11-07T19:59:30Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-lab3-probes",
+   "group": "Lab 3: metrics",
+   "lab": "lab3",
+   "signal": "metrics",
+   "title": "Failed probes, running total",
+   "why": "Uses latest, not rate. A counter that first appears above zero has nothing to compare with, so its rate reads 0.",
+   "expr": "namespace = 'lab3' AND result = 'failed'",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "probe_type"
+   ],
+   "metric": {
+    "metricName": "prober_probe_total",
+    "timeAggregation": "latest",
+    "spaceAggregation": "sum"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "time_series",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "prober_probe_total",
+      "timeAggregation": "latest",
+      "spaceAggregation": "sum"
+     }
+    ],
+    "stepInterval": 60,
+    "filter": {
+     "expression": "namespace = 'lab3' AND result = 'failed'"
+    },
+    "groupBy": [
+     {
+      "name": "probe_type"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "probe_type": "Readiness"
+      },
+      "points": 32,
+      "last": 0,
+      "peak": 15,
+      "peak_at": "19:26 UTC"
+     },
+     {
+      "labels": {
+       "probe_type": "Liveness"
+      },
+      "points": 29,
+      "last": 0,
+      "peak": 7,
+      "peak_at": "19:26 UTC"
+     },
+     {
+      "labels": {
+       "probe_type": "Startup"
+      },
+      "points": 32,
+      "last": 1,
+      "peak": 2,
+      "peak_at": "19:11 UTC"
+     }
+    ],
+    "total_series": 3,
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-07T19:10:00Z",
+    "end": "2026-11-07T19:59:30Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-lab3-node-disk",
+   "group": "Lab 3: metrics",
+   "lab": "lab3",
+   "signal": "metrics",
+   "title": "Disk used on each node",
+   "why": "In bytes. On k3d both nodes share a disk, so they move together.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "k8s.node.name"
+   ],
+   "metric": {
+    "metricName": "k8s.node.filesystem.usage",
+    "timeAggregation": "latest",
+    "spaceAggregation": "max"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "time_series",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "k8s.node.filesystem.usage",
+      "timeAggregation": "latest",
+      "spaceAggregation": "max"
+     }
+    ],
+    "stepInterval": 60,
+    "filter": {
+     "expression": ""
+    },
+    "groupBy": [
+     {
+      "name": "k8s.node.name"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "k8s.node.name": "k3d-signoz-lab-server-0"
+      },
+      "points": 49,
+      "last": 103549612032,
+      "peak": 104205918208,
+      "peak_at": "19:27 UTC"
+     },
+     {
+      "labels": {
+       "k8s.node.name": "k3d-signoz-lab-agent-0"
+      },
+      "points": 49,
+      "last": 103557115904,
+      "peak": 104196382720,
+      "peak_at": "19:27 UTC"
+     }
+    ],
+    "total_series": 2,
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-07T19:10:00Z",
+    "end": "2026-11-07T19:59:30Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-lab3-api-verbs",
+   "group": "Lab 3: metrics",
+   "lab": "lab3",
+   "signal": "metrics",
+   "title": "API server requests by verb",
+   "why": "Has no client or user label, so it shows that something is busy, not who.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "verb"
+   ],
+   "metric": {
+    "metricName": "apiserver_request_total",
+    "timeAggregation": "rate",
+    "spaceAggregation": "sum"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "time_series",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "apiserver_request_total",
+      "timeAggregation": "rate",
+      "spaceAggregation": "sum"
+     }
+    ],
+    "stepInterval": 60,
+    "filter": {
+     "expression": ""
+    },
+    "groupBy": [
+     {
+      "name": "verb"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "verb": "LIST"
+      },
+      "points": 49,
+      "last": 0.05,
+      "peak": 9.933,
+      "peak_at": "19:28 UTC"
+     },
+     {
+      "labels": {
+       "verb": "GET"
+      },
+      "points": 49,
+      "last": 0.717,
+      "peak": 2.267,
+      "peak_at": "19:11 UTC"
+     },
+     {
+      "labels": {
+       "verb": "PUT"
+      },
+      "points": 49,
+      "last": 0.35,
+      "peak": 1.4,
+      "peak_at": "19:11 UTC"
+     },
+     {
+      "labels": {
+       "verb": "WATCH"
+      },
+      "points": 49,
+      "last": 0.55,
+      "peak": 1.083,
+      "peak_at": "19:11 UTC"
+     },
+     {
+      "labels": {
+       "verb": "POST"
+      },
+      "points": 49,
+      "last": 0.15,
+      "peak": 1.083,
+      "peak_at": "19:11 UTC"
+     },
+     {
+      "labels": {
+       "verb": "PATCH"
+      },
+      "points": 49,
+      "last": 0,
+      "peak": 0.333,
+      "peak_at": "19:11 UTC"
+     }
+    ],
+    "total_series": 7,
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-07T19:10:00Z",
+    "end": "2026-11-07T19:59:30Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-lab3-killing",
+   "group": "Lab 3: logs",
+   "lab": "lab3",
+   "signal": "logs",
+   "title": "Containers killed by Kubernetes",
+   "why": "A Kubernetes event, stored as a log. Without the attribute. prefix this matches nothing.",
+   "expr": "attribute.k8s.namespace.name = 'lab3' AND k8s.event.reason = 'Killing'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "attribute.k8s.namespace.name = 'lab3' AND k8s.event.reason = 'Killing'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-07T19:50:20Z",
+      "service": "",
+      "severity": "Normal",
+      "body": "Stopping container workload",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T19:50:17Z",
+      "service": "",
+      "severity": "Normal",
+      "body": "Stopping container workload",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T19:43:30Z",
+      "service": "",
+      "severity": "Normal",
+      "body": "Container workload failed liveness probe, will be restarted",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T19:34:05Z",
+      "service": "",
+      "severity": "Normal",
+      "body": "Stopping container workload",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T19:34:02Z",
+      "service": "",
+      "severity": "Normal",
+      "body": "Stopping container loadgen",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 5
+   },
+   "savedWindow": {
+    "start": "2026-11-07T19:10:00Z",
+    "end": "2026-11-07T19:59:30Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-lab3-liveness",
+   "group": "Lab 3: logs",
+   "lab": "lab3",
+   "signal": "logs",
+   "title": "Failed liveness probes",
+   "why": "The events behind a liveness restart.",
+   "expr": "attribute.k8s.namespace.name = 'lab3' AND body CONTAINS 'Liveness probe failed'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "attribute.k8s.namespace.name = 'lab3' AND body CONTAINS 'Liveness probe failed'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-07T19:43:30Z",
+      "service": "",
+      "severity": "Warning",
+      "body": "Liveness probe failed: HTTP probe failed with statuscode: 503",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T19:43:25Z",
+      "service": "",
+      "severity": "Warning",
+      "body": "Liveness probe failed: HTTP probe failed with statuscode: 503",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T19:43:20Z",
+      "service": "",
+      "severity": "Warning",
+      "body": "Liveness probe failed: HTTP probe failed with statuscode: 503",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T19:21:19Z",
+      "service": "",
+      "severity": "Warning",
+      "body": "Liveness probe failed: HTTP probe failed with statuscode: 503",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T19:14:37Z",
+      "service": "",
+      "severity": "Warning",
+      "body": "Liveness probe failed: Get \"http://10.42.0.103:8000/healthz\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 5
+   },
+   "savedWindow": {
+    "start": "2026-11-07T19:10:00Z",
+    "end": "2026-11-07T19:59:30Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-lab3-denied",
+   "group": "Lab 3: traces",
+   "lab": "lab3",
+   "signal": "traces",
+   "title": "API calls the API server refused",
+   "why": "apiserver_request_total doesn't count these on k3s 1.26, so the client's spans are the evidence.",
+   "expr": "service.name = 'lab3-workload' AND kind_string = 'Client' AND response_status_code = '403'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "service.name = 'lab3-workload' AND kind_string = 'Client' AND response_status_code = '403'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "service.name": "lab3-workload",
+      "name": "GET",
+      "duration_nano": 1086542,
+      "response_status_code": "403",
+      "has_error": true,
+      "trace_id": "fc3656ee703a90b219ab8cbdb67b5408",
+      "timestamp": "2026-11-07T19:46:46.807498803Z"
+     },
+     {
+      "service.name": "lab3-workload",
+      "name": "GET",
+      "duration_nano": 1126250,
+      "response_status_code": "403",
+      "has_error": true,
+      "trace_id": "fc7821b6ec653a05e59fa90861fb5650",
+      "timestamp": "2026-11-07T19:46:46.704450262Z"
+     },
+     {
+      "service.name": "lab3-workload",
+      "name": "GET",
+      "duration_nano": 1479000,
+      "response_status_code": "403",
+      "has_error": true,
+      "trace_id": "afc6197101702f029dcab1463249022f",
+      "timestamp": "2026-11-07T19:46:46.601556678Z"
+     },
+     {
+      "service.name": "lab3-workload",
+      "name": "GET",
+      "duration_nano": 1553000,
+      "response_status_code": "403",
+      "has_error": true,
+      "trace_id": "55878af6ec0eb68b21387aaca8eec71a",
+      "timestamp": "2026-11-07T19:46:46.497344678Z"
+     },
+     {
+      "service.name": "lab3-workload",
+      "name": "GET",
+      "duration_nano": 1981583,
+      "response_status_code": "403",
+      "has_error": true,
+      "trace_id": "d37198bf6dc1218141e8040d9efadfa3",
+      "timestamp": "2026-11-07T19:46:46.392799178Z"
+     }
+    ],
+    "warnings": [],
+    "matched": 5
+   },
+   "savedWindow": {
+    "start": "2026-11-07T19:10:00Z",
+    "end": "2026-11-07T19:59:30Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-lab3-loadgen-errors",
+   "group": "Lab 3: traces",
+   "lab": "lab3",
+   "signal": "traces",
+   "title": "Failed calls to a dying pod",
+   "why": "A killed pod can't report itself, but its callers can.",
+   "expr": "service.name = 'lab3-loadgen' AND has_error = true",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "service.name = 'lab3-loadgen' AND has_error = true"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "service.name": "lab3-loadgen",
+      "name": "GET",
+      "duration_nano": 5737750,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "7412820a96a967fe56e83fdb59489cb3",
+      "timestamp": "2026-11-07T19:49:15.009469011Z"
+     },
+     {
+      "service.name": "lab3-loadgen",
+      "name": "GET",
+      "duration_nano": 3862625,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "6a2ab4de4d2a97ee4e9dabe6ab74151f",
+      "timestamp": "2026-11-07T19:49:13.995938344Z"
+     },
+     {
+      "service.name": "lab3-loadgen",
+      "name": "GET",
+      "duration_nano": 4705584,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "3599bf033c0b73ca0f4e68a260577e5c",
+      "timestamp": "2026-11-07T19:49:13.494910843Z"
+     },
+     {
+      "service.name": "lab3-loadgen",
+      "name": "GET",
+      "duration_nano": 4384708,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "ae73872da83b90ac22f5034af5f1d60b",
+      "timestamp": "2026-11-07T19:49:12.992836968Z"
+     },
+     {
+      "service.name": "lab3-loadgen",
+      "name": "GET",
+      "duration_nano": 3958208,
+      "response_status_code": "",
+      "has_error": true,
+      "trace_id": "4b975b655b7eab90698c0dc3ecaf693d",
+      "timestamp": "2026-11-07T19:49:12.491824718Z"
+     }
+    ],
+    "warnings": [],
+    "matched": 5
+   },
+   "savedWindow": {
+    "start": "2026-11-07T19:10:00Z",
+    "end": "2026-11-07T19:59:30Z"
+   },
+   "verified": "api"
   }
  ]
 }

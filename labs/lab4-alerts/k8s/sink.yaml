@@ -1,0 +1,44 @@
+# Receives SigNoz's alerts. This namespace has no injection annotation, because
+# the sink isn't part of what's being monitored.
+apiVersion: v1
+kind: Namespace
+metadata: { name: lab4 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-sink
+  namespace: lab4
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: alert-sink } }
+  template:
+    metadata: { labels: { app: alert-sink } }
+    spec:
+      containers:
+        - name: alert-sink
+          image: telemetry-lab4:dev
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8000 }]
+          readinessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5 }
+          resources: { requests: { cpu: 10m, memory: 32Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: alert-sink, namespace: lab4 }
+spec:
+  selector: { app: alert-sink }
+  ports: [{ port: 8000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: { name: alert-sink, namespace: lab4 }
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: lab4.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: alert-sink, port: { number: 8000 } } }

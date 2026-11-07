@@ -1,0 +1,81 @@
+# Lab 3: added on top of signoz/k8s-infra-values.yaml by `make lab3`.
+#
+# k8s-infra's defaults use the kubelet's summary API, which has no throttling,
+# probe or kubelet health data. These jobs read that from the raw Prometheus
+# endpoints instead. They run in the one cluster collector, so nothing is
+# scraped twice. On a large cluster, move the kubelet jobs to the node agents.
+#
+# Every job has a keep-list. Those endpoints expose over 30,000 series here, and
+# SigNoz stores everything it is sent.
+presets:
+  prometheus:
+    enabled: true
+    # `enabled` also turns on a job that scrapes every pod annotated with
+    # signoz.io/scrape. SigNoz's own ClickHouse, ZooKeeper and collectors are, and
+    # that added 5,239 series, more than double the jobs below. No pod in lab3 has
+    # the annotation, so limiting that job to lab3 turns it off.
+    namespaces: [lab3]
+    scrapeConfigs:
+      # The kubelet's health, and its view of the container runtime.
+      - job_name: kubelet
+        scrape_interval: 30s
+        scheme: https
+        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
+        tls_config: { insecure_skip_verify: true }
+        kubernetes_sd_configs: [{ role: node }]
+        relabel_configs:
+          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            action: keep
+            regex: go_goroutines|kubelet_(running_pods|running_containers|started_pods_total|pleg_relist_duration_seconds_(sum|count)|pleg_last_seen_seconds|runtime_operations_total|runtime_operations_errors_total|runtime_operations_duration_seconds_(bucket|sum|count)|pod_start_duration_seconds_(bucket|sum|count)|evictions)|storage_operation_duration_seconds_(bucket|sum|count)
+
+      # cAdvisor, which is built into the kubelet: throttling and OOM events.
+      - job_name: cadvisor
+        scrape_interval: 30s
+        scheme: https
+        metrics_path: /metrics/cadvisor
+        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
+        tls_config: { insecure_skip_verify: true }
+        kubernetes_sd_configs: [{ role: node }]
+        relabel_configs:
+          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            action: keep
+            regex: container_cpu_cfs_(throttled_)?periods_total|container_cpu_cfs_throttled_seconds_total|container_oom_events_total
+          # An empty container label means the pod's cgroup or its pause container.
+          - { source_labels: [container], action: drop, regex: "" }
+          - { action: labeldrop, regex: id|image|name }
+
+      # Every probe result, by pod and probe type.
+      - job_name: kubelet-probes
+        scrape_interval: 30s
+        scheme: https
+        metrics_path: /metrics/probes
+        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
+        tls_config: { insecure_skip_verify: true }
+        kubernetes_sd_configs: [{ role: node }]
+        relabel_configs:
+          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
+        metric_relabel_configs:
+          - { source_labels: [__name__], action: keep, regex: prober_probe_total }
+
+      # The API server. This job is the same on any cluster that exposes it.
+      - job_name: apiserver
+        scrape_interval: 30s
+        scheme: https
+        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          server_name: kubernetes.default.svc
+        kubernetes_sd_configs:
+          - { role: endpoints, namespaces: { names: [default] } }
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: kubernetes;https
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            action: keep
+            regex: apiserver_request_total|apiserver_request_sli_duration_seconds_(bucket|sum|count)|apiserver_current_inflight_requests|apiserver_longrunning_requests|apiserver_storage_objects|workqueue_depth|process_cpu_seconds_total|process_resident_memory_bytes|go_goroutines

@@ -86,8 +86,8 @@
 <h2 id="setup">Gap 5: nothing is set up for you</h2>
 <p>A fresh install has 0 dashboards, 0 alert rules, 0 notification channels, 0 log pipelines and 0 saved views <span class="badge api">API</span>. You should plan to:</p>
 <ul>
-  <li><strong>Import dashboards.</strong> <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a> has folders such as <code>apm/</code>, <code>k8s-infra-metrics/</code> and <code>postgresql/</code>. None were imported, so whether they suit this data is <span class="badge untested">Untested</span>.</li>
-  <li><strong>Write alerts.</strong> That repo has no alert definitions. Good first rules from this tutorial: error rate from <code>signoz_calls_total</code>, P99 latency, pod CPU, and a separate 4xx rule.</li>
+  <li><strong>Import dashboards.</strong> <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a> has folders such as <code>apm/</code>, <code>k8s-infra-metrics/</code> and <code>postgresql/</code>. <a href="lab3.html">Lab 3</a> imports four Kubernetes ones. The others are <span class="badge untested">Untested</span> here.</li>
+  <li><strong>Write alerts.</strong> That repo has no alert definitions, so you write your own. <a href="lab4.html">Lab 4</a> has eight, each proved against a real failure.</li>
   <li><strong>Add a notification channel</strong>, or alerts will have nowhere to go.</li>
 </ul>
 

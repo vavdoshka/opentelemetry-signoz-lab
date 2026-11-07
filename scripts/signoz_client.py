@@ -9,6 +9,8 @@ from pathlib import Path
 
 CREDENTIALS = Path(__file__).resolve().parent.parent / ".lab-credentials"
 SIGNOZ_URL = "http://signoz.localhost:8080"
+LAB3_URL = "http://lab3.localhost:8080"
+LAB4_URL = "http://lab4.localhost:8080"
 LABS = {
     "1": {"url": "http://lab1.localhost:8080", "frontend": "lab1-frontend", "backend": "lab1-backend"},
     "2": {"url": "http://lab2.localhost:8080", "frontend": "frontend", "backend": "backend"},
@@ -106,6 +108,12 @@ def metric_exists(token, name, expression="", minutes=10):
 def fire(lab, scenario):
     """Runs a scenario. Returns the response status and body."""
     return request(f"{LABS[lab]['url']}/api/scenario/{scenario}", {}, timeout=30)
+
+
+def received_alerts():
+    """What Lab 4's sink has received, newest first."""
+    status, alerts = request(f"{LAB4_URL}/api/alerts")
+    return alerts if status == 200 else []
 
 
 def wait_for(description, check, timeout, interval=5):
