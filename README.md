@@ -112,8 +112,7 @@ symptoms. Lab 2 adds the dimensions that explain them.
 
 ## Tested on
 
-Both labs boot from nothing, `make up` is safe to rerun, and `make compare` gives the same results,
-on all of these:
+Both labs boot from nothing, and `make compare` gives the same results, on all of these:
 
 | Platform | Provider |
 |---|---|
@@ -122,8 +121,8 @@ on all of these:
 | Ubuntu, x86 (the e2e workflow) | k3d 5.9.0 |
 | Ubuntu, x86 (the e2e workflow) | kind 0.33.0 |
 
-Recovery after stopping the cluster is tested on k3d on macOS. Other platforms, including Windows
-and Linux on ARM, are untested.
+Rerunning `make up` is tested in the e2e workflow and on k3d on macOS. Recovery after stopping the
+cluster is tested on k3d on macOS. Other platforms, including Windows and Linux on ARM, are untested.
 
 ## Troubleshooting
 
