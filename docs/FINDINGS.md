@@ -428,6 +428,7 @@ app's own client spans can, for that app. Otherwise you need the audit log, whic
 | Kernel log | No | Yes, through a DaemonSet |
 | kubelet, API server and scheduler on k3s | No: they go to k3s's output, which k3d sends to `docker logs` | No. Needs k3s's `--log` flag at cluster creation |
 | kubelet on kubeadm clusters | No: it's in journald | No. The `journald` receiver needs `journalctl` |
+| Control plane on kubeadm clusters | No: it runs in `kube-system` | Yes. In CI on kind, `kube-controller-manager` logs arrived. The API server didn't log during that check |
 | API server audit log | No: off by default | No. Needs API server flags at cluster creation |
 
 **k3d 5.5.0 logs about 5,800 lines an hour on the worker node,** unseen. Its start-up script runs
