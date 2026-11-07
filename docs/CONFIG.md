@@ -40,7 +40,9 @@ The app has no OpenTelemetry code or settings. All of its configuration is in
 | `OTEL_METRIC_EXPORT_INTERVAL=10000` | Exports metrics every 10 seconds (default 60), so the lab feels responsive |
 
 The Operator comes from its official Helm chart. `cluster/otel-operator-values.yaml` makes the chart
-generate its own webhook certificate, so the lab doesn't need cert-manager.
+generate its own webhook certificate, so the lab doesn't need cert-manager. It also sets
+`recreate: false`. By default every `helm upgrade` makes a new certificate, and pods created before
+the Operator loads it start without the agent, with no error.
 
 ## Lab 2: custom dimensions
 

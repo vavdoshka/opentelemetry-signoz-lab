@@ -28,6 +28,22 @@ for app in postgres $apps; do
   k -n "$namespace" rollout status "deployment/$app" --timeout=300s
 done
 
+# The Operator's webhook fails open: if it can't answer, pods start without the
+# agent and nothing reports an error. So check, rather than trust a healthy pod.
+missing=$(k -n "$namespace" get pods -o json | python3 -c '
+import json, sys
+for pod in json.load(sys.stdin)["items"]:
+    meta = pod["metadata"]
+    names = [c["name"] for c in pod["spec"].get("initContainers", [])]
+    if not meta.get("deletionTimestamp") and "postgres" not in meta["name"] and not any("opentelemetry" in n for n in names):
+        print(meta["name"])')
+if [ -n "$missing" ]; then
+  echo "These pods started without the OpenTelemetry agent:" >&2
+  echo "$missing" >&2
+  echo "The Operator's webhook may not have been ready. Rerun: make lab$1" >&2
+  exit 1
+fi
+
 step "Smoke test: Lab $1"
 python3 scripts/smoke_test.py "$1"
 

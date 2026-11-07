@@ -61,6 +61,9 @@ jobs:
       - name: Compare the labs
         run: make compare
 
+      - name: Rerun make up
+        run: make up
+
       - name: Show status
         run: make status
 

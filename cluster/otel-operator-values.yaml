@@ -1,9 +1,14 @@
-# OpenTelemetry Operator for Lab 2. Everything else is the chart default.
+# OpenTelemetry Operator. Everything else is the chart default.
 #
 # The Operator's admission webhook needs a TLS certificate. Let the chart
 # generate one, so the lab does not need cert-manager.
+#
+# recreate: false matters. By default every `helm upgrade` makes a new certificate,
+# and the running Operator takes a few seconds to load it. The webhook fails open,
+# so pods created in that window start without the agent, with no error at all.
 admissionWebhooks:
   certManager:
     enabled: false
   autoGenerateCert:
     enabled: true
+    recreate: false

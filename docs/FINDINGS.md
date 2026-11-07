@@ -238,6 +238,10 @@ injected agent. Lab 1's app has no OpenTelemetry code. Lab 2 adds a few API call
   the duration is on the span. And you can't see a field nobody logged.
 - **The agent turns on everything that applies,** including process, runtime and system metrics, so
   expect more metric series than you'd choose yourself.
+- **Injection can fail silently.** The Operator's webhook fails open, so if it can't answer, pods
+  start healthy with no agent and no error. This happened here: by default, each `helm upgrade`
+  makes a new webhook certificate, and pods created in the roughly 16 seconds before the Operator
+  loaded it got no telemetry. Set `autoGenerateCert.recreate: false`, and check pods were injected.
 
 ### Metric labels and cardinality
 
