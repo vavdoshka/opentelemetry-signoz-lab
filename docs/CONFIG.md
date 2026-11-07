@@ -94,6 +94,7 @@ Lab 1. `k8s/app.yaml` sets what Labs 1 and 2 don't, because these give Kubernete
 | `emptyDir` with `sizeLimit: 1Gi` | Puts the `disk` scenario's file on the node's disk, with a cap |
 | `Role` allowing `list pods` in `lab3` | Only used by the `api_flood` and `api_denied` scenarios |
 | Separate `lab3-loadgen` Deployment | Load keeps coming while the workload restarts |
+| `kernel-log` DaemonSet, privileged, in `k8s/kernel-log.yaml` | Reads each node's `/dev/kmsg` and prints it, so the agent collects the kernel log. The collector can't read it itself |
 
 `labs/lab3-kubernetes/k8s-infra-values.yaml` adds four scrape jobs to the `k8s-infra` cluster
 collector, and `k8s/metrics-rbac.yaml` gives that collector permission to read them:
@@ -106,6 +107,8 @@ collector, and `k8s/metrics-rbac.yaml` gives that collector permission to read t
 | `apiserver` | the API server's `/metrics` | Requests, latency and storage objects |
 
 - **Each job has a keep-list,** because SigNoz stores everything it's sent. See `FINDINGS.md`.
+- **`presets.logsCollection.blacklist.namespaces: []`** collects `kube-system` pod logs, which the chart
+  leaves out by default.
 - **`presets.prometheus.namespaces: [lab3]` matters.** `presets.prometheus.enabled` also turns on an
   annotation job that scrapes SigNoz's own pods. Limiting it to `lab3` turns it off.
 - **`make up` keeps these jobs.** `install_k8s_infra` in `scripts/lib.sh` adds this values file when

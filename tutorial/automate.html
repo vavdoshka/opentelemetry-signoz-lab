@@ -20,12 +20,13 @@
 <p>Nothing in Labs 3 and 4 is clicked by hand. Each step is a file in this repo and a standard tool:</p>
 <table>
   <thead><tr><th>Step</th><th>How</th><th>Where</th></tr></thead>
-  <tbody><tr><td>Collect more metrics</td><td><code>helm upgrade</code> with an extra values file</td><td><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code></td></tr><tr><td>Allow the collector to read them</td><td><code>kubectl apply</code></td><td><code>labs/lab3-kubernetes/k8s/metrics-rbac.yaml</code></td></tr><tr><td>Create dashboards</td><td><code>POST /api/v2/dashboards</code></td><td><code>scripts/create_dashboard.py</code></td></tr><tr><td>Create the channel and rules</td><td><code>/api/v2/notification_channels</code>, <code>/api/v2/rules</code></td><td><code>scripts/create_alerts.py</code>, <code>labs/lab4-alerts/alerts.json</code></td></tr></tbody>
+  <tbody><tr><td>Collect more metrics</td><td><code>helm upgrade</code> with an extra values file</td><td><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code></td></tr><tr><td>Allow the collector to read them</td><td><code>kubectl apply</code></td><td><code>labs/lab3-kubernetes/k8s/metrics-rbac.yaml</code></td></tr><tr><td>Collect kernel logs</td><td><code>kubectl apply</code></td><td><code>labs/lab3-kubernetes/k8s/kernel-log.yaml</code></td></tr><tr><td>Create dashboards</td><td><code>POST /api/v2/dashboards</code></td><td><code>scripts/create_dashboard.py</code></td></tr><tr><td>Create the channel and rules</td><td><code>/api/v2/notification_channels</code>, <code>/api/v2/rules</code></td><td><code>scripts/create_alerts.py</code>, <code>labs/lab4-alerts/alerts.json</code></td></tr></tbody>
 </table>
 
-<h2>1. Collect the metrics</h2>
+<h2>1. Collect the metrics and logs</h2>
 <p>This part is ordinary Helm and <code>kubectl</code>, so it fits any pipeline or GitOps tool:</p>
 <figure class="code"><pre><code>kubectl apply -f labs/lab3-kubernetes/k8s/metrics-rbac.yaml
+kubectl apply -f labs/lab3-kubernetes/k8s/kernel-log.yaml
 
 helm repo add signoz https://charts.signoz.io
 helm upgrade --install k8s-infra signoz/k8s-infra --version 0.17.1 \
@@ -35,7 +36,7 @@ helm upgrade --install k8s-infra signoz/k8s-infra --version 0.17.1 \
 <p>Change these for your own cluster:</p>
 <table>
   <thead><tr><th>File</th><th>Change</th></tr></thead>
-  <tbody><tr><td><code>signoz/k8s-infra-values.yaml</code></td><td><code>otelCollectorEndpoint</code> and <code>global.clusterName</code></td></tr><tr><td><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code></td><td><code>presets.prometheus.namespaces</code>: use a namespace with no pods annotated <code>signoz.io/scrape</code>, or you'll also scrape those. Review the keep-lists too</td></tr><tr><td><code>labs/lab3-kubernetes/k8s/metrics-rbac.yaml</code></td><td>The subject, if your release or namespace differs from <code>k8s-infra</code> in <code>signoz</code></td></tr></tbody>
+  <tbody><tr><td><code>signoz/k8s-infra-values.yaml</code></td><td><code>otelCollectorEndpoint</code> and <code>global.clusterName</code></td></tr><tr><td><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code></td><td><code>presets.prometheus.namespaces</code>: use a namespace with no pods annotated <code>signoz.io/scrape</code>, or you'll also scrape those. Review the keep-lists too</td></tr><tr><td><code>labs/lab3-kubernetes/k8s/metrics-rbac.yaml</code></td><td>The subject, if your release or namespace differs from <code>k8s-infra</code> in <code>signoz</code></td></tr><tr><td><code>labs/lab3-kubernetes/k8s/kernel-log.yaml</code></td><td>The image and namespace. It uses the lab's locally built image, so push it to a registry you use. It runs privileged, so decide whether that's acceptable</td></tr></tbody>
 </table>
 <p>Two things are fine for a lab but worth a decision on a real cluster. The kubelet jobs use <code>insecure_skip_verify</code>, like the chart's own default. And they run in one collector, so on a big cluster you'd move them to the node agents. <span class="badge untested">Untested</span></p>
 

@@ -13,14 +13,14 @@ breaks. One command, on k3d or kind.
 |---|---|---|---|
 | **1. Hands-off** | Get telemetry from an app with no OpenTelemetry code | How much you get for free, through six incidents | `make up` |
 | **2. Custom dimensions** | Add a few OpenTelemetry API calls, only where they help | How to slice telemetry by things only your code knows, through four incidents | `make lab2` |
-| **3. Kubernetes** | Run a workload with real limits, and scrape the kubelet, cAdvisor and API server | How to debug throttling, OOM kills and failed probes, through five incidents, and which metrics quietly miss them | `make lab3` |
+| **3. Kubernetes** | Run a workload with real limits, scrape the kubelet, cAdvisor and API server, and collect cluster and kernel logs | How to debug throttling, OOM kills and failed probes, through five incidents, and which metrics quietly miss them | `make lab3` |
 | **4. Alerts** | Add eight alert rules, and a page showing what they send | How to write alerts that fire for real failures, and how long they take | `make lab4` |
 
 Each lab builds on the one before and adds only what it needs. They run side by side on a local
 two-node cluster and send to the same SigNoz.
 
 An interactive tutorial walks you through all of it: 26 pages, with buttons that trigger real
-failures, 89 saved searches, and code quoted straight from this repo.
+failures, 91 saved searches, and code quoted straight from this repo.
 
 ## What you'll learn
 
@@ -51,6 +51,7 @@ failures, 89 saved searches, and code quoted straight from this repo.
 - Find an OOM kill, when the metric named after it reads 0
 - Read pod, node, kubelet and API server metrics, and tell a pod problem from a node problem
 - Scrape Prometheus endpoints into SigNoz with a keep-list, and see what that costs
+- Collect `kube-system` and kernel logs, and find an OOM kill's process and container in the kernel log
 - How k3s differs from a real API server
 - See what collects what, and why there's no node-exporter or kube-state-metrics
 
@@ -216,8 +217,8 @@ you need, and three traps that pass unnoticed in a pipeline.
 Every claim here comes from causing the failure and reading what each signal did. Some of the results
 were surprises:
 
-- **`container_oom_events_total` read 0 through a real OOM kill.** Only restarts grouped by
-  `last_terminated_reason` showed it.
+- **`container_oom_events_total` read 0 through a real OOM kill.** Restarts grouped by
+  `last_terminated_reason` showed it, and the kernel log named the process and its container.
 - **Memory against limit misled both ways.** It read 99.5% during a harmless file write, because it
   counts page cache, and 86% just before a real kill.
 - **Average CPU hid throttling.** A pod showing 23% of its limit was throttled in 19 to 32% of its CPU

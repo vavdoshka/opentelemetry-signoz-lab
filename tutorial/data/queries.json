@@ -8083,6 +8083,145 @@
     "end": "2026-11-07T19:59:30Z"
    },
    "verified": "api"
+  },
+  {
+   "id": "l-lab3-kernel-oom",
+   "group": "Lab 3: logs",
+   "lab": "lab3",
+   "signal": "logs",
+   "title": "The kernel's record of an OOM kill",
+   "why": "From Lab 3's kernel-log DaemonSet. On k3d each line arrives twice, because the nodes share a kernel.",
+   "expr": "k8s.pod.name CONTAINS 'kernel-log' AND body CONTAINS 'out of memory'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "k8s.pod.name CONTAINS 'kernel-log' AND body CONTAINS 'out of memory'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-07T22:06:09.758660716Z",
+      "service": "",
+      "severity": "",
+      "body": "ERROR Memory cgroup out of memory: Killed process 2162697 (uvicorn) total-vm:589180kB, anon-rss:259688kB, file-rss:17192kB, shmem-rss:0kB, UID:0 pgtables:1044kB oom_score_adj:990",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T22:06:09.746679258Z",
+      "service": "",
+      "severity": "",
+      "body": "ERROR Memory cgroup out of memory: Killed process 2162697 (uvicorn) total-vm:589180kB, anon-rss:259688kB, file-rss:17192kB, shmem-rss:0kB, UID:0 pgtables:1044kB oom_score_adj:990",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 2
+   },
+   "savedWindow": {
+    "start": "2026-11-07T21:58:00Z",
+    "end": "2026-11-07T22:10:00Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-lab3-kube-system",
+   "group": "Lab 3: logs",
+   "lab": "lab3",
+   "signal": "logs",
+   "title": "Logs from kube-system pods",
+   "why": "The chart leaves this namespace out. Lab 3 turns it on.",
+   "expr": "k8s.namespace.name = 'kube-system'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "k8s.namespace.name = 'kube-system'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-07T22:07:27.315033502Z",
+      "service": "",
+      "severity": "",
+      "body": "[WARNING] No files matching import glob pattern: /etc/coredns/custom/*.server",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T22:06:56.813205835Z",
+      "service": "",
+      "severity": "",
+      "body": "[WARNING] No files matching import glob pattern: /etc/coredns/custom/*.server",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T22:06:26.314652085Z",
+      "service": "",
+      "severity": "",
+      "body": "[WARNING] No files matching import glob pattern: /etc/coredns/custom/*.server",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T22:06:11.1416253Z",
+      "service": "",
+      "severity": "",
+      "body": "time=\"2026-11-07T22:06:11Z\" level=error msg=\"Skipping service: no endpoints found\" providerName=kubernetes ingress=workload namespace=lab3 serviceName=workload servicePort=\"&ServiceBackendPort{Name:,Number:8000,}\"",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-07T22:05:55.810911501Z",
+      "service": "",
+      "severity": "",
+      "body": "[WARNING] No files matching import glob pattern: /etc/coredns/custom/*.server",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 5
+   },
+   "savedWindow": {
+    "start": "2026-11-07T21:58:00Z",
+    "end": "2026-11-07T22:10:00Z"
+   },
+   "verified": "api"
   }
  ]
 }

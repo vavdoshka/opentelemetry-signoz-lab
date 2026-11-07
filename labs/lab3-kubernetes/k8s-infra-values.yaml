@@ -8,6 +8,13 @@
 # Every job has a keep-list. Those endpoints expose over 30,000 series here, and
 # SigNoz stores everything it is sent.
 presets:
+  logsCollection:
+    blacklist:
+      # The chart leaves out kube-system, but its pods are part of the cluster
+      # you're debugging: CoreDNS and Traefik here. On kubeadm clusters such as
+      # kind, the API server, scheduler, controller manager and etcd too.
+      namespaces: []
+
   prometheus:
     enabled: true
     # `enabled` also turns on a job that scrapes every pod annotated with

@@ -382,10 +382,17 @@ exit as `Completed`, so only the events show why.
 | `k8s.container.memory_limit_utilization` | Peaked at 0.863 |
 | `k8s.pod.memory.working_set` | Climbed to 224 MiB: an early warning, not proof |
 | `k8s.container.restarts` by `last_terminated_reason` | **`OOMKilled`**, the one that works |
+| The kernel log, collected by Lab 3 | **The process, its memory and its container ID** |
 
 The likely reason for the first is that the counter belongs to the cgroup the kill destroys. The app's
 last log arrived 2 seconds before the kill, and it reported nothing else. The caller did: the load
 generator recorded 38 failed calls.
+
+**The kernel log has the most detail.** Its record of a kill names the process and shows it at 254 MiB of its
+256 MiB limit. Its `cpuset` is the container ID, and it matched exactly the one Kubernetes reported:
+`d27ba4de75b6…`. The collector can't read the kernel log itself, because the `journald` receiver needs
+`journalctl` and the image has none, so Lab 3 runs a small privileged DaemonSet that reads `/dev/kmsg`.
+On k3d both nodes share a kernel, so each line arrives twice.
 
 **`k8s.container.memory_limit_utilization` misleads both ways.** It counts page cache and is sampled
 every 30 seconds:
@@ -412,6 +419,21 @@ app's own client spans can, for that app. Otherwise you need the audit log, whic
 **Disk shows on the node, not the pod.** Writing 512 MiB to an `emptyDir` raised
 `k8s.node.filesystem.usage` by about 467 MiB, on both nodes, because k3d nodes share a disk.
 `k8s.pod.filesystem.usage` didn't move.
+
+### Logs from the cluster and the node
+
+| Log | Collected by default? | In Lab 3 |
+|---|---|---|
+| `kube-system` pods | No: the chart excludes the namespace | Yes. About 2 lines a minute here |
+| Kernel log | No | Yes, through a DaemonSet |
+| kubelet, API server and scheduler on k3s | No: they go to k3s's output, which k3d sends to `docker logs` | No. Needs k3s's `--log` flag at cluster creation |
+| kubelet on kubeadm clusters | No: it's in journald | No. The `journald` receiver needs `journalctl` |
+| API server audit log | No: off by default | No. Needs API server flags at cluster creation |
+
+**k3d 5.5.0 logs about 5,800 lines an hour on the worker node,** unseen. Its start-up script runs
+`until kubectl uncordon "$HOSTNAME"; do sleep 3; done`, and worker nodes have no `kubectl` login, so it
+never stops. The server node logged 81 lines in the same hour. Harmless, but these logs are how you'd
+find it.
 
 ### The dashboards
 

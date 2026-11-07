@@ -1,0 +1,30 @@
+# Puts each node's kernel log into SigNoz, as the logs of these pods.
+# It needs to read /dev/kmsg, which only a privileged container can open.
+# That's a real trade-off on a shared cluster.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kernel-log
+  namespace: lab3
+spec:
+  selector: { matchLabels: { app: kernel-log } }
+  template:
+    metadata:
+      labels: { app: kernel-log }
+      annotations:
+        # This isn't an app to trace, so opt out of the namespace's injection.
+        instrumentation.opentelemetry.io/inject-python: "false"
+    spec:
+      containers:
+        - name: kernel-log
+          image: telemetry-lab3:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "kernel_log.py"]
+          securityContext: { privileged: true }
+          resources:
+            requests: { cpu: 5m, memory: 16Mi }
+            limits: { memory: 64Mi }
+          volumeMounts: [{ name: kmsg, mountPath: /dev/kmsg, readOnly: true }]
+      volumes:
+        - name: kmsg
+          hostPath: { path: /dev/kmsg, type: CharDevice }

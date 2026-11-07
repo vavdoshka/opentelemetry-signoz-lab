@@ -29,12 +29,13 @@
 <figure class="code"><pre><code>service.name = 'lab3-loadgen' AND has_error = true</code></pre></figure>
 
 <h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
-<p>This is the surprise. Six signals sound like they should show an OOM kill, and this is what each one did during a real kill:</p>
+<p>This is the surprise. Seven signals sound like they should show an OOM kill, and this is what each one did during a real kill:</p>
 <table>
   <thead><tr><th>Signal</th><th>What it showed</th><th>Useful?</th></tr></thead>
-  <tbody><tr><td><code>container_oom_events_total</code></td><td><strong>0, the whole time</strong></td><td>No</td></tr><tr><td><code>k8s.container.status.reason</code></td><td>0 for <code>OOMKilled</code></td><td>No</td></tr><tr><td>Kubernetes events</td><td>A generic <code>BackOff</code>, with no mention of memory</td><td>No</td></tr><tr><td><code>k8s.container.memory_limit_utilization</code></td><td>Peaked at 0.863, and read 0.995 when nothing was wrong</td><td>No</td></tr><tr><td><code>k8s.pod.memory.working_set</code></td><td>Climbed to 224 MiB, then the series restarted</td><td>An early warning</td></tr><tr><td><code>k8s.container.restarts</code> grouped by <code>k8s.container.status.last_terminated_reason</code></td><td><strong>Restart count 3, reason <code>OOMKilled</code></strong></td><td><strong>Yes</strong></td></tr></tbody>
+  <tbody><tr><td><code>container_oom_events_total</code></td><td><strong>0, the whole time</strong></td><td>No</td></tr><tr><td><code>k8s.container.status.reason</code></td><td>0 for <code>OOMKilled</code></td><td>No</td></tr><tr><td>Kubernetes events</td><td>A generic <code>BackOff</code>, with no mention of memory</td><td>No</td></tr><tr><td><code>k8s.container.memory_limit_utilization</code></td><td>Peaked at 0.863, and read 0.995 when nothing was wrong</td><td>No</td></tr><tr><td><code>k8s.pod.memory.working_set</code></td><td>Climbed to 224 MiB, then the series restarted</td><td>An early warning</td></tr><tr><td><code>k8s.container.restarts</code> grouped by <code>k8s.container.status.last_terminated_reason</code></td><td><strong>Restart count 3, reason <code>OOMKilled</code></strong></td><td><strong>Yes</strong></td></tr><tr><td>The kernel log, collected by Lab 3</td><td><strong>The process, its memory and its container ID</strong></td><td><strong>Yes, the most detail</strong></td></tr></tbody>
 </table>
-<p>So search for that last one. In the Metrics Explorer, choose <code>k8s.container.restarts</code>, filter on <code>k8s.namespace.name = 'lab3'</code>, and group by <code>k8s.container.status.last_terminated_reason</code>.</p>
+<p>Two searches find it. For a chart, use the Metrics Explorer: choose <code>k8s.container.restarts</code>, filter on <code>k8s.namespace.name = 'lab3'</code>, and group by <code>k8s.container.status.last_terminated_reason</code>. For the details, search the logs for the kernel's own record:</p>
+<figure class="code"><pre><code>k8s.pod.name CONTAINS 'kernel-log' AND body CONTAINS 'out of memory'</code></pre></figure>
 
 <h2 class="step" id="evidence"><span class="n">4</span>Evidence</h2>
 <p>The exit Kubernetes recorded, from <code>kubectl get pod</code>:</p>
@@ -42,6 +43,10 @@
 exitCode: 137
 startedAt:  2026-11-07T19:21:30Z
 finishedAt: 2026-11-07T19:24:30Z</code></pre></figure>
+<p>And the kernel's record of a later kill, as SigNoz received it:</p>
+<figure class="code"><pre><code>INFO  oom-kill:constraint=CONSTRAINT_MEMCG,...,cpuset=d27ba4de75b689d4c4d581d26f94c26ca2360912a7513d6df50f34c1bb4e3a19,...
+ERROR Memory cgroup out of memory: Killed process 2162697 (uvicorn) total-vm:589180kB, anon-rss:259688kB, ...</code></pre></figure>
+<p>It names the process, and shows it holding 254 MiB of its 256 MiB limit. The <code>cpuset</code> value is the container ID, and it matches exactly the one Kubernetes reported for that kill: <code>containerd://d27ba4de75b6…</code>. No metric tells you that much.</p>
 <p>Exit code 137 means the process received <code>SIGKILL</code>. The timing fits: the app started at about 64 MiB, and (256 − 64) ÷ 2 is 96 seconds. The kill came 104 seconds after the leak started.</p>
 
 <h3>Why the obvious metrics miss it</h3>
@@ -79,7 +84,7 @@ finishedAt: 2026-11-07T19:24:30Z</code></pre></figure>
 <ul>
   <li><strong>Find the leak.</strong> A climbing line on <strong>Memory in use (working set)</strong> is your early warning, and you have about a minute and a half here.</li>
   <li><strong>If it isn't a leak,</strong> raise the limit to fit real usage.</li>
-  <li><strong>Alert on the exit reason,</strong> not on the OOM counter. <a href="lab4.html">Lab 4</a> does this.</li>
+  <li><strong>Alert on the exit reason,</strong> not on the OOM counter. <a href="lab4.html">Lab 4</a> does this. The kernel's log line would also work for a log-based alert. <span class="badge untested">Untested</span></li>
 </ul>
 
 <div class="quiz" data-quiz="o1"><p class="q">Check yourself: Why did container_oom_events_total stay at 0 during a real OOM kill?</p><button type="button" data-right="false" data-why="Reading cAdvisor directly also showed 0.">The scrape job was misconfigured.</button><button type="button" data-right="true" data-why="The replacement container starts counting from 0.">The counter belongs to the container&#x27;s cgroup, which the kill destroyed.</button><button type="button" data-right="false" data-why="Kubernetes recorded OOMKilled with exit code 137.">It wasn&#x27;t really an OOM kill.</button></div>

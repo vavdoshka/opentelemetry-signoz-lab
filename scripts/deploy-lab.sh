@@ -23,7 +23,8 @@ k apply -f "$dir/k8s/instrumentation.yaml"
 k apply -f "$dir/k8s/app.yaml"
 
 if [ "$1" = 3 ]; then
-  step "Extra scrape jobs"
+  k apply -f "$dir/k8s/kernel-log.yaml"
+  step "Extra scrape jobs and logs"
   k apply -f "$dir/k8s/metrics-rbac.yaml"
   install_k8s_infra
   k -n signoz rollout status deployment/k8s-infra-otel-deployment --timeout=180s
@@ -38,6 +39,9 @@ for app in $apps; do
 done
 if [ "$1" != 3 ]; then
   k -n "$namespace" rollout status deployment/postgres --timeout=300s
+else
+  k -n "$namespace" rollout restart daemonset/kernel-log
+  k -n "$namespace" rollout status daemonset/kernel-log --timeout=180s
 fi
 
 # The Operator's webhook fails open: if it can't answer, pods start without the
@@ -47,7 +51,8 @@ import json, sys
 for pod in json.load(sys.stdin)["items"]:
     meta = pod["metadata"]
     names = [c["name"] for c in pod["spec"].get("initContainers", [])]
-    if not meta.get("deletionTimestamp") and "postgres" not in meta["name"] and not any("opentelemetry" in n for n in names):
+    opted_out = meta.get("annotations", {}).get("instrumentation.opentelemetry.io/inject-python") == "false"
+    if not meta.get("deletionTimestamp") and not opted_out and not any("opentelemetry" in n for n in names):
         print(meta["name"])')
 if [ -n "$missing" ]; then
   echo "These pods started without the OpenTelemetry agent:" >&2

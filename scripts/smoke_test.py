@@ -6,7 +6,7 @@ Usage: smoke_test.py 1|2|3
 
 import sys
 
-from signoz_client import LAB3_URL, LABS, count, fire, login, metric_exists, read_credentials, request, wait_for
+from signoz_client import LAB3_URL, LABS, count, fire, login, metric_exists, query, read_credentials, request, wait_for
 
 
 def smoke_test_lab3(token):
@@ -31,6 +31,16 @@ def smoke_test_lab3(token):
         ("apiserver", "apiserver_request_total", ""),
     ):
         wait_for(f"{job} metrics", lambda: metric_exists(token, metric, expression, minutes=3), timeout=180)
+    # Reported, not required: kube-system pods can stay quiet for minutes, and
+    # collection starts at the end of each file.
+    spec = {
+        "aggregations": [{"expression": "count()"}],
+        "filter": {"expression": "k8s.namespace.name = 'kube-system'"},
+        "groupBy": [{"name": "k8s.pod.name", "fieldContext": "resource", "fieldDataType": "string"}],
+    }
+    result = query(token, "logs", spec, "scalar", minutes=10) or {}
+    pods = sorted({row[0] for row in result.get("data") or []})
+    print(f"kube-system logs in the last 10 minutes, from: {', '.join(pods) or 'none yet'}")
     print("Smoke test passed: the workload and all four scrape jobs are reaching SigNoz.")
 
 
