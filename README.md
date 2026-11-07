@@ -6,6 +6,8 @@ A hands-on lab for learning OpenTelemetry on Kubernetes with SigNoz, the open so
 platform. Get traces, metrics and logs from an app with no code changes, debug real incidents, then
 add custom dimensions only where you need them. One command, on k3d or kind.
 
+![Sneak peek: the tutorial, the lab app, a live incident, a trace down to the failing SQL, and a dashboard](docs/images/sneak-peek.gif)
+
 | | Lab 1: hands-off | Lab 2: custom dimensions |
 |---|---|---|
 | **The app** | Contains no OpenTelemetry code | Lab 1 plus a few OpenTelemetry API calls |
@@ -15,6 +17,42 @@ add custom dimensions only where you need them. One command, on k3d or kind.
 You don't have to choose. Lab 2 keeps Lab 1's setup, and adds detail only where it's worth it. Both
 run side by side on a local two-node cluster and send to the same SigNoz, and an interactive tutorial
 walks you through them.
+
+## What you'll learn
+
+**Lab 1: get telemetry with no code**
+
+- Get traces, metrics and logs from a Kubernetes app with one annotation, using the OpenTelemetry
+  Operator
+- How auto-instrumentation works, and how it can fail silently
+- Read a distributed trace across services, down to the SQL statement
+- Link logs to traces, and use plain log fields as free dimensions
+- Debug six real incidents: an unhandled error, a latency spike, a cross-service failure, a slow SQL
+  query, a timeout and CPU saturation
+- Write SigNoz searches for traces, logs and metrics
+
+**Lab 2: add detail only where you need it**
+
+- Add custom spans, attributes and metrics on top of auto-instrumentation, with no SDK setup
+- Choose between a log field, a span attribute and a metric label
+- Avoid high-cardinality metrics, with measured numbers
+- Solve failures that auto-instrumentation can't fully explain: one slow product, lost revenue with no
+  errors, and random-looking slowness
+- Give users a trace ID they can quote to support
+- Build a SigNoz dashboard around your own dimensions
+
+**Running it for real**
+
+- Run node agents for pod metrics, container logs and Kubernetes events
+- What a plain SigNoz install leaves out, and how to fill the gaps
+- When to sample, and what sampling costs you
+- What survives a node crash, and what doesn't
+
+## See it
+
+| A failing request, traced down to the SQL | A dashboard built on custom dimensions |
+|---|---|
+| ![Trace of a failed request across frontend, backend and SQL](docs/images/failing-request-trace.png) | ![SigNoz dashboard showing orders, revenue, and latency by cache result](tutorial/screenshots/dimensions-dashboard.png) |
 
 ## Prerequisites
 
