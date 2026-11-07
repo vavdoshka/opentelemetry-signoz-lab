@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How SigNoz is configured | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="setup">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Reference</p>
+<h1>How SigNoz is configured</h1>
+<p class="lead">Nothing here is hidden. This page lists every piece of SigNoz configuration in the lab, where it lives, and why it exists. If something isn't listed, it's at its default.</p>
+
+<h2>The pieces</h2>
+<table>
+  <thead><tr><th>Piece</th><th>What it does</th><th>Configured in</th></tr></thead>
+  <tbody>
+    <tr><td><strong>SigNoz</strong></td><td>UI, API, ClickHouse, ZooKeeper and the collectors, from the official Helm chart</td><td><code>signoz/signoz-values.yaml</code></td></tr>
+    <tr><td><strong>k8s-infra</strong></td><td>Node agents and a cluster collector: pod and node metrics, container logs, Kubernetes events</td><td><code>signoz/k8s-infra-values.yaml</code></td></tr>
+    <tr><td><strong>OpenTelemetry Operator</strong></td><td>Injects the agent into your pods. Not part of SigNoz</td><td><code>cluster/otel-operator-values.yaml</code></td></tr>
+    <tr><td><strong>Instrumentation</strong></td><td>Tells the Operator how to instrument each lab</td><td><code>labs/*/k8s/instrumentation.yaml</code></td></tr>
+    <tr><td><strong>Ingress</strong></td><td>Serves the UI at <code>signoz.localhost:8080</code></td><td><code>signoz/ingress.yaml</code></td></tr>
+    <tr><td><strong>First admin</strong></td><td>Created automatically. The collector opens no OTLP ports until an organization exists</td><td><code>scripts/bootstrap_signoz.py</code></td></tr>
+    <tr><td><strong>Dashboard</strong></td><td>The lab's one dashboard</td><td><code>labs/lab2-custom-dimensions/dashboard.json</code></td></tr>
+  </tbody>
+</table>
+
+<h2>What was changed from the defaults</h2>
+<table>
+  <thead><tr><th>Setting</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>otelCollector.replicaCount: 2</code></td><td>Keeps ingestion running if a node dies. It's the only change to the SigNoz chart</td></tr>
+    <tr><td><code>otelCollectorEndpoint</code> in k8s-infra</td><td>Required, with no default. It must include <code>http://</code>, or exports fail while pods stay Running</td></tr>
+    <tr><td><code>global.clusterName</code> in k8s-infra</td><td>Labels data with a cluster name. It's blank by default</td></tr>
+    <tr><td><code>autoGenerateCert.recreate: false</code> on the Operator</td><td>Stops <code>helm upgrade</code> briefly breaking injection, which fails silently</td></tr>
+  </tbody>
+</table>
+<p>Everything else is a chart default, including retention: 15 days for traces and logs, 30 days for metrics.</p>
+
+<h2>Dashboards</h2>
+<p>A new SigNoz install has no dashboards, and this lab adds exactly one: <strong>Lab 2: custom dimensions</strong>. <code>make lab2</code> creates it through the API with <code>scripts/create_dashboard.py</code>, and leaves it alone if it already exists. To change it, edit it in the SigNoz UI, or change the JSON file and delete the dashboard before rerunning.</p>
+<p>A panel's <code>groupBy</code> must declare the right type. <code>cache.hit</code> is a boolean, and declaring it as a string makes the panel silently empty.</p>
+<p>SigNoz publishes ready-made dashboards at <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a>, including <code>k8s-infra-metrics</code> and <code>apm</code>. To add one, use Dashboards, then New dashboard, then Import JSON in SigNoz. The lab doesn't import any, so how well they fit this data is untested.</p>
+
+<h2>Alerts, channels and log pipelines</h2>
+<p>There are none, by choice. SigNoz starts with none, and this lab adds none.</p>
+
+<h2>How much it uses</h2>
+<p>Measured on this lab, with both labs running on k3d:</p>
+<table>
+  <thead><tr><th></th><th>Idle</th><th>Load generator at 5 requests/s</th></tr></thead>
+  <tbody>
+    <tr><td><strong>All pods, CPU</strong></td><td>About 0.5 core</td><td>About 0.8 core</td></tr>
+    <tr><td><strong>All pods, memory</strong></td><td>About 5.3 GiB</td><td>About 5.4 GiB</td></tr>
+    <tr><td><strong>ClickHouse</strong></td><td>0.3 core, 3.1 GiB</td><td>0.5 core, 3.2 GiB</td></tr>
+    <tr><td><strong>ZooKeeper</strong></td><td>0.05 core, 0.9 GiB</td><td>0.08 core, 0.9 GiB</td></tr>
+    <tr><td><strong>Docker Desktop's VM on the Mac</strong></td><td>About 0.6 core</td><td>About 2.2 cores</td></tr>
+  </tbody>
+</table>
+<p>The Docker VM costs more than the pods do, because virtualization adds overhead. Memory barely changes with traffic. It's mostly the fixed cost of running ClickHouse and ZooKeeper.</p>
+<p>ClickHouse also logs heavily about itself. In one measurement it held 1.83 GiB of its own system logs, against about 150 MiB of actual telemetry.</p>
+<p>To free your machine, stop the load generator when you aren't using it, and run <code>k3d cluster stop signoz-lab</code> between sessions. <code>make up</code> brings everything back.</p>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

@@ -334,11 +334,45 @@ Same load each time. All setups listed `backend` in every last-60-seconds check.
   apps on that node failed 4 metric exports during one restart.
 - **In-process state breaks with replicas.** The load generator had to become its own Deployment.
 
+## Kubernetes coverage
+
+What `k8s-infra` collects with its defaults, checked in this lab on 2026-11-07:
+
+| Signal | Collected? | Where |
+|---|---|---|
+| Pod CPU and memory | Yes | `k8s.pod.cpu.usage`, `k8s.pod.memory.working_set` |
+| Usage against requests | Yes | `k8s.pod.memory_request_utilization`, `k8s.pod.cpu_request_utilization` |
+| Usage against limits | Only for pods with limits | `k8s.pod.memory_limit_utilization` |
+| CPU throttling | **No** | Needs cAdvisor metrics from the kubelet |
+| Container restarts and readiness | Yes | `k8s.container.restarts`, `k8s.container.ready` |
+| Probe failures | Yes, as events | `Unhealthy` Kubernetes events |
+| OOM kills | Probably, **untested** | `k8s.container.status.reason`, `k8s.container.restarts` |
+| Node CPU, memory and disk | Yes, both nodes | `k8s.node.*`, `system.*` |
+| Node conditions | Yes | `k8s.node.condition_ready`, and the memory, disk and PID pressure metrics |
+| The kubelet's own health | **No** | Needs a scrape of the kubelet's `/metrics` |
+| containerd and node services | **No** | Needs extra receivers, and k3d nodes have no systemd |
+
+The lab's apps set no CPU or memory limits, and only readiness probes, so throttling, OOM kills and
+liveness failures can't happen here yet. On k3d, `system.*` metrics describe the Docker VM both nodes
+share, so they aren't truly per node. The lab has no dashboard for any of this yet.
+
 ## Resource use
 
-The SigNoz namespace used about 3.8 GiB (ClickHouse 2.7 GiB, ZooKeeper 0.8 GiB) and the k3d node
-about 5.3 GiB in total, after about 30 minutes at 5 requests/s. That is a small dataset (about
-10 MiB on disk), so treat these as a starting point, not a sizing guide.
+Measured 2026-11-07 with both labs running on k3d:
+
+| | Idle | Load generator at 5 requests/s |
+|---|---|---|
+| All pods, CPU | About 0.5 core | About 0.8 core |
+| All pods, memory | About 5.3 GiB | About 5.4 GiB |
+| ClickHouse | 0.3 core, 3.1 GiB | 0.5 core, 3.2 GiB |
+| ZooKeeper | 0.05 core, 0.9 GiB | 0.08 core, 0.9 GiB |
+| Docker Desktop's VM on the Mac | About 0.6 core | About 2.2 cores |
+
+- **Memory is a fixed cost.** It barely changes with traffic, and most of it is ClickHouse and ZooKeeper.
+- **The Docker VM costs more than the pods,** because of virtualization.
+- **ClickHouse logs heavily about itself.** It held 1.83 GiB of system logs, led by `zookeeper_log` at
+  761 MiB, against about 150 MiB of telemetry. Reducing those logs may be the biggest saving, but this
+  is **Untested**.
 
 ## Not caused by SigNoz
 

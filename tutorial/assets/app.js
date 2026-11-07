@@ -23,6 +23,7 @@
     { id: 'cachemiss', href: 'incident-cache-miss.html', title: 'Slow for no visible reason', group: 'Lab 2: custom dimensions' },
     { id: 'traceid', href: 'incident-trace-id.html', title: 'A customer quotes a trace ID', group: 'Lab 2: custom dimensions' },
     { id: 'queries', href: 'queries.html', title: 'Search query reference', group: 'Reference' },
+    { id: 'setup', href: 'setup.html', title: 'How SigNoz is configured', group: 'Reference' },
     { id: 'gaps', href: 'gaps.html', title: 'What is missing, and fixes', group: 'Reference' },
   ];
 

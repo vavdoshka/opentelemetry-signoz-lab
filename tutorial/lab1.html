@@ -63,6 +63,15 @@
 <span class="ln">39</span>      # Export metrics every 10 seconds (default 60), so the lab feels responsive.
 <span class="ln">40</span>      - { name: OTEL_METRIC_EXPORT_INTERVAL, value: &quot;10000&quot; }</code></pre></figure>
 
+<h2>Logs need one setting</h2>
+<p>Traces and metrics work as soon as a pod is injected. Python logs don't: the agent leaves them off by default, so without line 34 above, SigNoz would receive no application logs from it. That one setting is all it takes:</p>
+<ul>
+  <li>Everything your app writes with Python's <code>logging</code> goes to SigNoz.</li>
+  <li>Each log written during a request carries that request's <code>trace_id</code> and <code>span_id</code>, so logs link to their span.</li>
+  <li>Fields in <code>extra={...}</code> become searchable log attributes, with no OpenTelemetry code.</li>
+</ul>
+<p>Other languages have their own defaults, so check yours. The node agent also collects container stdout, but those copies have no trace link. See <a href="gaps.html">What is missing</a>.</p>
+
 <h2>What happens when a pod starts</h2>
 <ol>
   <li>Kubernetes asks the Operator's admission webhook about each new pod.</li>

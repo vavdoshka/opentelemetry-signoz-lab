@@ -40,7 +40,7 @@
 <figure class="shot"><img src="screenshots/lab1-service-frontend.png" alt="SigNoz lab1-frontend service page with p50, p90 and p99 latency lines" width="1440" height="900" loading="lazy"><figcaption>The Latency chart. <span class="badge ui">Seen in SigNoz UI</span> P99 sits between about 2 and 3 s, P90 swings between low values and over 1 s, and P50 stays near zero on this scale.</figcaption></figure>
 
 <h2 class="step" id="search"><span class="n">4</span>Search</h2>
-<p>Find anything over a second. Remember that <code>duration_nano</code> is in nanoseconds.</p>
+<p>Find anything over a second. <code>duration_nano</code> is stored in nanoseconds, so this search uses a long number. You can also write the time with a unit: <code>duration_nano &gt; '1s'</code> or <code>duration_nano &gt; '500ms'</code> give the same results as the raw numbers <span class="badge api">Query API only</span>. The Duration filter in the Traces Explorer sidebar takes milliseconds.</p>
 <div data-query="t-slow">Loading saved query...</div>
 <p>That counts child spans too. Limit it to Server spans to count requests instead:</p>
 <div data-query="t-slow-server">Loading saved query...</div>
