@@ -34,7 +34,10 @@
 <table>
   <thead><tr><th>Setting</th><th>Why</th></tr></thead>
   <tbody>
-    <tr><td><code>otelCollector.replicaCount: 2</code></td><td>Keeps ingestion running if a node dies. It's the only change to the SigNoz chart</td></tr>
+    <tr><td><code>otelCollector.replicaCount: 2</code></td><td>Keeps ingestion running if a node dies</td></tr>
+    <tr><td><code>otelCollector.config.processors.batch.timeout: 5s</code></td><td>Default 1s. Fewer, larger writes cost ClickHouse much less CPU. Data appears up to 5 seconds later</td></tr>
+    <tr><td><code>clickhouse.files</code></td><td>Turns off five of ClickHouse's logs about itself, which wrote more rows than the telemetry it stores</td></tr>
+    <tr><td><code>clickhouse.zookeeper.heapSize: 256</code></td><td>The default 1 GB heap is far more than this lab needs</td></tr>
     <tr><td><code>otelCollectorEndpoint</code> in k8s-infra</td><td>Required, with no default. It must include <code>http://</code>, or exports fail while pods stay Running</td></tr>
     <tr><td><code>global.clusterName</code> in k8s-infra</td><td>Labels data with a cluster name. It's blank by default</td></tr>
     <tr><td><code>autoGenerateCert.recreate: false</code> on the Operator</td><td>Stops <code>helm upgrade</code> briefly breaking injection, which fails silently</td></tr>
@@ -42,28 +45,44 @@
 </table>
 <p>Everything else is a chart default, including retention: 15 days for traces and logs, 30 days for metrics.</p>
 
-<h2>Dashboards</h2>
-<p>A new SigNoz install has no dashboards, and this lab adds exactly one: <strong>Lab 2: custom dimensions</strong>. <code>make lab2</code> creates it through the API with <code>scripts/create_dashboard.py</code>, and leaves it alone if it already exists. To change it, edit it in the SigNoz UI, or change the JSON file and delete the dashboard before rerunning.</p>
+<h2>Why ZooKeeper, and not ClickHouse Keeper?</h2>
+<p>ClickHouse has its own coordination service, <a href="https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper" target="_blank" rel="noopener">ClickHouse Keeper</a>, which it describes as replacing ZooKeeper. ZooKeeper still works, and this lab runs what SigNoz supports: chart 0.149.0 installs ClickHouse 25.12.5 with ZooKeeper 3.7.1, and has no Keeper option.</p>
+<p><a href="https://github.com/SigNoz/signoz/discussions/4671" target="_blank" rel="noopener">Use of Zookeeper</a> asks whether SigNoz will follow ClickHouse. It had no reply on 2026-11-07.</p>
+
+<h2>Dashboards and views</h2>
+<p><strong>Lab 1 uses only what's built into SigNoz.</strong> Services, Traces, Logs, Exceptions, Service Map, Metrics Explorer and Infra Monitoring all work with no setup, so <code>make up</code> creates no dashboards or saved views.</p>
+<p>The Dashboards page itself starts empty. This lab adds exactly one dashboard, in Lab 2: <strong>Lab 2: custom dimensions</strong>. <code>make lab2</code> creates it through the API with <code>scripts/create_dashboard.py</code>, and leaves it alone if it already exists. To change it, edit it in the SigNoz UI, or change the JSON file and delete the dashboard before rerunning.</p>
 <p>A panel's <code>groupBy</code> must declare the right type. <code>cache.hit</code> is a boolean, and declaring it as a string makes the panel silently empty.</p>
 <p>SigNoz publishes ready-made dashboards at <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a>, including <code>k8s-infra-metrics</code> and <code>apm</code>. To add one, use Dashboards, then New dashboard, then Import JSON in SigNoz. The lab doesn't import any, so how well they fit this data is untested.</p>
 
 <h2>Alerts, channels and log pipelines</h2>
-<p>There are none, by choice. SigNoz starts with none, and this lab adds none.</p>
+<p>There are none in Labs 1 and 2. SigNoz starts with none, and those labs add none.</p>
 
 <h2>How much it uses</h2>
 <p>Measured on this lab, with both labs running on k3d:</p>
 <table>
   <thead><tr><th></th><th>Idle</th><th>Load generator at 5 requests/s</th></tr></thead>
   <tbody>
-    <tr><td><strong>All pods, CPU</strong></td><td>About 0.5 core</td><td>About 0.8 core</td></tr>
-    <tr><td><strong>All pods, memory</strong></td><td>About 5.3 GiB</td><td>About 5.4 GiB</td></tr>
-    <tr><td><strong>ClickHouse</strong></td><td>0.3 core, 3.1 GiB</td><td>0.5 core, 3.2 GiB</td></tr>
-    <tr><td><strong>ZooKeeper</strong></td><td>0.05 core, 0.9 GiB</td><td>0.08 core, 0.9 GiB</td></tr>
-    <tr><td><strong>Docker Desktop's VM on the Mac</strong></td><td>About 0.6 core</td><td>About 2.2 cores</td></tr>
+    <tr><td><strong>All pods, CPU</strong></td><td>0.25 to 0.3 core</td><td>0.6 to 0.7 core</td></tr>
+    <tr><td><strong>All pods, memory</strong></td><td>About 4.3 GiB</td><td>About 4.4 GiB</td></tr>
+    <tr><td><strong>ClickHouse</strong></td><td>0.12 to 0.17 core, 2.6 GiB</td><td>0.23 to 0.35 core, 2.7 GiB</td></tr>
+    <tr><td><strong>ZooKeeper</strong></td><td>0.02 core, 0.4 GiB</td><td>0.03 core, 0.4 GiB</td></tr>
+    <tr><td><strong>Docker Desktop's VM on the Mac</strong></td><td>0.5 to 0.9 core</td><td>0.6 to 1.6 cores</td></tr>
   </tbody>
 </table>
-<p>The Docker VM costs more than the pods do, because virtualization adds overhead. Memory barely changes with traffic. It's mostly the fixed cost of running ClickHouse and ZooKeeper.</p>
-<p>ClickHouse also logs heavily about itself. In one measurement it held 1.83 GiB of its own system logs, against about 150 MiB of actual telemetry.</p>
+<p>The Docker VM costs more than the pods do, because virtualization adds overhead. Memory barely changes with traffic. It's mostly the fixed cost of running ClickHouse.</p>
+
+<h3>What reduced ClickHouse's load</h3>
+<table>
+  <thead><tr><th></th><th>Before</th><th>After</th></tr></thead>
+  <tbody>
+    <tr><td><strong>ClickHouse's logs about itself</strong></td><td>About 165,000 rows a minute</td><td>About 4,500 rows a minute</td></tr>
+    <tr><td><strong>Writes in the test window</strong></td><td>5,775</td><td>1,672</td></tr>
+    <tr><td><strong>ClickHouse CPU under load</strong></td><td>0.4 to 0.7 core</td><td>0.2 to 0.3 core</td></tr>
+    <tr><td><strong>All pods, memory</strong></td><td>About 5.4 GiB</td><td>About 4.4 GiB</td></tr>
+  </tbody>
+</table>
+<p>The self-logging cost disk and memory, not CPU. In one measurement it took 1.83 GiB, against about 150 MiB of telemetry. The CPU went on writes: with a 1-second batch, ClickHouse took about 24 small writes a second. Other containers on the machine were quieter in the second run, so the CPU figure is partly confounded, but the write counts aren't.</p>
 <p>To free your machine, stop the load generator when you aren't using it, and run <code>k3d cluster stop signoz-lab</code> between sessions. <code>make up</code> brings everything back.</p>
 
 <section class="page-end" id="page-end" aria-label="Page navigation"></section>

@@ -68,9 +68,9 @@ walks you through them.
 You also need:
 
 - **Memory:** at least 8 GB for Docker, and 10 GB is better. On Docker Desktop, set this in
-  Settings > Resources. The lab uses about 5.5 GiB, mostly ClickHouse and ZooKeeper.
-- **CPU:** about 0.5 core idle in the cluster, but Docker Desktop's VM can use over 2 cores under load
-  on a Mac. Stop the load generator when you aren't using it, and run `k3d cluster stop signoz-lab`
+  Settings > Resources. The lab uses about 4.5 GiB, mostly ClickHouse.
+- **CPU:** about 0.3 core idle in the cluster, but Docker Desktop's VM can use over 1.5 cores under
+  load on a Mac. Stop the load generator when you aren't using it, and run `k3d cluster stop signoz-lab`
   between sessions. `make up` brings it back.
 - **Port 8080** free on your machine.
 

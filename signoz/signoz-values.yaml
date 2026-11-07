@@ -1,4 +1,27 @@
-# HA step: the only override to the SigNoz chart. Everything else is default.
-# Two collectors, so losing one node does not stop ingestion.
+# Overrides to the SigNoz chart. Everything else is default.
 otelCollector:
+  # HA: losing one node does not stop ingestion.
   replicaCount: 2
+  config:
+    processors:
+      batch:
+        # Default 1s. Each flush writes to about a dozen tables, so fewer, larger
+        # writes cost ClickHouse much less CPU. Data appears up to 5 seconds later.
+        timeout: 5s
+
+clickhouse:
+  # ClickHouse logs heavily about itself: about 165,000 rows a minute here, more
+  # than the telemetry it stores. These logs are for debugging ClickHouse itself,
+  # so turn them off. query_log and part_log stay, because they help diagnosis.
+  files:
+    config.d/zz-lab-system-logs.xml: |
+      <clickhouse>
+        <zookeeper_log remove="1"/>
+        <aggregated_zookeeper_log remove="1"/>
+        <asynchronous_metric_log remove="1"/>
+        <processors_profile_log remove="1"/>
+        <trace_log remove="1"/>
+      </clickhouse>
+  zookeeper:
+    # The default 1 GB heap is far more than this lab needs.
+    heapSize: 256

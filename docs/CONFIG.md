@@ -16,12 +16,26 @@ Every change from a default, with the reason. If it isn't listed here, it's at i
 
 | What | Where | Why |
 |---|---|---|
-| `otelCollector.replicaCount: 2` | `signoz/signoz-values.yaml` | HA, and **the only chart override.** Ingestion survives losing a node, but Service Map accuracy falls. See `FINDINGS.md` |
+| `otelCollector.replicaCount: 2` | `signoz/signoz-values.yaml` | HA. Ingestion survives losing a node, but Service Map accuracy falls. See `FINDINGS.md` |
+| `otelCollector.config.processors.batch.timeout: 5s` | `signoz/signoz-values.yaml` | Default 1s. Each flush writes to about a dozen tables, so fewer, larger writes cost ClickHouse much less CPU. Data appears up to 5 seconds later |
+| `config.d/zz-lab-system-logs.xml` | `clickhouse.files` in `signoz/signoz-values.yaml` | Turns off five of ClickHouse's logs about itself. `query_log` and `part_log` stay, because they help diagnosis |
+| `clickhouse.zookeeper.heapSize: 256` | `signoz/signoz-values.yaml` | The default 1 GB heap is far more than this lab needs |
 | Ingress for `signoz.localhost` | `signoz/ingress.yaml` | UI access, kept outside the Helm release |
 | First admin account | `scripts/bootstrap_signoz.py` | **Required.** The collector opens no OTLP ports until an organization exists |
 
 The admin uses the placeholder `admin@lab.local` and a generated password, stored in
 `.lab-credentials` (mode 600).
+
+### ZooKeeper, not ClickHouse Keeper
+
+ClickHouse has its own coordination service, [ClickHouse Keeper](https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper),
+which it describes as replacing ZooKeeper. ZooKeeper still works: this lab runs it with ClickHouse
+25.12.5. SigNoz chart 0.149.0 has no Keeper option. It installs ZooKeeper 3.7.1, and the only
+alternative it offers is `clickhouse.externalZookeeper`, which points at one you run yourself.
+Pointing that at a Keeper is **Untested**.
+
+[Use of Zookeeper](https://github.com/SigNoz/signoz/discussions/4671) asks whether SigNoz will
+follow ClickHouse. It had no reply on 2026-11-07.
 
 ## Lab 1: hands-off
 

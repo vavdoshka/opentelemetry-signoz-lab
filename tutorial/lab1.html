@@ -20,6 +20,21 @@
 <p><code>make up</code> already deployed this lab. Start some background traffic, so SigNoz has data to show. Stop it when you finish.</p>
 <div data-load-panel="lab1"></div>
 
+<h2>Everything here is built in</h2>
+<p>Lab 1 adds nothing to SigNoz. Every screen you'll use comes with it: no dashboards, saved views, queries or alerts are created for you.</p>
+<table>
+  <thead><tr><th>Built-in view</th><th>What it gives you</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Services</strong></td><td>Latency, error rate and traffic per service, worked out from spans</td></tr>
+    <tr><td><strong>Traces</strong></td><td>Search spans, and open any trace</td></tr>
+    <tr><td><strong>Logs</strong></td><td>Search logs, and jump between a log and its trace</td></tr>
+    <tr><td><strong>Exceptions</strong></td><td>Errors grouped by type</td></tr>
+    <tr><td><strong>Service Map</strong></td><td>Which services call which. Its counts can be unreliable, as <a href="gaps.html">What is missing</a> explains</td></tr>
+    <tr><td><strong>Metrics Explorer</strong></td><td>Every metric, ready to chart</td></tr>
+    <tr><td><strong>Infra Monitoring</strong></td><td>Hosts and Kubernetes objects, from the node agents</td></tr>
+  </tbody>
+</table>
+
 <h2>The whole configuration</h2>
 <p>This is every piece of OpenTelemetry configuration in Lab 1. The app's code and its Kubernetes manifest don't mention OpenTelemetry at all. (Its image does contain the <code>opentelemetry-api</code> package, because FastAPI depends on it, but the app never imports it.)</p>
 <figure class="code"><figcaption><span><code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> lines 1–40</span></figcaption><pre><code><span class="ln">1</span># This file is all the OpenTelemetry configuration Lab 1 has.

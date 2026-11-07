@@ -30,7 +30,7 @@
 <p>Both pages depend on ClickHouse materialized views that join a parent span to its child. Those views only match a parent and child that arrive <strong>in the same insert</strong>. By default each service flushes spans on its own 5-second timer, so they usually land in different inserts, and the view writes nothing. <code>docs/FINDINGS.md</code> has the reproduction.</p>
 
 <h3 id="fix-2">The fix that is applied</h3>
-<p>Both labs flush spans every 500 ms, inside the collector's 1-second batch window, so parents and children usually share an insert:</p>
+<p>Both labs flush spans every 500 ms, so parents and children usually land in the same collector batch and share an insert. This table was measured with the chart's default 1-second batch. The lab now uses 5 seconds, which reduces load on ClickHouse:</p>
 <figure class="code"><figcaption><span><code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> lines 37–38</span></figcaption><pre><code><span class="ln">37</span>      # Service Map fix. See gap 2 in docs/FINDINGS.md.
 <span class="ln">38</span>      - { name: OTEL_BSP_SCHEDULE_DELAY, value: &quot;500&quot; }</code></pre></figure>
 <p>That helps, but it doesn't make these pages exact. This lab runs two collectors, and a parent and child on different collectors can never share an insert. These are the counts from this tutorial's load run, measured against real calls:</p>

@@ -108,7 +108,7 @@ this section. Everything before them describes the default 5-second flush.
 - **Unknown:** why the timing lined up when it did, and how often this hits real deployments.
   A few searches of SigNoz's issue tracker found nothing, which is weak evidence.
 - **Fix applied:** `OTEL_BSP_SCHEDULE_DELAY=500` on both services, so spans flush inside the
-  collector's 1-second batch window. Measured over 5 minutes at 5 requests/s with 10% errors:
+  collector's default 1-second batch window. Measured over 5 minutes at 5 requests/s with 10% errors:
 
   | | 5-second flush (default) | 500 ms flush |
   |---|---|---|
@@ -120,7 +120,8 @@ this section. Everything before them describes the default 5-second flush.
 - **Limits of that test:**
   - It was short, on one node, with one collector replica and almost no network delay.
   - Map counts were still about 15% low, most likely from pairs split across two batches.
-  - **It does not hold with two collectors:** accuracy fell to 41%. See "Two nodes and HA".
+  - **It does not hold with two collectors:** accuracy fell to 41%. See "Two nodes and HA". A
+    5-second collector batch later reached 74% in one run. See "Resource use".
   - Exports can be up to 10× more frequent. The cost of that was not measured.
 - **Other options (Untested):**
   - Add a `loadbalancing` exporter keyed on trace ID, so a whole trace reaches one collector.
@@ -358,21 +359,43 @@ share, so they aren't truly per node. The lab has no dashboard for any of this y
 
 ## Resource use
 
-Measured 2026-11-07 with both labs running on k3d:
+Measured 2026-11-07 with both labs running on k3d, after the tuning below:
 
 | | Idle | Load generator at 5 requests/s |
 |---|---|---|
-| All pods, CPU | About 0.5 core | About 0.8 core |
-| All pods, memory | About 5.3 GiB | About 5.4 GiB |
-| ClickHouse | 0.3 core, 3.1 GiB | 0.5 core, 3.2 GiB |
-| ZooKeeper | 0.05 core, 0.9 GiB | 0.08 core, 0.9 GiB |
-| Docker Desktop's VM on the Mac | About 0.6 core | About 2.2 cores |
+| All pods, CPU | 0.25 to 0.3 core | 0.6 to 0.7 core |
+| All pods, memory | About 4.3 GiB | About 4.4 GiB |
+| ClickHouse | 0.12 to 0.17 core, 2.6 GiB | 0.23 to 0.35 core, 2.7 GiB |
+| ZooKeeper | 0.02 core, 0.4 GiB | 0.03 core, 0.4 GiB |
+| Docker Desktop's VM on the Mac | 0.5 to 0.9 core | 0.6 to 1.6 cores |
 
-- **Memory is a fixed cost.** It barely changes with traffic, and most of it is ClickHouse and ZooKeeper.
+- **Memory is a fixed cost.** It barely changes with traffic, and most of it is ClickHouse.
 - **The Docker VM costs more than the pods,** because of virtualization.
-- **ClickHouse logs heavily about itself.** It held 1.83 GiB of system logs, led by `zookeeper_log` at
-  761 MiB, against about 150 MiB of telemetry. Reducing those logs may be the biggest saving, but this
-  is **Untested**.
+- **Other projects share that VM.** Containers from other work on the same machine were using up to
+  a whole core during these tests, so the VM figures are approximate.
+
+### Reducing ClickHouse's own load
+
+Two changes, both in `signoz/signoz-values.yaml`:
+
+| | Before | After |
+|---|---|---|
+| ClickHouse's logs about itself | About 165,000 rows a minute | About 4,500 rows a minute |
+| Writes in the test window, same load | 5,775 | 1,672 |
+| CPU spent on those writes | 28.1 seconds | 7.5 seconds |
+| ClickHouse CPU under load | 0.4 to 0.7 core | 0.2 to 0.3 core |
+| ZooKeeper memory | 904 MiB | About 400 MiB |
+| All pods, memory | About 5.4 GiB | About 4.4 GiB |
+
+- **Turning off the self-logging didn't reduce CPU.** It saved disk and memory. In one measurement
+  those logs took 1.83 GiB, against about 150 MiB of telemetry.
+- **The CPU cost was the writes.** With a 1-second batch, ClickHouse took about 24 small writes a
+  second. A 5-second batch cut that by 71%.
+- **Other containers were quieter in the second run,** so the CPU comparison is partly confounded.
+  The write counts aren't affected.
+- **The Service Map improved slightly.** `lab1-frontend → lab1-backend` went from 62% to 74% of real
+  calls, because a longer batch keeps more parents and children in one insert. That's one run with
+  two collectors, so don't treat 74% as a fixed figure. It varied from 0 to 74% across runs.
 
 ## Not caused by SigNoz
 
