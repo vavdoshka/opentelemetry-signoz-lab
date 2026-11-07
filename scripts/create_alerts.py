@@ -4,15 +4,16 @@
 import json
 from pathlib import Path
 
-from signoz_client import SIGNOZ_URL, login, read_credentials, received_alerts, request, wait_for
+from signoz_client import API_KEY, SIGNOZ_URL, received_alerts, request, session, wait_for
 
 ALERTS = Path(__file__).resolve().parent.parent / "labs/lab4-alerts/alerts.json"
 
 
 def existing(token, path, key):
     status, result = request(f"{SIGNOZ_URL}{path}", token=token)
-    if status != 200:
-        raise SystemExit(f"Could not read {path} (HTTP {status}).")
+    # SigNoz answers unknown paths with its web page and a 200, so check for JSON too.
+    if status != 200 or not result:
+        raise SystemExit(f"Could not read {path} (HTTP {status}). Check SIGNOZ_URL and the key's role.")
     data = result["data"]
     items = data.get(key, []) if isinstance(data, dict) else data
     return items or []
@@ -20,8 +21,7 @@ def existing(token, path, key):
 
 def main():
     alerts = json.loads(ALERTS.read_text())
-    credentials = read_credentials()
-    token = login(credentials) if credentials else None
+    token = session()
     if not token:
         raise SystemExit("Could not log in to SigNoz, so no alerts were created.")
 
@@ -54,6 +54,10 @@ def main():
             if status not in (200, 204):
                 raise SystemExit(f"Could not remove rule {rule['alert']} (HTTP {status}): {json.dumps(result)[:400]}")
             print(f"Removed rule: {rule['alert']}")
+
+    # This check needs the lab's sink, so it doesn't apply to another SigNoz.
+    if API_KEY:
+        return
 
     # A created channel proves nothing, so send one through it and see that it arrives.
     # This can take a few tries, because a new Service isn't routable the moment its

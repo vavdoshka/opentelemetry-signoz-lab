@@ -27,6 +27,7 @@ the HTML files directly, because the pages load their saved examples through it.
 | `lab3.html` | Lab 3: what Kubernetes tells you, and the extra scrape jobs |
 | `incident-throttling.html`, `-oom`, `-liveness`, `-node`, `-apiserver` | Lab 3: five failures at the pod, node and API server level |
 | `lab4.html` | Lab 4: alert rules, each proved against a real failure |
+| `automate.html` | How to set up the metrics, dashboards and alerts on your own cluster |
 | `queries.html` | Working searches for traces, logs and metrics, labelled by lab, plus ClickHouse SQL |
 | `gaps.html` | What a plain install leaves out, and possible fixes |
 
@@ -53,8 +54,8 @@ generator when you finish.
 
 ## If the lab is down
 
-The pages still work. Each lab is checked on its own, so Lab 1 keeps working when Lab 2 is not
-deployed, which is normal after `make up`. A banner reports both labs, live buttons for anything
+The pages still work. Each lab is checked on its own, so Lab 1 keeps working when the later labs
+aren't deployed, which is normal after `make up`. A banner reports each lab, live buttons for anything
 down turn off, and every walkthrough shows its saved example from a real run.
 
 ## Saved data

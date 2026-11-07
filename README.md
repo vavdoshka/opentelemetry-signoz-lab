@@ -3,26 +3,24 @@
 [![e2e](https://github.com/vavdoshka/opentelemetry-signoz-lab/actions/workflows/e2e.yml/badge.svg)](https://github.com/vavdoshka/opentelemetry-signoz-lab/actions/workflows/e2e.yml)
 
 A hands-on lab for learning OpenTelemetry on Kubernetes with SigNoz, the open source observability
-platform. Get traces, metrics and logs from an app with no code changes, debug real incidents, then
-add custom dimensions only where you need them, monitor the Kubernetes underneath, and get alerted.
-One command, on k3d or kind.
+platform. Get traces, metrics and logs from an app with no code changes, debug real incidents, add
+custom dimensions only where you need them, watch the Kubernetes underneath, and get alerted when it
+breaks. One command, on k3d or kind.
 
-![Sneak peek: the tutorial, the lab app, a live incident, a trace down to the failing SQL, and a dashboard](docs/images/sneak-peek.gif)
+![Sneak peek: the tutorial, the lab app, a live incident, a trace down to the failing SQL, a dashboard, Kubernetes failures, and alerts](docs/images/sneak-peek.gif)
 
-| | Lab 1: hands-off | Lab 2: custom dimensions |
-|---|---|---|
-| **The app** | Contains no OpenTelemetry code | Lab 1 plus a few OpenTelemetry API calls |
-| **Telemetry comes from** | The OpenTelemetry Operator, at pod start | The same agent, plus what your code adds |
-| **You learn** | How much you get for free, and how to debug six incidents with it | How to slice telemetry by things only your code knows |
+| Lab | What you do | What you learn | Start it |
+|---|---|---|---|
+| **1. Hands-off** | Get telemetry from an app with no OpenTelemetry code | How much you get for free, through six incidents | `make up` |
+| **2. Custom dimensions** | Add a few OpenTelemetry API calls, only where they help | How to slice telemetry by things only your code knows, through four incidents | `make lab2` |
+| **3. Kubernetes** | Run a workload with real limits, and scrape the kubelet, cAdvisor and API server | How to debug throttling, OOM kills and failed probes, through five incidents, and which metrics quietly miss them | `make lab3` |
+| **4. Alerts** | Add eight alert rules, and a page showing what they send | How to write alerts that fire for real failures, and how long they take | `make lab4` |
 
-| | Lab 3: Kubernetes | Lab 4: alerts |
-|---|---|---|
-| **What it adds** | A workload with real limits and probes, plus scrape jobs for the kubelet, cAdvisor and the API server | Eight alert rules and a place to receive them |
-| **You learn** | How to debug throttling, OOM kills and failed probes, and which metrics quietly miss them | How to write alerts that fire for real failures, and how long they take |
+Each lab builds on the one before and adds only what it needs. They run side by side on a local
+two-node cluster and send to the same SigNoz.
 
-You don't have to choose. Each lab builds on the one before and adds only what it needs. They run
-side by side on a local two-node cluster and send to the same SigNoz, and an interactive tutorial
-walks you through them.
+An interactive tutorial walks you through all of it: 26 pages, with buttons that trigger real
+failures, 89 saved searches, and code quoted straight from this repo.
 
 ## What you'll learn
 
@@ -54,12 +52,14 @@ walks you through them.
 - Read pod, node, kubelet and API server metrics, and tell a pod problem from a node problem
 - Scrape Prometheus endpoints into SigNoz with a keep-list, and see what that costs
 - How k3s differs from a real API server
+- See what collects what, and why there's no node-exporter or kube-state-metrics
 
 **Lab 4: get told when it breaks**
 
 - Write metric, trace and log alerts, including one that fires when data stops arriving
 - Choose a signal that really sees the failure, and a threshold above your normal
 - Send notifications through a webhook, and measure how long they take
+- Automate dashboards and alerts with a service account, instead of a password
 
 **Running it for real**
 
@@ -73,6 +73,10 @@ walks you through them.
 | A failing request, traced down to the SQL | A dashboard built on custom dimensions |
 |---|---|
 | ![Trace of a failed request across frontend, backend and SQL](docs/images/failing-request-trace.png) | ![SigNoz dashboard showing orders, revenue, and latency by cache result](tutorial/screenshots/dimensions-dashboard.png) |
+
+| Throttling, restarts and OOM kills | Alerts from real failures |
+|---|---|
+| ![SigNoz dashboard showing CPU throttling, memory and container restarts](tutorial/screenshots/lab3-pod-failures.png) | ![Alert sink listing firing and resolved notifications from SigNoz](docs/images/alerts-received.png) |
 
 ## Prerequisites
 
@@ -109,27 +113,29 @@ make up
 The first run downloads several images, so allow about 5 to 10 minutes. It finishes with a smoke test
 that proves traces, logs and metrics are reaching SigNoz.
 
+Then start the tutorial, which takes it from there:
+
+```bash
+make tutorial  # then open http://127.0.0.1:8765
+```
+
+Add the other labs when you reach them:
+
+```bash
+make lab2      # custom dimensions
+make compare   # sends Labs 1 and 2 the same requests and shows what each captured
+make lab3      # Kubernetes
+make lab4      # alerts. Needs Lab 3
+```
+
 | What | Where |
 |---|---|
-| Lab 1 | http://lab1.localhost:8080 |
+| Tutorial | http://127.0.0.1:8765, after `make tutorial` |
 | SigNoz | http://signoz.localhost:8080 (the generated login is in `.lab-credentials`) |
-| Tutorial | Run `make tutorial`, then open http://127.0.0.1:8765 |
+| Labs 1 to 3 | http://lab1.localhost:8080, and `lab2`, `lab3` in the same form |
+| Alerts received | http://lab4.localhost:8080 |
 
-Start the load generator in the lab's page, so SigNoz has data to show.
-
-When you're ready for Lab 2:
-
-```bash
-make lab2      # adds it at http://lab2.localhost:8080
-make compare   # sends both labs the same requests and shows what each captured
-```
-
-Then Labs 3 and 4:
-
-```bash
-make lab3      # a workload with real limits, at http://lab3.localhost:8080
-make lab4      # alert rules, and a page showing what they send, at http://lab4.localhost:8080
-```
+Start the load generator on a lab's page, so SigNoz has data to show, and stop it when you finish.
 
 ## Commands
 
@@ -137,11 +143,11 @@ make lab4      # alert rules, and a page showing what they send, at http://lab4.
 |---|---|
 | `make check` | Checks the prerequisites |
 | `make up` | Creates the cluster and deploys SigNoz and Lab 1. Safe to rerun, and recovers the lab after a restart |
-| `make lab2` | Deploys Lab 2 and its SigNoz dashboard, or redeploys it after you change its code |
 | `make lab1` | Redeploys Lab 1 after you change its code |
+| `make lab2` | Deploys Lab 2 and its SigNoz dashboard, or redeploys it after you change its code |
 | `make lab3` | Deploys Lab 3, its extra scrape jobs and its dashboards |
 | `make lab4` | Deploys Lab 4's alert sink and rules, and proves a notification gets through. Needs Lab 3 |
-| `make compare` | Shows what SigNoz captures from each lab |
+| `make compare` | Shows what SigNoz captures from Labs 1 and 2 |
 | `make status` | Shows nodes, pods and URLs |
 | `make tutorial` | Runs the interactive tutorial |
 | `make down` | Deletes the cluster and all its data |
@@ -149,9 +155,9 @@ make lab4      # alert rules, and a page showing what they send, at http://lab4.
 k3d is the default. To use kind, run `make up PROVIDER=kind`. The other commands find the running
 cluster themselves.
 
-## The test app
+## The test apps
 
-Both labs run the same app: `frontend → backend → Postgres`, two Python FastAPI services that send
+Labs 1 and 2 run the same app: `frontend → backend → Postgres`, two Python FastAPI services that send
 telemetry through the SigNoz agent on their node. Lab 2 runs two replicas of each, one per node. The
 UI has a button for each scenario:
 
@@ -171,7 +177,7 @@ UI has a button for each scenario:
 | `free_orders` | Five orders with a coupon. Everything succeeds, but revenue is zero |
 | `cache_miss` | Six catalogue lookups. Some are slow, for no visible reason |
 
-The last three are the point of Lab 2. Both labs have those bugs, but Lab 1 can only show the
+The last three are the point of Lab 2. Both apps have those bugs, but Lab 1 can only show the
 symptoms. Lab 2 adds the dimensions that explain them.
 
 Lab 3 runs a separate workload with real limits and a liveness probe. Each scenario makes Kubernetes
@@ -186,26 +192,61 @@ step in:
 | `api_flood` | Lists pods from the API server up to 20 times a second |
 | `api_denied` | Asks the API server for secrets it isn't allowed to read |
 
+Lab 4 adds no app of its own. Its rules watch Labs 1 and 3, so these same scenarios set them off.
+
+## Use it on your own cluster
+
+Everything in Labs 3 and 4 is scripted, so you can reuse it. The metrics are a Helm values file and an
+RBAC manifest. The dashboards and alerts come from two scripts that work on any SigNoz, with a service
+account's key:
+
+```bash
+export SIGNOZ_URL=https://signoz.example.com
+export SIGNOZ_API_KEY=...   # a service account's key, with the signoz-editor role
+
+python3 scripts/create_dashboard.py 3
+python3 scripts/create_alerts.py
+```
+
+They're safe to run repeatedly. The tutorial's **Automate it** page covers what to change, which roles
+you need, and three traps that pass unnoticed in a pipeline.
+
 ## What we found
 
+Every claim here comes from causing the failure and reading what each signal did. Some of the results
+were surprises:
+
+- **`container_oom_events_total` read 0 through a real OOM kill.** Only restarts grouped by
+  `last_terminated_reason` showed it.
+- **Memory against limit misled both ways.** It read 99.5% during a harmless file write, because it
+  counts page cache, and 86% just before a real kill.
+- **Average CPU hid throttling.** A pod showing 23% of its limit was throttled in 19 to 32% of its CPU
+  periods. With a little more load, the same limit got a healthy pod killed by its liveness probe.
+- **549 denied API calls never reached `apiserver_request_total`,** on k3s 1.26. The app's own client
+  spans showed all of them.
+- **Alerts took about 4 minutes to arrive,** and that's by design: SigNoz reads data that's 2 minutes
+  old, so late data can land.
+
+The full write-ups:
+
 - **[Findings](docs/FINDINGS.md):** what works with no configuration, what doesn't, what custom
-  dimensions add, and a node crash test.
+  dimensions add, Kubernetes coverage, alert timings, resource use and a node crash test.
 - **[Benchmark](docs/BENCHMARK.md):** the lab scored against OpenTelemetry and SigNoz guidance.
 - **[Configuration log](docs/CONFIG.md):** every non-default setting, and why.
 
 ## Tested on
 
-Both labs boot from nothing, and `make compare` gives the same results, on all of these:
+| Platform | Provider | Labs 1 and 2 | Labs 3 and 4 |
+|---|---|---|---|
+| macOS, Apple Silicon | k3d 5.5.0 | Yes | Yes, every scenario and alert |
+| macOS, Apple Silicon | kind 0.22.0 | Yes | Not tested |
+| Ubuntu, x86 (the e2e workflow) | k3d 5.9.0 | Yes | Yes, scrape jobs and one real alert |
+| Ubuntu, x86 (the e2e workflow) | kind 0.33.0 | Yes | Yes, scrape jobs and one real alert |
 
-| Platform | Provider |
-|---|---|
-| macOS, Apple Silicon | k3d 5.5.0 |
-| macOS, Apple Silicon | kind 0.22.0 |
-| Ubuntu, x86 (the e2e workflow) | k3d 5.9.0 |
-| Ubuntu, x86 (the e2e workflow) | kind 0.33.0 |
-
+"Yes" for Labs 1 and 2 means they boot from nothing and `make compare` gives the same results.
 Rerunning `make up` is tested in the e2e workflow and on k3d on macOS. Recovery after stopping the
-cluster is tested on k3d on macOS. Other platforms, including Windows and Linux on ARM, are untested.
+cluster is tested on k3d on macOS, with Labs 1 and 2. Other platforms, including Windows and Linux on
+ARM, are untested.
 
 ## Troubleshooting
 
@@ -220,6 +261,12 @@ data.
 SIGNOZ_EMAIL=you@example.com
 SIGNOZ_PASSWORD=your-password
 ```
+
+**A dashboard says "No data in this time range".** The Pod dashboard's namespace selector starts on
+`default`, which has no pods. Choose `lab3` at the top of the page.
+
+**An alert hasn't arrived.** Allow about 4 minutes, or about 6 for `telemetry stopped`. That one
+arrives as `[No data] Lab 3: telemetry stopped`.
 
 **Pods fail with "too many open files" on Linux.** Raise the inotify limit:
 `sudo sysctl fs.inotify.max_user_instances=1024`.

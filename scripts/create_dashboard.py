@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from signoz_client import SIGNOZ_URL, login, read_credentials, request
+from signoz_client import SIGNOZ_URL, request, session
 
 ROOT = Path(__file__).resolve().parent.parent
 # SigNoz's own dashboards (Apache-2.0), pinned so upstream changes can't break the lab.
@@ -44,16 +44,17 @@ def main():
     dashboards = [json.loads(path.read_text()) for path in LOCAL[lab] if path.exists()]
     dashboards += [fetch(path) for path in REMOTE[lab]]
 
-    credentials = read_credentials()
-    token = login(credentials) if credentials else None
+    token = session()
     if not token:
         raise SystemExit("Could not log in to SigNoz, so no dashboards were created.")
 
+    # SigNoz answers unknown paths with its web page and a 200, so check for JSON too.
     status, existing = request(f"{SIGNOZ_URL}/api/v2/dashboards", token=token)
-    if status != 200:
-        raise SystemExit(f"Could not list dashboards (HTTP {status}).")
+    if status != 200 or not existing:
+        raise SystemExit(f"Could not list dashboards (HTTP {status}). Check SIGNOZ_URL and the key's role.")
     present = json.dumps(existing["data"])
 
+    # Posting a dashboard twice creates two copies, so check first.
     for dashboard in dashboards:
         name = dashboard["spec"]["display"]["name"]
         if name in present:

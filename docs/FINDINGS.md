@@ -1,7 +1,8 @@
 # SigNoz evaluation: what a dev gets from plain OpenTelemetry + a simple install
 
 Most of these findings were measured on an earlier hand-instrumented version of the app, in the
-namespace `lab`. The section "Hands-off versus custom dimensions" covers today's two labs.
+namespace `lab`. "Hands-off versus custom dimensions" covers today's Labs 1 and 2, and "Kubernetes
+coverage" and "Alerts" cover Labs 3 and 4.
 
 Tested 2026-11-04 with SigNoz chart 0.149.0, k8s-infra chart 0.17.1, ClickHouse 25.12.5,
 k3s v1.26.4 on k3d, OTel Python SDK 1.45.2 (instrumentation 0.66b2), Python 3.13.
@@ -459,6 +460,25 @@ name has to allow for that. A test that matched the exact name reported that thi
 
 **`eval_window` in SigNoz's log is misleading.** It logs 300000 for every rule, because that's a legacy
 field that defaults to 5 minutes. The query uses `evaluation.spec.evalWindow`, as the timings confirm.
+
+## Automating it
+
+Tested 2026-11-07 on k3d with real service account keys, then deleted. Terraform wasn't run.
+
+| Role | Read dashboards and rules | Create dashboards and rules | Create channels |
+|---|---|---|---|
+| None | 403 | 403 | |
+| `signoz-viewer` | 200 | 403 | |
+| `signoz-editor` | 200 | 201 | 403 |
+| `signoz-admin` | | | 201 |
+
+- **Keys use the `SigNoz-Api-Key` header.** A deleted key gets a 401.
+- **Posting a dashboard twice creates two copies,** with a 201 each time.
+- **Unknown paths return the web app with a 200,** so `curl -f` passes. A mistyped role assignment
+  returned 200 and did nothing.
+- **Deleted service accounts stay in the list,** marked `deleted`, with no keys or roles.
+- **The Terraform provider is Untested.** Its documentation describes typed snake_case dashboards,
+  so exported camelCase JSON probably can't be loaded as it is.
 
 ## Resource use
 

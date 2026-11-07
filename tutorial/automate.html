@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Automate it | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="automate">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Reference</p>
+<h1>Automate it</h1>
+<p class="lead">Everything in Labs 3 and 4 is scripted, so you can use the same pieces on your own cluster. This page shows how, with a proper identity instead of a password, and the traps that turned up when we tested it.</p>
+
+<h2>What <code>make</code> really runs</h2>
+<p>Nothing in Labs 3 and 4 is clicked by hand. Each step is a file in this repo and a standard tool:</p>
+<table>
+  <thead><tr><th>Step</th><th>How</th><th>Where</th></tr></thead>
+  <tbody><tr><td>Collect more metrics</td><td><code>helm upgrade</code> with an extra values file</td><td><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code></td></tr><tr><td>Allow the collector to read them</td><td><code>kubectl apply</code></td><td><code>labs/lab3-kubernetes/k8s/metrics-rbac.yaml</code></td></tr><tr><td>Create dashboards</td><td><code>POST /api/v2/dashboards</code></td><td><code>scripts/create_dashboard.py</code></td></tr><tr><td>Create the channel and rules</td><td><code>/api/v2/notification_channels</code>, <code>/api/v2/rules</code></td><td><code>scripts/create_alerts.py</code>, <code>labs/lab4-alerts/alerts.json</code></td></tr></tbody>
+</table>
+
+<h2>1. Collect the metrics</h2>
+<p>This part is ordinary Helm and <code>kubectl</code>, so it fits any pipeline or GitOps tool:</p>
+<figure class="code"><pre><code>kubectl apply -f labs/lab3-kubernetes/k8s/metrics-rbac.yaml
+
+helm repo add signoz https://charts.signoz.io
+helm upgrade --install k8s-infra signoz/k8s-infra --version 0.17.1 \
+  --namespace signoz \
+  -f signoz/k8s-infra-values.yaml \
+  -f labs/lab3-kubernetes/k8s-infra-values.yaml</code></pre></figure>
+<p>Change these for your own cluster:</p>
+<table>
+  <thead><tr><th>File</th><th>Change</th></tr></thead>
+  <tbody><tr><td><code>signoz/k8s-infra-values.yaml</code></td><td><code>otelCollectorEndpoint</code> and <code>global.clusterName</code></td></tr><tr><td><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code></td><td><code>presets.prometheus.namespaces</code>: use a namespace with no pods annotated <code>signoz.io/scrape</code>, or you'll also scrape those. Review the keep-lists too</td></tr><tr><td><code>labs/lab3-kubernetes/k8s/metrics-rbac.yaml</code></td><td>The subject, if your release or namespace differs from <code>k8s-infra</code> in <code>signoz</code></td></tr></tbody>
+</table>
+<p>Two things are fine for a lab but worth a decision on a real cluster. The kubelet jobs use <code>insecure_skip_verify</code>, like the chart's own default. And they run in one collector, so on a big cluster you'd move them to the node agents. <span class="badge untested">Untested</span></p>
+
+<h2>2. Give automation its own identity</h2>
+<p>Don't put a person's password in a pipeline. <code>make lab3</code> uses the lab's login only because it created that login itself. For anything else, create a service account: <strong>Settings</strong>, then <strong>Service Accounts</strong>, then <strong>New Service Account</strong>. Give it a role and a key, and keep the key in your secret store.</p>
+<p>Roles matter, so we tested each one with a real key:</p>
+<table>
+  <thead><tr><th>Role</th><th>Read dashboards and rules</th><th>Create dashboards and rules</th><th>Create channels</th></tr></thead>
+  <tbody><tr><td>None</td><td>403</td><td>403</td><td></td></tr><tr><td><code>signoz-viewer</code></td><td>200</td><td>403</td><td></td></tr><tr><td><code>signoz-editor</code></td><td>200</td><td><strong>201</strong></td><td><strong>403</strong></td></tr><tr><td><code>signoz-admin</code></td><td></td><td></td><td><strong>201</strong></td></tr></tbody>
+</table>
+<p>So use <code>signoz-editor</code> day to day. Channels change rarely, so create them once with an admin, in the UI or with a separate key. An editor key can still list them, and rules can name them.</p>
+
+<h2>3. Create dashboards and alerts</h2>
+<p>The lab's scripts work on any SigNoz. Set two variables, and they use the key instead of the lab's login:</p>
+<figure class="code"><pre><code>export SIGNOZ_URL=https://signoz.example.com
+export SIGNOZ_API_KEY=...   # from your secret store
+
+python3 scripts/create_dashboard.py 3
+python3 scripts/create_alerts.py</code></pre></figure>
+<p>Both are safe to run again and again. <code>create_dashboard.py</code> skips dashboards that exist. <code>create_alerts.py</code> updates changed rules, and removes rules labelled <code>lab: lab4</code> that left the file. Before using it, point the channel in <code>alerts.json</code> at your own service, and change the rules' filters and thresholds to suit your apps.</p>
+<p>In a pipeline, run them after a merge, so that the repo decides what's in SigNoz. This GitHub Actions step shows the idea, though this exact job hasn't been run: <span class="badge untested">Untested</span></p>
+<figure class="code"><pre><code>- run: python3 scripts/create_dashboard.py 3 &amp;&amp; python3 scripts/create_alerts.py
+  env:
+    SIGNOZ_URL: ${{ vars.SIGNOZ_URL }}
+    SIGNOZ_API_KEY: ${{ secrets.SIGNOZ_API_KEY }}</code></pre></figure>
+
+<h3>With only curl</h3>
+<p>For a one-off, the API is simple. These commands import this lab's dashboard, and one of SigNoz's:</p>
+<figure class="code"><pre><code>curl -sS -X POST "$SIGNOZ_URL/api/v2/dashboards" \
+  -H "SigNoz-Api-Key: $SIGNOZ_API_KEY" -H 'content-type: application/json' \
+  --data @labs/lab3-kubernetes/dashboard.json
+
+curl -fsSL https://raw.githubusercontent.com/SigNoz/dashboards/7d43df2673039ba200e94eb87adcca5674434f0d/k8s-system-monitoring/kubernetes-etcd.json \
+  | curl -sS -X POST "$SIGNOZ_URL/api/v2/dashboards" \
+      -H "SigNoz-Api-Key: $SIGNOZ_API_KEY" -H 'content-type: application/json' --data @-</code></pre></figure>
+
+<h2>Three traps</h2>
+<p>All three turned up when we tested this, and each would pass unnoticed in a pipeline:</p>
+<table>
+  <thead><tr><th>Trap</th><th>What happens</th><th>What to do</th></tr></thead>
+  <tbody><tr><td><strong>Repeat runs</strong></td><td>Posting the same dashboard twice creates two copies, with no error</td><td>Check by name first, as <code>create_dashboard.py</code> does</td></tr><tr><td><strong>A wrong path looks like success</strong></td><td>SigNoz answers unknown paths with its web page and a 200, so <code>curl -f</code> passes</td><td>Check the reply is JSON. Don't trust the status alone</td></tr><tr><td><strong>A role assigned the wrong way</strong></td><td>For the same reason, a mistyped role request returned 200 and did nothing. Every call then got a 403</td><td>Use <code>POST /api/v1/service_account_roles</code>, and test the key afterwards</td></tr></tbody>
+</table>
+<p>SigNoz publishes its API, with worked examples, as <code>docs/api/openapi.yml</code> in its repo. Use the file from the tag you run.</p>
+
+<h2>Terraform</h2>
+<p>SigNoz also publishes a <a href="https://github.com/SigNoz/terraform-provider-signoz" target="_blank" rel="noopener">Terraform provider</a>, version 0.1.6 at the time of writing, with resources for dashboards, rules, channels and service accounts. It's worth a look if you already use Terraform. <span class="badge untested">Untested</span> We read its documentation but haven't run it, so this is what the documentation says:</p>
+<ul>
+  <li>It takes the same kind of service account key, through <code>SIGNOZ_ACCESS_TOKEN</code>, and the URL through <code>SIGNOZ_ENDPOINT</code>.</li>
+  <li>Its dashboards are typed HCL in snake_case, such as <code>refresh_interval</code>, while exported dashboards are camelCase JSON. So you probably can't load an exported JSON file as it is.</li>
+  <li>It supports <code>terraform import</code>, so you could build a dashboard in the UI and bring it under Terraform.</li>
+</ul>
+
+<div class="quiz" data-quiz="au1"><p class="q">Check yourself: Your pipeline posts a dashboard on every merge. What happens after three merges?</p><button type="button" data-right="false" data-why="A POST creates a new one each time.">The dashboard is updated three times.</button><button type="button" data-right="true" data-why="So check by name first, or use create_dashboard.py.">You have three copies.</button><button type="button" data-right="false" data-why="They succeed with a 201, which is why it goes unnoticed.">The second and third fail with a conflict.</button></div>
+<div class="quiz" data-quiz="au2"><p class="q">Check yourself: Which role should a pipeline use to manage dashboards and rules?</p><button type="button" data-right="false" data-why="It works, but it can do far more than the pipeline needs.">signoz-admin, to be safe.</button><button type="button" data-right="true" data-why="It can create both. Only channels need an admin, and those rarely change.">signoz-editor.</button><button type="button" data-right="false" data-why="It can read, but creating gets a 403.">signoz-viewer.</button></div>
+
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

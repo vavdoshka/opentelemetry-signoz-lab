@@ -125,6 +125,12 @@ labelled `lab: lab4` that it no longer lists.
 shows it at `lab4.localhost:8080`. To use a real service, change the channel's `config` in
 `alerts.json`. SigNoz's OpenAPI file (`docs/api/openapi.yml` in its repo) has an example for each one.
 
+## Automation
+
+`scripts/create_dashboard.py` and `scripts/create_alerts.py` read `SIGNOZ_URL` and `SIGNOZ_API_KEY`.
+With those set, they use a service account's key instead of the lab's login, so they work on any
+SigNoz. `tutorial/automate.html` covers this, and `FINDINGS.md` has what was tested.
+
 ## k8s-infra
 
 | What | Where | Why |

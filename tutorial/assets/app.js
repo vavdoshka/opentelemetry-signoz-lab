@@ -31,6 +31,7 @@
     { id: 'lab4', href: 'lab4.html', title: 'Alerts that reach you', group: 'Lab 4: alerts' },
     { id: 'queries', href: 'queries.html', title: 'Search query reference', group: 'Reference' },
     { id: 'setup', href: 'setup.html', title: 'How SigNoz is configured', group: 'Reference' },
+    { id: 'automate', href: 'automate.html', title: 'Automate it', group: 'Reference' },
     { id: 'gaps', href: 'gaps.html', title: 'What is missing, and fixes', group: 'Reference' },
   ];
 

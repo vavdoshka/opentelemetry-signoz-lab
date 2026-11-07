@@ -76,6 +76,14 @@
 </table>
 <p>The defaults come from the kubelet's summary API, which doesn't include these. They're on the kubelet's and the API server's Prometheus endpoints, so this lab scrapes them.</p>
 
+<h2>What collects it</h2>
+<p>If you've used Prometheus on Kubernetes, you might expect node-exporter, kube-state-metrics and a Prometheus server. <strong>None of those run here.</strong> <code>k8s-infra</code> installs OpenTelemetry collectors, and their <em>receivers</em> do the same jobs:</p>
+<table>
+  <thead><tr><th>Runs as</th><th>Receiver</th><th>What it collects</th><th>Does the job of</th></tr></thead>
+  <tbody><tr><td>Node agent, one per node</td><td><code>kubeletstats</code></td><td>Pod, container, node and volume usage, from the kubelet</td><td>Scraping usage from cAdvisor</td></tr><tr><td>Node agent</td><td><code>hostmetrics</code></td><td>The machine: CPU, memory, disk, network</td><td>node-exporter</td></tr><tr><td>Node agent</td><td><code>filelog/k8s</code></td><td>Container logs</td><td>A log shipper</td></tr><tr><td>Node agent</td><td><code>otlp</code></td><td>Your apps' traces, metrics and logs</td><td></td></tr><tr><td>Cluster collector, one in the cluster</td><td><code>k8s_cluster</code></td><td>Object state: restarts, node conditions, replicas</td><td>kube-state-metrics</td></tr><tr><td>Cluster collector</td><td><code>k8s_events</code></td><td>Kubernetes events, stored as logs</td><td>An event exporter</td></tr><tr><td>Cluster collector</td><td><code>prometheus/scraper</code>, <strong>added by Lab 3</strong></td><td>Anything with a Prometheus endpoint</td><td>A Prometheus server</td></tr></tbody>
+</table>
+<p>Everything then goes to SigNoz's own collector over OTLP. One rule to remember: the agents run on every node, so they collect what's local to a node. The cluster collector runs once, so it handles what would otherwise be counted twice. Its <code>prometheus/scraper</code> receiver is what Lab 3 adds, and it's why the kubelet and cAdvisor can be read without installing anything else.</p>
+
 <h2>The scrape jobs</h2>
 <p>All four are in <code>labs/lab3-kubernetes/k8s-infra-values.yaml</code>. This is the one that adds throttling:</p>
 <figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code> lines 33–49</span></figcaption><pre><code><span class="ln">33</span>      # cAdvisor, which is built into the kubelet: throttling and OOM events.
@@ -141,7 +149,7 @@
 </ul>
 
 <h2>Dashboards</h2>
-<p>The first four are SigNoz's own, unchanged, from <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a>. They're pinned to one commit, so upstream changes can't break the lab.</p>
+<p>The first four are SigNoz's own, unchanged, from <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a>. They're pinned to one commit, so upstream changes can't break the lab. <code>make lab3</code> imports them through SigNoz's API, and you can also use Dashboards, then New dashboard, then Import JSON. <a href="automate.html">Automate it</a> shows how to do all of this on your own cluster.</p>
 <table>
   <thead><tr><th>Dashboard</th><th>Use it for</th></tr></thead>
   <tbody><tr><td>Kubernetes Pod Metrics - Detailed</td><td>CPU, memory, network and disk per pod</td></tr><tr><td>Kubernetes Node Metrics - Detailed</td><td>The same, per node</td></tr><tr><td>Kubernetes Kubelet</td><td>Running pods, container runtime operations, pod start time</td></tr><tr><td>Kubernetes API Server</td><td>Requests by verb and status, latency, in-flight requests</td></tr><tr><td><strong>Lab 3: pod failures</strong></td><td>Throttling, limits, restarts and failed probes. No community dashboard covers these, so this lab adds its own</td></tr></tbody>
