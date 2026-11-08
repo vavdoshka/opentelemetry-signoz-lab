@@ -29,10 +29,10 @@
 <figure class="code"><pre><code>service.name = 'lab3-loadgen' AND has_error = true</code></pre></figure>
 
 <h2 class="step" id="look"><span class="n">3</span>Where to look</h2>
-<p>This is the surprise. Seven signals sound like they should show an OOM kill, and this is what each one did during a real kill:</p>
+<p>This is the surprise. Eight signals sound like they should show an OOM kill, and this is what each one did during a real kill. The last is only collected on kind:</p>
 <table>
   <thead><tr><th>Signal</th><th>What it showed</th><th>Useful?</th></tr></thead>
-  <tbody><tr><td><code>container_oom_events_total</code></td><td><strong>0, the whole time</strong></td><td>No</td></tr><tr><td><code>k8s.container.status.reason</code></td><td>0 for <code>OOMKilled</code></td><td>No</td></tr><tr><td>Kubernetes events</td><td>A generic <code>BackOff</code>, with no mention of memory</td><td>No</td></tr><tr><td><code>k8s.container.memory_limit_utilization</code></td><td>Peaked at 0.863, and read 0.995 when nothing was wrong</td><td>No</td></tr><tr><td><code>k8s.pod.memory.working_set</code></td><td>Climbed to 224 MiB, then the series restarted</td><td>An early warning</td></tr><tr><td><code>k8s.container.restarts</code> grouped by <code>k8s.container.status.last_terminated_reason</code></td><td><strong>Restart count 3, reason <code>OOMKilled</code></strong></td><td><strong>Yes</strong></td></tr><tr><td>The kernel log, collected by Lab 3</td><td><strong>The process, its memory and its container ID</strong></td><td><strong>Yes, the most detail</strong></td></tr></tbody>
+  <tbody><tr><td><code>container_oom_events_total</code></td><td><strong>0, the whole time</strong></td><td>No</td></tr><tr><td><code>k8s.container.status.reason</code></td><td>0 for <code>OOMKilled</code></td><td>No</td></tr><tr><td>Kubernetes events</td><td>A generic <code>BackOff</code>, with no mention of memory</td><td>No</td></tr><tr><td><code>k8s.container.memory_limit_utilization</code></td><td>Peaked at 0.863, and read 0.995 when nothing was wrong</td><td>No</td></tr><tr><td><code>k8s.pod.memory.working_set</code></td><td>Climbed to 224 MiB, then the series restarted</td><td>An early warning</td></tr><tr><td><code>k8s.container.restarts</code> grouped by <code>k8s.container.status.last_terminated_reason</code></td><td><strong>Restart count 3, reason <code>OOMKilled</code></strong></td><td><strong>Yes</strong></td></tr><tr><td>The kernel log, collected by Lab 3</td><td><strong>The process, its memory and its container ID</strong></td><td><strong>Yes, the most detail</strong></td></tr><tr><td>containerd&#x27;s log, collected by Lab 3 on kind</td><td><code>TaskOOM</code>, with the container ID</td><td>Yes</td></tr></tbody>
 </table>
 <p>Two searches find it. For a chart, use the Metrics Explorer: choose <code>k8s.container.restarts</code>, filter on <code>k8s.namespace.name = 'lab3'</code>, and group by <code>k8s.container.status.last_terminated_reason</code>. For the details, search the logs for the kernel's own record:</p>
 <figure class="code"><pre><code>k8s.pod.name CONTAINS 'kernel-log' AND body CONTAINS 'out of memory'</code></pre></figure>
@@ -48,6 +48,16 @@ finishedAt: 2026-11-07T19:24:30Z</code></pre></figure>
 ERROR Memory cgroup out of memory: Killed process 2162697 (uvicorn) total-vm:589180kB, anon-rss:259688kB, ...</code></pre></figure>
 <p>It names the process, and shows it holding 254 MiB of its 256 MiB limit. The <code>cpuset</code> value is the container ID, and it matches exactly the one Kubernetes reported for that kill: <code>containerd://d27ba4de75b6…</code>. No metric tells you that much.</p>
 <p>Exit code 137 means the process received <code>SIGKILL</code>. The timing fits: the app started at about 64 MiB, and (256 − 64) ÷ 2 is 96 seconds. The kill came 104 seconds after the leak started.</p>
+
+<h3>On kind</h3>
+<p>On kind, Lab 3 also reads the journal, where containerd recorded the kill with the same container ID that Kubernetes and the kernel reported:</p>
+<figure class="code"><pre><code>service.name = 'containerd' AND body CONTAINS 'TaskOOM'
+
+time="2026-11-08T12:22:13.767302464Z" level=info msg="TaskOOM event container_id:\"0686a99602f9…\""</code></pre></figure>
+<p>The kubelet&#x27;s own log only said that it removed the container, <code>RemoveContainer containerID="0686a99602f9…"</code>, with no mention of memory.</p>
+<p>The kernel&#x27;s kill line also arrives twice from each node there, because the kernel wrote it twice. On cgroup v2, Kubernetes 1.28 and later set <code>memory.oom.group</code>, so the kernel kills every process in the container and logs each one, including the first again:</p>
+<figure class="code"><pre><code>Tasks in /…/cri-containerd-0686a99602f9….scope are going to be killed due to memory.oom.group set</code></pre></figure>
+<p>kind 0.22 runs Kubernetes 1.29. The k3d cluster here runs 1.26, which doesn&#x27;t set it.</p>
 
 <h3>Why the obvious metrics miss it</h3>
 <ul>

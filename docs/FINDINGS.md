@@ -394,6 +394,15 @@ generator recorded 38 failed calls.
 `journalctl` and the image has none, so Lab 3 runs a small privileged DaemonSet that reads `/dev/kmsg`.
 On k3d both nodes share a kernel, so each line arrives twice.
 
+**On kind, containerd records the kill too, and the kernel logs it twice.** In an OOM kill on kind 0.22
+(Kubernetes 1.29), containerd's journal said `TaskOOM event container_id:"0686a99602f9…"`, the same ID as
+the kernel's `cpuset` and Kubernetes' `containerd://0686a99602f9…`. The kubelet only logged
+`RemoveContainer` for that ID, with no mention of memory. The kernel wrote the kill line twice, then
+`Tasks in …/cri-containerd-0686a99602f9….scope are going to be killed due to memory.oom.group set`: on
+cgroup v2, Kubernetes 1.28 and later set `memory.oom.group`, so the kernel kills and logs every process in
+the container, the first one again. k3s 1.26 doesn't. With two nodes sharing the kernel, that's four
+copies of the line in SigNoz.
+
 **`k8s.container.memory_limit_utilization` misleads both ways.** It counts page cache and is sampled
 every 30 seconds:
 
@@ -465,7 +474,9 @@ and the agents read its output.
 though, and only `journalctl` reads it. `labs/lab3-kubernetes/k8s/journal-log.yaml` runs `journalctl`
 as user 10001 in group 0 and prints the kubelet's and containerd's entries as JSON. `journalctl` 257,
 from the Lab 3 image, read kind 0.22's systemd 252 journal. Both services wrote nothing in an idle
-minute, and 84 lines across two nodes while the reader started and CoreDNS restarted.
+minute, and 84 lines across two nodes while the reader started and CoreDNS restarted. With every lab
+running on kind 0.22, they wrote nothing in 5 idle minutes, and the audit log wrote 15 events a minute,
+18.9 KiB, against 11.8 on k3d.
 
 **Most of k3s's ERROR lines are routine.** While a worker restarted and the labs redeployed, k3s logged 52
 ERROR lines in 7 minutes: 27 `RemoveStaleState: removing container`, 23 lookups of containers that were

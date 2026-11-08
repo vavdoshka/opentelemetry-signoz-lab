@@ -251,7 +251,7 @@
 <span class="ln">49</span>            runAsGroup: 0</code></pre></figure>
 <p><code>make lab3</code> only applies it on kind: k3d nodes have no journald, and k3s&#x27;s log covers their kubelet. The <code>filelog/journal</code> receiver turns each entry back into a log line, with journald&#x27;s timestamp, the level from the line, and <code>service.name</code> set to <code>kubelet</code> or <code>containerd</code>:</p>
 <figure class="code"><pre><code>service.name = 'kubelet'</code></pre></figure>
-<p>CI checks that these lines reach SigNoz on kind 0.33. On kind 0.22, this reader read the journal and the receiver parsed its output, in a test without SigNoz. Both services are quiet at idle, with no lines in a minute. Starting this reader and restarting CoreDNS made them write 84 lines across the two nodes.</p>
+<p>These lines reach SigNoz on kind 0.22 locally and kind 0.33 in CI. Both services are quiet at idle, with no lines in a minute. Starting this reader and restarting CoreDNS made them write 84 lines across the two nodes. During an OOM kill, containerd logged <code>TaskOOM</code> with the container&#x27;s ID, and the kubelet only logged removing the container. <a href="incident-oom.html">The OOM incident</a> shows both.</p>
 
 <h3>What you miss without them</h3>
 <p>While checking this, we found the worker node logging about 5,800 lines an hour, which nobody would have seen. It's k3d 5.5.0's own start-up script on worker nodes, retrying this every 3 seconds, forever:</p>
