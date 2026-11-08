@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask it questions | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="ai-ask">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 5: AI analysis</p>
+<h1>Ask it questions</h1>
+<p class="lead">Two use cases: why something broke, and a business question. Each answer is shown in full, and checked against what really happened.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#incident">1. Why did this restart?</a></li><li><a href="#analytics">2. A business question</a></li><li><a href="#use">3. What it~~s good for</a></li></ul>
+
+<p>Each answer below comes from Claude Code, started in <code>labs/lab5-ai/workspace</code>, on Sonnet 5.5. We ran them headless to record the cost, with this command. In a normal session, you just type the question.</p>
+<figure class="code"><pre><code>KUBECONFIG=$PWD/.kubeconfig claude -p "lab3-workload restarted in the last 15 minutes. Find out why." \
+  --setting-sources project,local --settings .claude/settings.json \
+  --permission-mode dontAsk --output-format json --max-turns 40</code></pre></figure>
+
+<h2 class="step" id="incident"><span class="n">1</span>Why did this restart?</h2>
+<p>Start an OOM kill, wait about 2 minutes for it to happen, then ask:</p>
+<div data-fire="oom" data-lab="lab3" data-hint="Leaks memory until the kernel kills the container, about 2 minutes later."></div>
+<figure class="code"><pre><code>lab3-workload restarted in the last 15 minutes. Find out why.</code></pre></figure>
+<p>That's all it was told. 18 seconds, 7 turns, $0.16:</p>
+<figure class="code report"><pre><code>**Cause:** the kernel OOM-killed the `uvicorn` process in the `lab3-workload` container at 13:00:32 UTC because it hit its 256Mi memory limit. The kubelet then restarted the container at 13:00:33. This is probably a memory leak or unbounded growth, but I haven&#x27;t checked that.
+
+**Evidence**
+- **Kernel log** (`signoz_search_logs`, `kernel-log` pods, 30m window):
+  - `Memory cgroup out of memory: Killed process 3403622 (uvicorn) … anon-rss:259488kB, file-rss:17660kB`.
+  - The line `oom-kill:constraint=CONSTRAINT_MEMCG` shows the container&#x27;s own cgroup limit was hit, not node-wide memory pressure.
+  - The cgroup is `kubepods/burstable/podc0bf9f0f-…`.
+  - The anonymous RSS of about 253 MiB (259488 kB), plus 17 MiB of file-backed pages, is right at the 256Mi limit from AGENTS.md.
+  - The same kill is logged twice, 18 ms apart (13:00:32.366 and .384). I&#x27;m treating that as duplicate log lines for one event.
+- **Kubernetes events** (`attribute.k8s.event.reason`, namespace `lab3`, 20m window): the only events are `Pulled` and `Started container workload` at 13:00:33. There is no `Unhealthy` or `Killing` event, so this was not a liveness-probe restart or a rollout. The last rollout was at 12:37:18–12:37:29, outside your 15-minute window.
+
+**Confidence:** high that this was an OOM kill. Medium on the underlying reason for the memory growth.
+
+**What would confirm it**
+- Run `kubectl describe pod` and look for `Last State: Terminated, Reason: OOMKilled, Exit Code 137`. I couldn&#x27;t run `kubectl` because Bash is denied in this session.
+- Query `k8s.container.memory.working_set` for `lab3-workload` and check that it climbs toward 256Mi before 13:00:32.
+- Check whether the restart count keeps rising and the kills repeat.
+
+**Suggested fix (nothing applied):**
+- Find what is growing in memory. The load from `lab3-loadgen` is a likely trigger.
+- If the growth is legitimate, raise the memory limit.
+- If it&#x27;s a leak, fix the code.</code></pre></figure>
+<p>Compare that with <a href="incident-oom.html">the OOM incident</a>, where we worked this out by hand. It went straight to the kernel log, which that incident found to have the most detail, and it skipped <code>container_oom_events_total</code>, which reads 0. It used the events to rule out a probe failure and a rollout. <code>kubectl</code> was blocked by a rule we've since fixed, so it says what it couldn't check.</p>
+
+<h3>When it wasn't what we expected</h3>
+<p>We asked again later, after starting the same leak. This time the machine was overloaded, which we hadn't noticed, because we'd left three load generators running on Docker's 4 CPUs. So the OOM kill we expected never happened. 156 seconds, 7 turns, $0.11:</p>
+<figure class="code report"><pre><code>**Cause (likely, not confirmed):** the kubelet killed `lab3-workload` because its liveness probe on `/healthz` timed out. I don&#x27;t know yet why the probe timed out.
+
+**Evidence**
+- The first `kubectl get pods -n lab3` showed `lab3-workload-948b748b4-x76sr` with 1 restart, 59s before that check.
+- The first `kubectl get events -n lab3` showed these events for that pod:
+  - 92s earlier: &quot;Liveness probe failed: … context deadline exceeded (Client.Timeout exceeded while awaiting headers)&quot;.
+  - The same second: &quot;Container workload failed liveness probe, will be restarted&quot;.
+  - Readiness probes failed with the same timeout.
+  - After the restart, probes got &quot;connection refused&quot; while the new process started.
+- The `lab3-loadgen` pod also had a readiness probe time out the same way, about 2 minutes before that check.
+- The probe timed out while waiting for response headers, so the container was running but not answering.
+- The container is limited to 200m CPU and 256Mi memory. A busy or throttled app could stall like this, but I haven&#x27;t checked that.
+- It isn&#x27;t a one-off. The deployment was rolled twice in about 11 minutes, and each new pod failed its startup probe with &quot;connection refused&quot; for a few seconds before it came up. That is normal startup and not the cause of the restart.
+
+**Not checked**
+- Whether the last termination reason was `OOMKilled` or a liveness kill. The `kubectl describe` and `--previous` logs call was denied by the permission mode.
+- CPU throttling (`container_cpu_cfs_throttled_periods_total`) and memory usage. `kubectl top` was in the same denied call.
+- Kernel OOM messages from the `kernel-log` pods. Three SigNoz queries (Kubernetes events, kernel log, `Unhealthy` events) all timed out.
+
+**Confidence:** medium on the liveness kill, low on the underlying reason.
+
+**What would confirm it**
+- `kubectl -n lab3 describe pod lab3-workload-948b748b4-x76sr`: look for `Last State: Terminated`, the reason and the exit code (`137` could mean OOM or a liveness kill).
+- Throttling and memory for the pod over the last 15 minutes.
+- `kernel-log` entries containing &quot;oom&quot; or &quot;Killed process&quot;.
+
+**Likely fix, if throttling or memory is confirmed:** raise the CPU limit, or give the liveness probe a longer `timeoutSeconds` and `failureThreshold`. I haven&#x27;t applied anything.
+
+If you allow Bash again, I can run the `kubectl` checks. I can also retry SigNoz with a narrower filter.</code></pre></figure>
+<p><strong>It was right, and we were wrong.</strong> We checked what it said against what happened:</p>
+<table>
+  <thead><tr><th>Where</th><th>What it shows</th></tr></thead>
+  <tbody><tr><td>The exit Kubernetes recorded</td><td><code>exitCode: 137, reason: Error</code>, not <code>OOMKilled</code></td></tr><tr><td>The Kubernetes event, at 14:22:11</td><td><code>Container workload failed liveness probe, will be restarted</code></td></tr><tr><td>The kernel log, 14:19 to 14:26</td><td>No <code>out of memory</code> lines at all</td></tr><tr><td>The app's last log line</td><td><code>holding 192 MiB on purpose</code>, of a 256 MiB limit</td></tr></tbody>
+</table>
+<p>The liveness probe timed out on the starved machine, and the pod was killed with memory to spare. An answer that followed the obvious story would have said OOM.</p>
+<p>It also shows what the agent can't do when the platform is struggling. Three of its SigNoz queries timed out, because ClickHouse was starved too. It said so, and it lowered its confidence. Don't rely on an agent that reads SigNoz to explain SigNoz being down.</p>
+
+<h2 class="step" id="analytics"><span class="n">2</span>A business question</h2>
+<p>Telemetry with business data is a database of what your customers did, as <a href="lab2.html">Lab 2</a> showed. You can ask it things directly. Start Lab 2's load generator, wait a while, then ask about a time range that's already over:</p>
+<div data-load-panel="lab2"></div>
+<figure class="code"><pre><code>In Lab 2's shop, between 12:59 and 13:05 UTC today: which product brought in the
+most revenue, and which product's orders were slowest to price? Give the numbers
+for every product.</code></pre></figure>
+<p>23 seconds, 5 turns, $0.10:</p>
+<figure class="code report"><pre><code>**Revenue: sandwich brought in the most, $6,691.30. Pricing speed: bagel orders were slowest on average, at 19.03 ms.** The ranking depends on which latency statistic you use, and the gaps are small.
+
+I read the `price_order` spans from 12:59 to 13:05 UTC on 2026-11-08 with `signoz_aggregate_traces`. I grouped by `order.item` and summed `order.total`. I used span `duration_nano` as the pricing time. Rows below are ordered by revenue.
+
+| Product | Orders | Revenue (USD) | Avg price time | p50 | p99 | Max |
+|---|---|---|---|---|---|---|
+| sandwich | 278 | 6,691.30 | 18.53 ms | 17.01 ms | 31.84 ms | 142.4 ms |
+| cake | 250 | 3,614.75 | 18.81 ms | 18.82 ms | 34.95 ms | 61.0 ms |
+| coffee | 239 | 2,534.00 | 18.21 ms | 18.94 ms | 32.71 ms | 39.2 ms |
+| bagel | 253 | 1,793.25 | 19.03 ms | 18.50 ms | 34.01 ms | 143.9 ms |
+
+- **Slowest by average:** bagel, 19.03 ms, ahead of cake at 18.81 ms.
+- **Slowest by p99:** cake, 34.95 ms, ahead of bagel at 34.01 ms.
+- **Slowest by p50:** coffee, 18.94 ms, then cake at 18.82 ms.
+- **Slowest single order:** bagel, 143.9 ms. Sandwich&#x27;s slowest was nearly as long at 142.4 ms.
+- **Spread:** averages differ by under 1 ms between products. I wouldn&#x27;t call any product meaningfully slower. The two 140 ms+ orders (bagel, sandwich) look like one-off outliers.
+
+Confidence is high on revenue because the sums come straight from the span attribute. It&#x27;s low on any &quot;slowest&quot; product. To check revenue another way, sum the `orders.value` metric by `order.item` over the same window. It should match these totals.</code></pre></figure>
+<p>To check it, we ran our own query for the same six minutes, using <code>sum(attribute.order.total)</code> and the duration percentiles of the <code>price_order</code> spans:</p>
+<table>
+  <thead><tr><th>Product</th><th>Orders</th><th>Revenue</th><th>Avg</th><th>p50</th><th>p99</th></tr></thead>
+  <tbody><tr><td>sandwich</td><td>278</td><td>$6,691.30</td><td>18.53 ms</td><td>17.01 ms</td><td>31.84 ms</td></tr><tr><td>cake</td><td>250</td><td>$3,614.75</td><td>18.81 ms</td><td>18.82 ms</td><td>34.95 ms</td></tr><tr><td>coffee</td><td>239</td><td>$2,534.00</td><td>18.21 ms</td><td>18.94 ms</td><td>32.71 ms</td></tr><tr><td>bagel</td><td>253</td><td>$1,793.25</td><td>19.03 ms</td><td>18.50 ms</td><td>34.01 ms</td></tr></tbody>
+</table>
+<p><strong>Every number matches.</strong> And it answered the second question better than it was asked: no product is really slower, and the statistics disagree because of noise. A dashboard would have shown you a slowest product anyway.</p>
+<div class="warn"><p><strong>Check that the time range is over.</strong> Our first attempts asked about 13:00 to 13:10 while it was still 13:06. Its numbers looked 7% short of ours, because each of us counted an unfinished window at a different moment. The mistake was ours, not the agent's, but neither of us noticed it from the answer alone.</p></div>
+
+<h2 class="step" id="use"><span class="n">3</span>What it's good for</h2>
+<table>
+  <thead><tr><th>It's good at</th><th>You still need to</th></tr></thead>
+  <tbody><tr><td>Getting from a vague question to the right signal, without knowing the query syntax</td><td>Check the numbers on anything you'll act on. It shows its queries, so you can</td></tr><tr><td>Reading several signals together, and ruling causes out</td><td>Decide what to do. It only suggests</td></tr><tr><td>Saying what it didn't check</td><td>Ask the follow-up. A session keeps its context, so "now check throttling" works</td></tr></tbody>
+</table>
+
+<div class="quiz" data-quiz="ask1"><p class="q">Check yourself: An agent reports an OOM kill. What would convince you?</p><button type="button" data-right="false" data-why="It would sound the same if it were wrong.">That it sounds confident.</button><button type="button" data-right="true" data-why="It lists its sources, so you can check them yourself.">The evidence it quotes: the kernel log line, or the exit reason Kubernetes recorded.</button><button type="button" data-right="false" data-why="In this lab, a leak ended in a liveness kill, not an OOM kill.">That the alert was about memory.</button></div>
+<div class="quiz" data-quiz="ask2"><p class="q">Check yourself: Why can't you rely on this agent to explain SigNoz being down?</p><button type="button" data-right="false" data-why="It can read pods with kubectl.">It has no way to read SigNoz&#x27;s own pods.</button><button type="button" data-right="true" data-why="That happened here: three queries timed out when ClickHouse was starved.">Most of its evidence comes through SigNoz, so when SigNoz struggles, its queries fail too.</button><button type="button" data-right="false" data-why="It tries, and tells you what failed.">It refuses to.</button></div>
+
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

@@ -8556,6 +8556,166 @@
     "end": "2026-11-08T00:40:00Z"
    },
    "verified": "api"
+  },
+  {
+   "id": "a-lab5-cost",
+   "group": "Lab 5: the AI itself",
+   "lab": "lab5",
+   "signal": "logs",
+   "title": "What the AI cost",
+   "why": "Claude Code's own telemetry, one event per model call. The total matched what it reported for each investigation.",
+   "expr": "service.name = 'claude-code' AND body = 'claude_code.api_request'",
+   "neg": false,
+   "aggs": [
+    "count()",
+    "sum(attribute.cost_usd)",
+    "sum(attribute.output_tokens)",
+    "sum(attribute.cache_read_tokens)"
+   ],
+   "by": [
+    "model"
+   ],
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "scalar",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name = 'claude-code' AND body = 'claude_code.api_request'"
+    },
+    "aggregations": [
+     {
+      "expression": "count()"
+     },
+     {
+      "expression": "sum(attribute.cost_usd)"
+     },
+     {
+      "expression": "sum(attribute.output_tokens)"
+     },
+     {
+      "expression": "sum(attribute.cache_read_tokens)"
+     }
+    ],
+    "limit": 20,
+    "groupBy": [
+     {
+      "name": "model"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "table",
+    "columns": [
+     "model",
+     "__result_0",
+     "__result_1",
+     "__result_2",
+     "__result_3"
+    ],
+    "data": [
+     [
+      "claude-sonnet-5-5",
+      17,
+      0.732,
+      8643,
+      497855
+     ]
+    ],
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-08T15:39:00Z",
+    "end": "2026-11-08T15:59:00Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "a-lab5-tools",
+   "group": "Lab 5: the AI itself",
+   "lab": "lab5",
+   "signal": "traces",
+   "title": "What the AI asked SigNoz",
+   "why": "The MCP server's own traces: each tool call, and how long it took. Prompts and answers aren't in them.",
+   "expr": "service.name = 'signoz-mcp' AND name CONTAINS 'tools/call'",
+   "neg": false,
+   "aggs": [
+    "count()",
+    "avg(duration_nano)"
+   ],
+   "by": [
+    "name"
+   ],
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "scalar",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "service.name = 'signoz-mcp' AND name CONTAINS 'tools/call'"
+    },
+    "aggregations": [
+     {
+      "expression": "count()"
+     },
+     {
+      "expression": "avg(duration_nano)"
+     }
+    ],
+    "limit": 20,
+    "groupBy": [
+     {
+      "name": "name"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "table",
+    "columns": [
+     "name",
+     "__result_0",
+     "__result_1"
+    ],
+    "data": [
+     [
+      "tools/call signoz_search_logs",
+      7,
+      2199792959.429
+     ],
+     [
+      "tools/call signoz_get_alert",
+      4,
+      428797531.5
+     ],
+     [
+      "tools/call signoz_get_alert_history",
+      3,
+      873456027.667
+     ],
+     [
+      "tools/call signoz_query_metrics",
+      3,
+      3100213112.333
+     ],
+     [
+      "tools/call signoz_aggregate_logs",
+      2,
+      723657104.5
+     ]
+    ],
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-08T15:39:00Z",
+    "end": "2026-11-08T15:59:00Z"
+   },
+   "verified": "api"
   }
  ]
 }

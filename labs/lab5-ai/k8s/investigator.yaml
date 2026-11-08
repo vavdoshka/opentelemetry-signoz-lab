@@ -1,0 +1,80 @@
+# Investigates alerts with headless Claude Code. SigNoz sends alerts to it
+# through the "Lab 5 investigator" webhook channel, which
+# scripts/create_ai_routes.py adds to the rules in labs/lab5-ai/investigate.json.
+#
+# It needs a Claude login in the Secret lab5/claude-auth, made by
+# scripts/deploy-ai.sh from .lab-ai-credentials. Without one it still receives
+# alerts, and each investigation fails with a login error.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: investigator
+  namespace: lab5
+spec:
+  replicas: 1
+  # One pod, so one queue and one hourly cap.
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: investigator } }
+  template:
+    metadata: { labels: { app: investigator } }
+    spec:
+      # Read-only Kubernetes access: see reader-rbac.yaml. kubectl in this pod
+      # uses it automatically.
+      serviceAccountName: ai-reader
+      containers:
+        - name: investigator
+          image: telemetry-lab5:dev
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            # CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY.
+            - secretRef: { name: claude-auth, optional: true }
+          env:
+            - { name: MODEL, value: sonnet }
+            - { name: MAX_TURNS, value: "40" }
+            - { name: MAX_BUDGET_USD, value: "1.00" }
+            - { name: MAX_PER_HOUR, value: "10" }
+            # Claude Code checks for updates by default. The image pins a version.
+            - { name: DISABLE_AUTOUPDATER, value: "1" }
+            # Claude Code's own telemetry: cost, tokens and every tool call, as
+            # OpenTelemetry metrics and events, to SigNoz through the node
+            # agents. Off unless you turn it on, and it goes nowhere else.
+            - { name: CLAUDE_CODE_ENABLE_TELEMETRY, value: "1" }
+            - { name: OTEL_METRICS_EXPORTER, value: otlp }
+            - { name: OTEL_LOGS_EXPORTER, value: otlp }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: grpc }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://k8s-infra-otel-agent.signoz.svc.cluster.local:4317" }
+            - { name: OTEL_METRIC_EXPORT_INTERVAL, value: "10000" }
+            - { name: OTEL_RESOURCE_ATTRIBUTES, value: "k8s.namespace.name=lab5,deployment.environment=lab" }
+          ports: [{ containerPort: 8000 }]
+          readinessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 5 }
+          resources:
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { memory: 1Gi }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: home, mountPath: /home/node }
+      volumes:
+        # Reports are kept until the pod is replaced.
+        - { name: data, emptyDir: {} }
+        # Claude Code writes its session files under $HOME.
+        - { name: home, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: investigator, namespace: lab5 }
+spec:
+  selector: { app: investigator }
+  ports: [{ port: 8000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: { name: investigator, namespace: lab5 }
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: lab5.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: investigator, port: { number: 8000 } } }

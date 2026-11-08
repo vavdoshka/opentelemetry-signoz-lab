@@ -44,7 +44,7 @@ jobs:
           python3 --version
 
       - name: Make *.localhost resolve
-        run: echo '127.0.0.1 lab1.localhost lab2.localhost lab3.localhost lab4.localhost signoz.localhost' | sudo tee -a /etc/hosts
+        run: echo '127.0.0.1 lab1.localhost lab2.localhost lab3.localhost lab4.localhost lab5.localhost mcp.localhost signoz.localhost' | sudo tee -a /etc/hosts
 
       - name: Check tutorial code quotes
         run: python3 scripts/check_tutorial_quotes.py
@@ -69,6 +69,10 @@ jobs:
 
       - name: Prove a real failure raises an alert
         run: python3 scripts/smoke_alerts.py
+      # No Claude login here, so this proves everything except the AI itself: the
+      # MCP server, its read-only access, and that alerts reach the investigator.
+      - name: Deploy Lab 5
+        run: make lab5
 
       - name: Rerun make up
         run: make up

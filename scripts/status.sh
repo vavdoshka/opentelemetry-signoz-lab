@@ -9,7 +9,7 @@ step "SigNoz"
 k -n signoz get pods -o wide
 step "Lab 1"
 k -n lab1 get pods -o wide
-for lab in 2 3 4; do
+for lab in 2 3 4 5; do
   step "Lab $lab"
   if k get namespace "lab$lab" >/dev/null 2>&1; then
     k -n "lab$lab" get pods -o wide
@@ -23,6 +23,7 @@ Lab 1     $LAB1_URL
 Lab 2     $LAB2_URL
 Lab 3     $LAB3_URL
 Lab 4     $LAB4_URL
+Lab 5     $LAB5_URL
 SigNoz    $SIGNOZ_URL  (login in .lab-credentials)
 Tutorial  run: make tutorial
 DONE

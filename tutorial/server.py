@@ -48,6 +48,7 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("TUTORIAL_PORT", "8765"))
 SIGNOZ_URL = os.environ.get("TUTORIAL_SIGNOZ_URL", "http://signoz.localhost:8080").rstrip("/")
 ALERT_SINK_URL = os.environ.get("TUTORIAL_LAB4_URL", "http://lab4.localhost:8080").rstrip("/")
+INVESTIGATOR_URL = os.environ.get("TUTORIAL_LAB5_URL", "http://lab5.localhost:8080").rstrip("/")
 
 LABS = {
     "lab1": {
@@ -444,6 +445,11 @@ class Handler(BaseHTTPRequestHandler):
             if not signoz.available():
                 return self.send_json(503, {"error": ".lab-credentials not found"})
             return self.send_json(*find_trace(lab_id, parts[2], int(since)))
+        if method == "GET" and parts == ["investigations"]:
+            try:
+                return self.send_json(*http_call("GET", f"{INVESTIGATOR_URL}/api/investigations", timeout=3))
+            except UNREACHABLE:
+                return self.send_json(503, {"error": "Lab 5 is not running. Start it with: make lab5"})
         if method == "GET" and parts == ["alerts"]:
             try:
                 return self.send_json(*http_call("GET", f"{ALERT_SINK_URL}/api/alerts", timeout=3))

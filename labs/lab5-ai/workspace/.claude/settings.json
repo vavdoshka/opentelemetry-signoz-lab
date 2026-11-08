@@ -1,0 +1,61 @@
+{
+  "model": "sonnet",
+  "enabledMcpjsonServers": [
+    "signoz"
+  ],
+  "permissions": {
+    "allow": [
+      "mcp__signoz__*",
+      "Bash(kubectl get *)",
+      "Bash(kubectl describe *)",
+      "Bash(kubectl logs *)",
+      "Bash(kubectl top *)",
+      "Bash(kubectl * get *)",
+      "Bash(kubectl * describe *)",
+      "Bash(kubectl * logs *)",
+      "Bash(kubectl * top *)"
+    ],
+    "deny": [
+      "mcp__signoz__signoz_create_*",
+      "mcp__signoz__signoz_update_*",
+      "mcp__signoz__signoz_patch_*",
+      "mcp__signoz__signoz_delete_*",
+      "mcp__signoz__signoz_import_*",
+      "Bash(kubectl apply *)",
+      "Bash(kubectl create *)",
+      "Bash(kubectl delete *)",
+      "Bash(kubectl edit *)",
+      "Bash(kubectl patch *)",
+      "Bash(kubectl replace *)",
+      "Bash(kubectl scale *)",
+      "Bash(kubectl rollout *)",
+      "Bash(kubectl exec *)",
+      "Bash(kubectl cp *)",
+      "Bash(kubectl drain *)",
+      "Bash(kubectl cordon *)",
+      "Bash(kubectl label *)",
+      "Bash(kubectl annotate *)",
+      "Bash(kubectl set *)",
+      "Bash(kubectl * apply *)",
+      "Bash(kubectl * create *)",
+      "Bash(kubectl * delete *)",
+      "Bash(kubectl * edit *)",
+      "Bash(kubectl * patch *)",
+      "Bash(kubectl * replace *)",
+      "Bash(kubectl * scale *)",
+      "Bash(kubectl * rollout *)",
+      "Bash(kubectl * exec *)",
+      "Bash(kubectl * cp *)",
+      "Bash(kubectl * drain *)",
+      "Bash(kubectl * cordon *)",
+      "Bash(kubectl * label *)",
+      "Bash(kubectl * annotate *)",
+      "Bash(kubectl * set *)",
+      "Write",
+      "Edit",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch"
+    ]
+  }
+}

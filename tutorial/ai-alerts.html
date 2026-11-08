@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Investigate alerts by itself | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="ai-alerts">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 5: AI analysis</p>
+<h1>Investigate alerts by itself</h1>
+<p class="lead">A person gets paged and starts from a one-line alert. Here, an agent has already looked, and its report is waiting for them.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#login">1. Give it a login</a></li><li><a href="#trigger">2. Trigger it</a></li><li><a href="#path">3. What happens</a></li><li><a href="#report">4. What it found</a></li><li><a href="#limits">5. What keeps it under control</a></li></ul>
+
+<h2 class="step" id="login"><span class="n">1</span>Give it a login</h2>
+<p>The investigator runs Claude Code inside the cluster, so it needs its own login, which <code>make lab5</code> can't create for you. On a paid Claude plan, run this in your own terminal. It prints a token valid for a year, meant for scripts and CI:</p>
+<figure class="code"><pre><code>claude setup-token</code></pre></figure>
+<p>Save it from the repo's root. This reads it without showing it. The file is git-ignored, and only you can read it:</p>
+<figure class="code"><pre><code>umask 077; read -rs 'TOKEN?Paste the token: '; printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$TOKEN" &gt; .lab-ai-credentials; unset TOKEN; echo</code></pre></figure>
+<p>That's for zsh. In bash, replace the <code>read</code> with <code>read -rsp 'Paste the token: ' TOKEN</code>. With an API key instead, the line in the file is <code>ANTHROPIC_API_KEY=...</code>, and it's billed per token. Then run <code>make lab5</code> again. It puts the file into a Secret, and its smoke test makes Claude Code answer one word from inside the pod.</p>
+
+<h2 class="step" id="trigger"><span class="n">2</span>Trigger it</h2>
+<p>This runs a slow SQL query three times. Nothing else about it is special: the alert only says that a database query took over a second. Watch this page. The alert takes about 5 minutes, and the investigation about 2:</p>
+<div data-fire="slow_query" data-lab="lab1" data-hint="Runs SELECT pg_sleep(2) in the backend. Press it a few times. Each investigation costs about $0.25 on Sonnet 5.5."></div>
+<div data-investigations></div>
+<p>Reports also appear at <a href="http://lab5.localhost:8080" target="_blank" rel="noopener">lab5.localhost:8080</a>.</p>
+
+<h2 class="step" id="path"><span class="n">3</span>What happens</h2>
+<figure class="code"><pre><code>kernel, app or Kubernetes misbehaves
+      │
+      ▼
+SigNoz rule fires ───► Lab 4's sink      a person's notification
+      │
+      └──────────────► investigator      a second webhook channel
+                           │
+                           ▼
+                       claude -p "A SigNoz alert just fired..."
+                           │  queries SigNoz, then Kubernetes
+                           ▼
+                       report, cost and turns, kept by the investigator</code></pre></figure>
+<p>This is ordinary alert routing. <code>make lab5</code> adds a webhook channel next to Lab 4's, on the rules listed in <code>labs/lab5-ai/investigate.json</code>. Not every alert should start a paid investigation. The file gives a reason for each rule, including those left out: the load generator causes errors on purpose, so an error-rate alert would run all day.</p>
+<p>For each alert that starts firing, the investigator runs one headless Claude Code in the same workspace you use on your machine, so it has the same instructions, skills and permissions:</p>
+<figure class="code"><figcaption><span><code>labs/lab5-ai/app/investigator.py</code> lines 94–108</span></figcaption><pre><code><span class="ln">94</span>    command = [
+<span class="ln">95</span>        &quot;claude&quot;, &quot;-p&quot;, item[&quot;prompt&quot;],
+<span class="ln">96</span>        &quot;--model&quot;, MODEL,
+<span class="ln">97</span>        # Only the MCP server in this file, not anything else it might find.
+<span class="ln">98</span>        &quot;--strict-mcp-config&quot;, &quot;--mcp-config&quot;, MCP_CONFIG,
+<span class="ln">99</span>        # The workspace&#x27;s permissions. Claude Code ignores a folder&#x27;s own
+<span class="ln">100</span>        # allow-list until someone trusts the folder interactively, which can&#x27;t
+<span class="ln">101</span>        # happen here, so pass the same file explicitly.
+<span class="ln">102</span>        &quot;--settings&quot;, f&quot;{WORKSPACE}/.claude/settings.json&quot;,
+<span class="ln">103</span>        # Anything those settings don&#x27;t allow is refused, not asked.
+<span class="ln">104</span>        &quot;--permission-mode&quot;, &quot;dontAsk&quot;,
+<span class="ln">105</span>        &quot;--max-turns&quot;, MAX_TURNS,
+<span class="ln">106</span>        &quot;--max-budget-usd&quot;, MAX_BUDGET_USD,
+<span class="ln">107</span>        &quot;--output-format&quot;, &quot;json&quot;,
+<span class="ln">108</span>    ]</code></pre></figure>
+<p>The prompt only passes on what the notification said, and asks for SigNoz's investigation skill:</p>
+<figure class="code"><figcaption><span><code>labs/lab5-ai/app/investigator.py</code> lines 34–43</span></figcaption><pre><code><span class="ln">34</span>PROMPT = &quot;&quot;&quot;A SigNoz alert just fired. Find out why, using the signoz-investigating-alerts skill.
+<span class="ln">35</span>
+<span class="ln">36</span>Alert: {alertname}
+<span class="ln">37</span>Severity: {severity}
+<span class="ln">38</span>Started firing: {startsAt}
+<span class="ln">39</span>Summary: {summary}
+<span class="ln">40</span>Description: {description}
+<span class="ln">41</span>Labels: {labels}
+<span class="ln">42</span>
+<span class="ln">43</span>Answer as AGENTS.md describes.&quot;&quot;&quot;</code></pre></figure>
+
+<h2 class="step" id="report"><span class="n">4</span>What it found</h2>
+<p>This is its whole report, unedited, from a run triggered at 14:12:29:</p>
+<figure class="code report"><pre><code>**Cause:** Someone deliberately ran the lab1 &quot;slow_query&quot; scenario. It calls `GET /work/slow-query?seconds=2`, which makes the backend run `SELECT pg_sleep(...)`, so the alert is firing on a sleep rather than a real database fault.
+
+**Evidence**
+- **Rule:** `signoz_get_alert` shows `max(duration_nano)` over `service.name=&#x27;lab1-backend&#x27; AND db.system=&#x27;postgresql&#x27;`. It fires above 1000 ms, with a 5m rolling window evaluated every minute.
+- **Fire:** `signoz_get_alert_history` (7d) returned one firing row, at 14:16:48 UTC, with value 2,032,733,543 ns (2.03 s). It has no resolved row, so the alert is still firing (the rule&#x27;s `state` is `firing`).
+- **Slow spans:** `signoz_search_traces` for spans over 500 ms between 13:46 and 14:46 UTC found three `SELECT pg_sleep(%s)` spans at 14:12:29–14:12:40 UTC:
+  - 2.033 s, trace `97bede5354321861512ca4f07361b11f`
+  - 2.033 s, trace `80aa4a1b15b7abd0fde0869cb6c0bca3`
+  - 2.010 s, trace `6eda3b00fc0325bc62a45d100be17a46`
+- **Trace detail:** `signoz_get_trace_details` on the first trace shows `POST /api/scenario/{name}` from lab1-frontend with URL `.../api/scenario/slow_query`. That calls `GET /work/slow-query?seconds=2` on `lab1-backend`, which runs the `pg_sleep` span. All three spans came from pod `lab1-backend-5fdf895ff4-zqw8x`.
+- **Secondary:** Two `INSERT INTO orders` spans took 906 ms and 558 ms at 14:14 UTC. Both are under the threshold, so they didn&#x27;t trigger the alert.
+- **Latency by 5-minute bucket:** max was 2.03 s and p99 was 1.005 s in the 14:10 bucket (392 spans). In the 14:15 bucket max was 240 ms and p99 was 166 ms (365 spans). Only those two buckets came back.
+
+**Confidence:** High that the cause is the injected `pg_sleep` scenario. The rule&#x27;s own description says the default load generator has no calls this slow, and three spans from one endpoint line up with the fire time. I did not check Postgres or node resource metrics, and I did not find who triggered the scenario. The 14:15 bucket looks normal, so the alert should resolve soon, once the 5-minute window moves past 14:12.
+
+**What would confirm it:** Confirm the alert resolves, and that no further `pg_sleep` spans appear after 14:12:40 UTC.
+
+**Fix:** None is needed if the scenario was intended. If it wasn&#x27;t, find out who or what called `POST /api/scenario/slow_query`. If you only care about real database slowness, exclude `pg_sleep` from the rule&#x27;s filter.</code></pre></figure>
+<table>
+  <thead><tr><th>Step</th><th>Time</th></tr></thead>
+  <tbody><tr><td>From the failure to the alert reaching the investigator</td><td>301 s. That's SigNoz's alert delay, covered in <a href="lab4.html">Lab 4</a></td></tr><tr><td>The investigation</td><td>116 s, in 9 turns</td></tr><tr><td>Cost</td><td>$0.24, on Sonnet 5.5</td></tr></tbody>
+</table>
+<p>So the cause was waiting for whoever got paged about 7 minutes after the failure. We checked its claims by querying SigNoz ourselves:</p>
+<table>
+  <thead><tr><th>What it said</th><th>What SigNoz shows</th></tr></thead>
+  <tbody><tr><td>Three <code>SELECT pg_sleep</code> spans, of 2.033, 2.033 and 2.010 seconds</td><td>The same three spans, and the same durations</td></tr><tr><td>Their trace IDs, and the pod <code>lab1-backend-5fdf895ff4-zqw8x</code></td><td>The same</td></tr><tr><td>Two <code>INSERT INTO orders</code> spans, of 906 and 558 ms, at 14:14, too short to fire the alert</td><td>The same two</td></tr></tbody>
+</table>
+<div class="note"><p><strong>It separated the failure from the noise.</strong> Normal traffic was running, including requests that are slow on purpose. It noticed that those <code>INSERT</code> spans were under the threshold, and said so. It also said what it hadn't checked: Postgres itself, the node, and who triggered the scenario.</p></div>
+
+<h2 class="step" id="limits"><span class="n">5</span>What keeps it under control</h2>
+<figure class="code"><figcaption><span><code>labs/lab5-ai/k8s/investigator.yaml</code> lines 32–35</span></figcaption><pre><code><span class="ln">32</span>            - { name: MODEL, value: sonnet }
+<span class="ln">33</span>            - { name: MAX_TURNS, value: &quot;40&quot; }
+<span class="ln">34</span>            - { name: MAX_BUDGET_USD, value: &quot;1.00&quot; }
+<span class="ln">35</span>            - { name: MAX_PER_HOUR, value: &quot;10&quot; }</code></pre></figure>
+<table>
+  <thead><tr><th>Limit</th><th>Why</th></tr></thead>
+  <tbody><tr><td><code>MAX_BUDGET_USD</code>, $1.00</td><td>Stops one investigation at Claude Code's own cost estimate. It can overshoot a little</td></tr><tr><td><code>MAX_PER_HOUR</code>, 10</td><td>A flapping alert can't run up a bill. Past that, an alert gets a note saying it wasn't investigated</td></tr><tr><td><code>MAX_TURNS</code>, 40</td><td>Stops a loop that isn't getting anywhere</td></tr><tr><td>One at a time</td><td>If many alerts fire together, they wait in a queue. It keeps cost predictable, at the price of a later answer</td></tr><tr><td>One investigation per alert</td><td>Alertmanager repeats notifications. The alert name and start time identify a firing, so repeats are ignored</td></tr></tbody>
+</table>
+<p>The reports are kept in the pod, so replacing the pod loses them. In production you'd post them to the incident channel, which is the part this lab doesn't build.</p>
+<div class="note"><p><strong>It doesn't fix anything.</strong> It can't: both of its logins are read-only. Letting an agent act on production is a much bigger decision than letting it read, and this lab doesn't need it to show the value.</p></div>
+
+<div class="quiz" data-quiz="al1"><p class="q">Check yourself: Why does the investigator pass its permissions with --settings?</p><button type="button" data-right="false" data-why="It is. It&#x27;s the same file you use on your machine.">The settings file isn&#x27;t in the image.</button><button type="button" data-right="true" data-why="Without it, every tool call is refused, and you get a polite report saying so.">Claude Code ignores a folder&#x27;s allow list until someone trusts the folder, and nobody can do that in a pod.</button><button type="button" data-right="false" data-why="It has no effect on speed.">--settings makes it faster.</button></div>
+<div class="quiz" data-quiz="al2"><p class="q">Check yourself: Why isn't every alert sent to the investigator?</p><button type="button" data-right="false" data-why="These rules have two.">SigNoz only allows one webhook per rule.</button><button type="button" data-right="true" data-why="investigate.json gives the reason for each rule, including those left out.">Each investigation costs money, and some alerts fire all day or only repeat another alert.</button><button type="button" data-right="false" data-why="It could try any of them. Whether it&#x27;s worth paying for is the question.">Some alerts can&#x27;t be investigated.</button></div>
+
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

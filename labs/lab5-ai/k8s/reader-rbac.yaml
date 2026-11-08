@@ -1,0 +1,37 @@
+# What the AI may see in Kubernetes: reads only, enforced by the API server.
+#
+# Telemetry says what happened. Kubernetes adds what it decided: a pod's last
+# exit reason, its events, its limits. This account can read those, and can't
+# change anything, exec into a pod, or read Secrets or ConfigMaps, which hold
+# credentials.
+#
+# The alert-triggered investigator runs as this ServiceAccount. For agents on
+# your machine, scripts/create_ai_access.py writes a kubeconfig for it.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: ai-reader, namespace: lab5 }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: { name: lab5-ai-reader }
+rules:
+  - apiGroups: [""]
+    resources: [pods, pods/log, events, nodes, services, endpoints, namespaces, persistentvolumeclaims]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, daemonsets, statefulsets]
+    verbs: [get, list, watch]
+  - apiGroups: [events.k8s.io]
+    resources: [events]
+    verbs: [get, list, watch]
+  # kubectl top. k3s ships metrics-server. kind doesn't, so there it fails.
+  - apiGroups: [metrics.k8s.io]
+    resources: [pods, nodes]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: { name: lab5-ai-reader }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: lab5-ai-reader }
+subjects:
+  - { kind: ServiceAccount, name: ai-reader, namespace: lab5 }

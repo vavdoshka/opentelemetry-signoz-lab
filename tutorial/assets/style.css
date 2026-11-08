@@ -237,6 +237,8 @@ h2.step .n {
 figure { margin: 1.2rem auto; }
 
 figure.code { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--code-bg); position: relative; }
+figure.code.report pre, figure.code.report pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
+figure.code.report pre code { width: auto; }
 figure.code figcaption {
   font-size: 0.8rem;
   color: var(--muted);

@@ -29,6 +29,10 @@
     { id: 'node', href: 'incident-node.html', title: 'Is it the pod or the node?', group: 'Lab 3: Kubernetes' },
     { id: 'apiserver', href: 'incident-apiserver.html', title: 'The API server', group: 'Lab 3: Kubernetes' },
     { id: 'lab4', href: 'lab4.html', title: 'Alerts that reach you', group: 'Lab 4: alerts' },
+    { id: 'lab5', href: 'lab5.html', title: 'Connect an AI agent', group: 'Lab 5: AI analysis' },
+    { id: 'ai-ask', href: 'ai-ask.html', title: 'Ask it questions', group: 'Lab 5: AI analysis' },
+    { id: 'ai-alerts', href: 'ai-alerts.html', title: 'Investigate alerts by itself', group: 'Lab 5: AI analysis' },
+    { id: 'ai-measured', href: 'ai-measured.html', title: 'How good is it?', group: 'Lab 5: AI analysis' },
     { id: 'queries', href: 'queries.html', title: 'Search query reference', group: 'Reference' },
     { id: 'setup', href: 'setup.html', title: 'How SigNoz is configured', group: 'Reference' },
     { id: 'automate', href: 'automate.html', title: 'Automate it', group: 'Reference' },
@@ -37,7 +41,7 @@
 
   const SIGNOZ = 'http://signoz.localhost:8080';
   const STORE = 'telemetry-tutorial-v1';
-  const LAB_NAMES = { lab1: 'Lab 1', lab2: 'Lab 2', lab3: 'Lab 3' };
+  const LAB_NAMES = { lab1: 'Lab 1', lab2: 'Lab 2', lab3: 'Lab 3', lab5: 'Lab 5' };
   const LAB_START = { lab1: 'make up', lab2: 'make lab2', lab3: 'make lab3' };
   const LAB_FRONTEND = { lab1: 'lab1-frontend', lab2: 'frontend', lab3: 'lab3-workload' };
   const SPAN_ARRIVAL_WAIT_MS = 2000;
@@ -767,6 +771,40 @@
     setInterval(refresh, 5000);
   }
 
+  /* What Lab 5's investigator has reported, newest first. */
+  function renderInvestigations(host) {
+    host.classList.add('panel');
+    const status = el('p', { class: 'meta', style: 'color:var(--muted);font-size:.88rem;margin:.25rem 0 .5rem', role: 'status' });
+    const box = el('div');
+    const notRunning = 'Lab 5 is not running. Start it with: make lab5';
+    const show = (items) => {
+      box.textContent = '';
+      status.textContent = items.length
+        ? 'Refreshes every 10 seconds. Times are UTC.'
+        : 'No investigations yet. An alert takes about 4 minutes to fire. Refreshes every 10 seconds.';
+      items.slice(0, 5).forEach((item) => {
+        const facts = [item.status];
+        if (item.startsAt) facts.unshift('fired ' + item.startsAt.slice(11, 19));
+        if (item.seconds != null) facts.push(item.seconds + ' s');
+        if (item.cost_usd != null) facts.push('$' + item.cost_usd.toFixed(2));
+        box.append(el('h5', { text: item.alertname }), el('p', { class: 'meta', text: facts.join(' · ') }),
+          el('pre', { style: 'white-space:pre-wrap', text: item.report || 'Investigating…' }));
+      });
+    };
+    const refresh = async () => {
+      try {
+        const { status: code, body } = await getJSON('/live/investigations');
+        if (code === 200 && Array.isArray(body)) show(body);
+        else status.textContent = notRunning;
+      } catch (error) {
+        status.textContent = notRunning;
+      }
+    };
+    host.append(el('h4', { text: 'AI investigations' }), status, box);
+    refresh();
+    setInterval(refresh, 10000);
+  }
+
   /* ---------- query cards ---------- */
 
   function verifiedBadge(item) {
@@ -1185,6 +1223,7 @@
   document.querySelectorAll('[data-fire]').forEach(renderFire);
   document.querySelectorAll('[data-load-panel]').forEach(renderLoad);
   document.querySelectorAll('[data-alert-feed]').forEach(renderAlertFeed);
+  document.querySelectorAll('[data-investigations]').forEach(renderInvestigations);
   document.querySelectorAll('[data-query]').forEach(renderQuery);
   document.querySelectorAll('[data-query-index]').forEach(renderQueryIndex);
   document.querySelectorAll('[data-ch]').forEach(renderClickHouse);

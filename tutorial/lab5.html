@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect an AI agent | Telemetry tutorial</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="lab5">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 5: AI analysis</p>
+<h1>Connect an AI agent</h1>
+<p class="lead">An AI agent can query SigNoz the way you do, read the answer, and decide what to ask next. This lab connects one with read-only access, then measures how well it works.</p>
+
+<h2>Start it</h2>
+<p>Lab 5 builds on Lab 4, because it investigates Lab 4's alerts:</p>
+<figure class="code"><pre><code>make lab5</code></pre></figure>
+<p>That deploys everything except the AI's own login, and proves the plumbing works. Asking questions needs <a href="https://code.claude.com/docs" target="_blank" rel="noopener">Claude Code</a> on your machine, logged in. <a href="ai-alerts.html">Investigating alerts by itself</a> needs a login in the cluster too.</p>
+
+<h2>What's really happening</h2>
+<p>There's no AI inside SigNoz here. An agent queries SigNoz the way you do, reads the answer, and decides what to ask next. Three separate pieces make that work:</p>
+<table>
+  <thead><tr><th>Piece</th><th>What it does</th><th>In this lab</th></tr></thead>
+  <tbody><tr><td><strong>Model</strong></td><td>Reads what the tools return, and decides what to do next</td><td>Claude Sonnet 5.5, through Anthropic's API</td></tr><tr><td><strong>Harness</strong></td><td>Runs the loop: ask the model, run the tool it chose, send back the result. Enforces permissions and limits</td><td>Claude Code. OpenCode and Codex do the same job</td></tr><tr><td><strong>MCP server</strong></td><td>Turns SigNoz's API into tools any harness can call. MCP (Model Context Protocol) is the open standard for this</td><td><code>signoz-mcp-server</code>, SigNoz's own, with 46 tools</td></tr></tbody>
+</table>
+<figure class="code"><pre><code>you, or an alert
+      │
+      ▼
+ Claude Code  ◄──────►  Sonnet 5.5, at Anthropic
+      │
+      ├── MCP ──►  signoz-mcp  ──►  SigNoz API          viewer key
+      └── kubectl ───────────────►  Kubernetes API      read-only account</code></pre></figure>
+
+<h3>What SigNoz offers</h3>
+<table>
+  <thead><tr><th>What</th><th>Where it runs</th><th>Here?</th></tr></thead>
+  <tbody><tr><td>A built-in AI assistant in the UI</td><td>SigNoz Cloud. The UI has the code, but it needs a separate AI backend that SigNoz hasn't published. Self-hosted, <code>ai_assistant_url</code> is unset, so it's hidden</td><td>No</td></tr><tr><td><a href="https://github.com/SigNoz/signoz-mcp-server" target="_blank" rel="noopener">MCP server</a></td><td>Anywhere. Apache-2.0</td><td><strong>Yes</strong>, in the cluster</td></tr><tr><td><a href="https://github.com/SigNoz/agent-skills" target="_blank" rel="noopener">Agent skills</a></td><td>Written procedures that a harness loads when they're relevant, such as how to investigate an alert. MIT</td><td><strong>Yes</strong>, three read-only ones</td></tr></tbody>
+</table>
+
+<h2>What the AI can touch</h2>
+<p>Treat an agent like a new colleague with a read-only login. Two limits are enforced outside the AI, and those are the ones that count:</p>
+<table>
+  <thead><tr><th>Limit</th><th>Enforced by</th><th>What it stops</th><th>Tested</th></tr></thead>
+  <tbody><tr><td>A SigNoz viewer key</td><td>SigNoz</td><td>Any change. The MCP server also has tools that create and delete alerts and dashboards, and they fail</td><td><code>signoz_create_dashboard</code> returned 403</td></tr><tr><td>A read-only Kubernetes account</td><td>The API server</td><td>Changes, <code>exec</code>, Secrets and ConfigMaps</td><td><code>kubectl auth can-i</code>: pods and logs yes, the rest no</td></tr><tr><td>Allow and deny lists</td><td>The harness</td><td>The agent trying other tools at all. Not a security boundary: a rule can match more or less than you meant</td><td>A <code>kubectl delete</code> was refused before it ran</td></tr><tr><td>Budget and turn caps</td><td>The harness</td><td>A runaway investigation. Claude Code stops at its own cost estimate, and can overshoot a little</td><td>Not hit</td></tr></tbody>
+</table>
+<figure class="code"><figcaption><span><code>labs/lab5-ai/k8s/mcp.yaml</code> lines 9–13</span></figcaption><pre><code><span class="ln">9</span># It holds a SigNoz API key, so clients connect with no key of their own. The
+<span class="ln">10</span># key belongs to a service account with the signoz-viewer role, which
+<span class="ln">11</span># scripts/create_ai_access.py creates, so SigNoz refuses any change the AI
+<span class="ln">12</span># tries. The server also has tools that create and delete alerts and
+<span class="ln">13</span># dashboards: with this key they fail with 403.</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab5-ai/k8s/reader-rbac.yaml</code> lines 15–30</span></figcaption><pre><code><span class="ln">15</span>kind: ClusterRole
+<span class="ln">16</span>metadata: { name: lab5-ai-reader }
+<span class="ln">17</span>rules:
+<span class="ln">18</span>  - apiGroups: [&quot;&quot;]
+<span class="ln">19</span>    resources: [pods, pods/log, events, nodes, services, endpoints, namespaces, persistentvolumeclaims]
+<span class="ln">20</span>    verbs: [get, list, watch]
+<span class="ln">21</span>  - apiGroups: [apps]
+<span class="ln">22</span>    resources: [deployments, replicasets, daemonsets, statefulsets]
+<span class="ln">23</span>    verbs: [get, list, watch]
+<span class="ln">24</span>  - apiGroups: [events.k8s.io]
+<span class="ln">25</span>    resources: [events]
+<span class="ln">26</span>    verbs: [get, list, watch]
+<span class="ln">27</span>  # kubectl top. k3s ships metrics-server. kind doesn&#x27;t, so there it fails.
+<span class="ln">28</span>  - apiGroups: [metrics.k8s.io]
+<span class="ln">29</span>    resources: [pods, nodes]
+<span class="ln">30</span>    verbs: [get, list]</code></pre></figure>
+<p><code>scripts/create_ai_access.py</code> creates both accounts. It tests the key before finishing: reading has to give 200, and creating a dashboard has to give 403.</p>
+<div class="note"><p><strong>What leaves your machine.</strong> Everything the agent reads goes to the model: log lines, span attributes, pod names. Here that's made-up shop data. On a real system, logs can hold customer data and credentials, so check your provider's terms, and what your logs contain, first.</p></div>
+
+<h2>Connect Claude Code</h2>
+<p>All of it lives in one directory, <code>labs/lab5-ai/workspace/</code>, so it doesn't change how Claude Code behaves anywhere else:</p>
+<table>
+  <thead><tr><th>File</th><th>What it does</th></tr></thead>
+  <tbody><tr><td><code>.mcp.json</code></td><td>Where the MCP server is</td></tr><tr><td><code>.claude/settings.json</code></td><td>The model, and what's allowed and denied</td></tr><tr><td><code>.claude/settings.local.json</code></td><td>Written by <code>make lab5</code>. Points <code>kubectl</code> at the read-only account. Not committed</td></tr><tr><td><code>.kubeconfig</code></td><td>Written by <code>make lab5</code>. The read-only account's login, valid for 30 days. Not committed</td></tr><tr><td><code>AGENTS.md</code></td><td>What a new colleague would need: what runs where, and which signal is where. Most harnesses read this file. <code>CLAUDE.md</code> just imports it</td></tr><tr><td><code>.claude/skills/</code></td><td>Fetched by <code>make lab5</code>, from SigNoz/agent-skills, pinned to one commit. Not committed</td></tr></tbody>
+</table>
+<figure class="code"><figcaption><span><code>labs/lab5-ai/workspace/.mcp.json</code> lines 1–8</span></figcaption><pre><code><span class="ln">1</span>{
+<span class="ln">2</span>  &quot;mcpServers&quot;: {
+<span class="ln">3</span>    &quot;signoz&quot;: {
+<span class="ln">4</span>      &quot;type&quot;: &quot;http&quot;,
+<span class="ln">5</span>      &quot;url&quot;: &quot;http://mcp.localhost:8080/mcp&quot;
+<span class="ln">6</span>    }
+<span class="ln">7</span>  }
+<span class="ln">8</span>}</code></pre></figure>
+<p>Start it, and accept the prompt to trust the folder:</p>
+<figure class="code"><pre><code>cd labs/lab5-ai/workspace
+claude</code></pre></figure>
+<p>Inside it, run <code>/mcp</code>. It should list <code>signoz</code> as connected. Then <a href="ai-ask.html">ask it something</a>.</p>
+<div class="note"><p><strong>AGENTS.md doesn't say what's gone wrong before.</strong> It describes the environment, like a team runbook, and nothing about these incidents. If it did, <a href="ai-measured.html">the scores</a> would mean nothing.</p></div>
+
+<h3>Three traps</h3>
+<ul>
+  <li><strong>An untrusted folder ignores its own allow list.</strong> Claude Code prints <code>this workspace has not been trusted</code>, then refuses every call. The agent said so, and labelled its ideas as guesses. Interactively, you accept the prompt once. Headless, where nobody can, pass the same file with <code>--settings .claude/settings.json</code>.</li>
+  <li><strong>Agents put flags first.</strong> Claude wrote <code>kubectl -n lab3 get pods</code>, which <code>Bash(kubectl get *)</code> doesn't match. The settings allow <code>Bash(kubectl * get *)</code> too. That also matches odd commands, so the verbs that change things are denied by name.</li>
+  <li><strong>Your own hooks still apply.</strong> A hook in your user settings that rewrites commands, such as a token-saving proxy, changes what the rules see, so <code>kubectl get</code> becomes something they don't allow. For headless runs, <code>--setting-sources project,local</code> leaves user settings out.</li>
+</ul>
+
+<h2>Other harnesses</h2>
+<p>MCP is why this isn't tied to one tool. The server and the accounts stay the same, and only the client's config changes.</p>
+<h3>OpenCode</h3>
+<figure class="code"><figcaption><span><code>labs/lab5-ai/workspace/opencode.jsonc</code> lines 1–12</span></figcaption><pre><code><span class="ln">1</span>// OpenCode&#x27;s settings for this workspace. It reads AGENTS.md by itself.
+<span class="ln">2</span>// Start it with your kubectl pointed at the read-only account:
+<span class="ln">3</span>//   KUBECONFIG=$PWD/.kubeconfig opencode
+<span class="ln">4</span>{
+<span class="ln">5</span>  &quot;$schema&quot;: &quot;https://opencode.ai/config.json&quot;,
+<span class="ln">6</span>  &quot;mcp&quot;: {
+<span class="ln">7</span>    &quot;servers&quot;: {
+<span class="ln">8</span>      &quot;signoz&quot;: { &quot;type&quot;: &quot;remote&quot;, &quot;url&quot;: &quot;http://mcp.localhost:8080/mcp&quot; }
+<span class="ln">9</span>    }
+<span class="ln">10</span>  },
+<span class="ln">11</span>  // The last matching rule wins, and anything unmatched asks you. SigNoz&#x27;s key
+<span class="ln">12</span>  // and the Kubernetes account are what really stop changes. These rules just</code></pre></figure>
+<p>It reads <code>AGENTS.md</code> by itself. Start it with <code>KUBECONFIG=$PWD/.kubeconfig opencode</code>. We checked that it connects, with OpenCode 2.2.5: <code>opencode mcp list</code> shows <code>signoz connected</code>. We didn't run an investigation with it. <span class="badge untested">Untested</span></p>
+<h3>Codex</h3>
+<p>From the MCP server's documentation. Codex wasn't installed here, so this hasn't been run. <span class="badge untested">Untested</span></p>
+<figure class="code"><pre><code>codex mcp add signoz --url http://mcp.localhost:8080/mcp</code></pre></figure>
+
+<h2>What it costs</h2>
+<p>At idle, in the cluster: 129 MiB for the MCP server and 81 MiB for the investigator, with almost no CPU. The real cost is the model. <a href="ai-ask.html">A question</a> cost $0.10 to $0.16 here, on Sonnet 5.5. <a href="ai-measured.html">Investigations</a> are measured separately.</p>
+
+<div class="quiz" data-quiz="l1"><p class="q">Check yourself: What actually stops the AI from deleting an alert rule?</p><button type="button" data-right="false" data-why="Instructions ask. They can&#x27;t enforce anything.">The instructions in AGENTS.md.</button><button type="button" data-right="true" data-why="The check happens outside the AI, so no prompt can get past it.">SigNoz refuses it, because the key only has the viewer role.</button><button type="button" data-right="false" data-why="It has several. With this key they fail with 403.">The MCP server has no delete tool.</button></div>
+<div class="quiz" data-quiz="l2"><p class="q">Check yourself: Why use the MCP server instead of giving the agent SigNoz's API docs?</p><button type="button" data-right="false" data-why="The API is open. The lab&#x27;s own scripts use it.">It&#x27;s the only way to reach SigNoz.</button><button type="button" data-right="true" data-why="That&#x27;s why the same server works with Claude Code and OpenCode.">Any harness can use the same tools, with descriptions written for agents.</button><button type="button" data-right="false" data-why="It provides tools. How well they&#x27;re used still depends on the model.">It makes the model more accurate by itself.</button></div>
+
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

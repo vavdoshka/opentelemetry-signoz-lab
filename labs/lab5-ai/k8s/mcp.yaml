@@ -1,0 +1,80 @@
+# SigNoz's MCP server: the adapter that lets an AI agent query SigNoz.
+#
+# MCP (Model Context Protocol) is the open standard most agent harnesses use for
+# tools: Claude Code, Codex, OpenCode, Cursor and others. This server turns
+# SigNoz's API into about 50 tools, such as signoz_search_logs and
+# signoz_query_metrics. It's SigNoz's own, from
+# https://github.com/SigNoz/signoz-mcp-server (Apache-2.0).
+#
+# It holds a SigNoz API key, so clients connect with no key of their own. The
+# key belongs to a service account with the signoz-viewer role, which
+# scripts/create_ai_access.py creates, so SigNoz refuses any change the AI
+# tries. The server also has tools that create and delete alerts and
+# dashboards: with this key they fail with 403.
+apiVersion: v1
+kind: Namespace
+metadata: { name: lab5 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signoz-mcp
+  namespace: lab5
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: signoz-mcp } }
+  template:
+    metadata: { labels: { app: signoz-mcp } }
+    spec:
+      containers:
+        - name: signoz-mcp
+          # Pinned: each release targets the newest SigNoz, here 0.149.0.
+          image: signoz/signoz-mcp-server:v0.18.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: TRANSPORT_MODE, value: http }
+            - { name: MCP_SERVER_PORT, value: "8000" }
+            - { name: SIGNOZ_URL, value: http://signoz.signoz.svc.cluster.local:8080 }
+            - name: SIGNOZ_API_KEY
+              valueFrom: { secretKeyRef: { name: signoz-viewer, key: api-key } }
+            # The server ships SigNoz's docs for its search tool, and by default
+            # refreshes them from signoz.io every 6 hours. Serve the shipped copy.
+            - { name: SIGNOZ_DOCS_REFRESH_INTERVAL, value: "0" }
+            - { name: SIGNOZ_DOCS_FULL_REFRESH_INTERVAL, value: "0" }
+            - { name: ANALYTICS_ENABLED, value: "false" }
+            # Its own traces and metrics go to SigNoz through the node agents,
+            # like Lab 1's apps, so you can see every tool call the AI makes.
+            # This setting is gRPC, hence port 4317.
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://k8s-infra-otel-agent.signoz.svc.cluster.local:4317" }
+            - { name: OTEL_SERVICE_NAME, value: signoz-mcp }
+          ports: [{ containerPort: 8000 }]
+          # It builds a search index of SigNoz's docs at start, which the project
+          # measured at up to 134 MiB above its usual heap. It recommends a
+          # limit of at least 512Mi.
+          resources:
+            requests: { cpu: 20m, memory: 128Mi }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: signoz-mcp, namespace: lab5 }
+spec:
+  selector: { app: signoz-mcp }
+  ports: [{ port: 8000 }]
+---
+# For agents on your machine: http://mcp.localhost:8080/mcp. Anyone who can
+# reach this URL can read your SigNoz data, so on a shared cluster, don't expose
+# it like this. Turn on the server's OAuth mode, or pass the key from each
+# client instead.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: { name: signoz-mcp, namespace: lab5 }
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: mcp.localhost
+      http:
+        paths:
+          - path: /mcp
+            pathType: Prefix
+            backend: { service: { name: signoz-mcp, port: { number: 8000 } } }

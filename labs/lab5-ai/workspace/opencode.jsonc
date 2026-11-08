@@ -1,0 +1,27 @@
+// OpenCode's settings for this workspace. It reads AGENTS.md by itself.
+// Start it with your kubectl pointed at the read-only account:
+//   KUBECONFIG=$PWD/.kubeconfig opencode
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "signoz": { "type": "remote", "url": "http://mcp.localhost:8080/mcp" }
+    }
+  },
+  // The last matching rule wins, and anything unmatched asks you. SigNoz's key
+  // and the Kubernetes account are what really stop changes. These rules just
+  // stop the agent trying.
+  "permissions": [
+    { "action": "shell", "resource": "*", "effect": "deny" },
+    { "action": "shell", "resource": "kubectl get *", "effect": "allow" },
+    { "action": "shell", "resource": "kubectl * get *", "effect": "allow" },
+    { "action": "shell", "resource": "kubectl describe *", "effect": "allow" },
+    { "action": "shell", "resource": "kubectl * describe *", "effect": "allow" },
+    { "action": "shell", "resource": "kubectl logs *", "effect": "allow" },
+    { "action": "shell", "resource": "kubectl * logs *", "effect": "allow" },
+    { "action": "shell", "resource": "kubectl top *", "effect": "allow" },
+    { "action": "shell", "resource": "kubectl * top *", "effect": "allow" },
+    { "action": "edit", "resource": "*", "effect": "deny" },
+    { "action": "webfetch", "resource": "*", "effect": "deny" }
+  ]
+}

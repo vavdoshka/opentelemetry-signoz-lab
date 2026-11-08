@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "signoz": {
+      "type": "http",
+      "url": "http://mcp.localhost:8080/mcp"
+    }
+  }
+}

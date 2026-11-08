@@ -91,7 +91,12 @@
   <li><strong>Add a notification channel</strong>, or alerts will have nowhere to go.</li>
 </ul>
 
-<h2 id="noise">Gap 6: smaller issues</h2>
+<h2 id="collector">Gap 6: a collector can silently stop writing logs</h2>
+<p>During an overload in <a href="ai-measured.html">Lab 5</a>, one of the two <code>signoz-otel-collector</code> pods stopped writing logs to ClickHouse, and never recovered. For 84 minutes it stayed <code>1/1 Running</code> with 0 restarts, while the other pod and ClickHouse were fine. It dropped 19,131 log records and 3,445 spans. Because agents hold long-lived connections, whatever was pinned to that pod lost its logs, including Kubernetes events, so a real alert never fired.</p>
+<p>This matches an open issue, <a href="https://github.com/SigNoz/signoz-otel-collector/issues/965" target="_blank" rel="noopener">signoz-otel-collector#965</a>, &quot;clickhouselogsexporter: pushToClickhouse deadlocks when the consumer exits early&quot;, which others confirm on v0.144.15, the version here. Running two replicas doesn&#x27;t protect you. A healthy pod status proves nothing, so check the logs, and delete the pod if you find it:</p>
+<figure class="code"><pre><code>kubectl -n signoz logs -l app.kubernetes.io/component=otel-collector --since=10m --tail=-1 | grep -c 'Dropping data'</code></pre></figure>
+
+<h2 id="noise">Gap 7: smaller issues</h2>
 <h3>Span noise</h3>
 <p>59.1% of Lab 1's spans in the load run are zero-length ASGI <code>http send</code> and <code>http receive</code> spans. They crowd traces and inflate error counts.</p>
 <div data-ch="c-noise">Loading saved SQL...</div>

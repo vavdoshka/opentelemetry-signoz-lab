@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 QUOTE = re.compile(
-    r"<code>([\w/.-]+\.(?:py|yaml|html))</code> lines? (\d+)(?:–(\d+))?</span>.*?<pre><code>(.*?)</code></pre>",
+    r"<code>([\w/.-]+\.(?:py|yaml|html|json|jsonc))</code> lines? (\d+)(?:–(\d+))?</span>.*?<pre><code>(.*?)</code></pre>",
     re.S,
 )
 

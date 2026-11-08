@@ -20,6 +20,11 @@ k -n lab4 rollout status deployment/alert-sink --timeout=120s
 
 step "Alert rules"
 python3 scripts/create_alerts.py
+# Rewriting the rules drops Lab 5's channel from them. Put it back, or alerts
+# would silently stop reaching the investigator.
+if k get namespace lab5 >/dev/null 2>&1; then
+  python3 scripts/create_ai_routes.py
+fi
 
 cat <<DONE
 

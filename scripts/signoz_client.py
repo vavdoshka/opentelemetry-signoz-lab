@@ -26,11 +26,15 @@ LABS = {
 _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
-def request(url, data=None, token=None, method=None, timeout=20):
-    """Returns (status, parsed JSON or None). Status 0 means no connection."""
-    headers = {"content-type": "application/json"}
-    if API_KEY:
-        headers["SigNoz-Api-Key"] = API_KEY
+def request(url, data=None, token=None, method=None, timeout=20, api_key=None, headers=None):
+    """Returns (status, parsed JSON or None). Status 0 means no connection.
+
+    api_key sends that service account key instead of the usual login.
+    headers adds or replaces request headers.
+    """
+    headers = {"content-type": "application/json", **(headers or {})}
+    if api_key or API_KEY:
+        headers["SigNoz-Api-Key"] = api_key or API_KEY
     elif token:
         headers["Authorization"] = f"Bearer {token}"
     body = json.dumps(data).encode() if data is not None else None

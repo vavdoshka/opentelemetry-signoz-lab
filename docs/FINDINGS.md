@@ -179,7 +179,29 @@ A fresh install has 0 dashboards, 0 alert rules, 0 notification channels, 0 log 
 - **Alerts:** that repo contains no alert definitions. I did not find a ready-made alert pack, but
   that search was limited. Expect to write your own rules, as Lab 4 does.
 
-### 6. Smaller issues
+### 6. A collector can silently stop writing logs, while reporting healthy
+
+During an overload in Lab 5, one of the two `signoz-otel-collector` pods stopped writing logs to ClickHouse
+at 14:11:41, and never recovered. For 84 minutes it stayed `1/1 Running` with 0 restarts, while logging
+`couldn't PrepareBatch for inserting resource fingerprints: context deadline exceeded` and `Exporting failed.
+Dropping data`. The other replica had no such errors, and ClickHouse was answering inserts in about 100 ms.
+
+It dropped **19,131 log records and 3,445 spans**. Its span drops stopped by 14:40, while ClickHouse recovered,
+but the log drops continued at a steady 18 batches every 10 minutes. Agents and the cluster collector hold
+long-lived connections, so whatever was pinned to that pod lost its logs. In this lab that meant Kubernetes
+events, so the "killed by a liveness probe" alert didn't fire for a real kill, and the kernel log's record of an
+OOM kill never arrived. No health check or restart revealed it. Deleting the pod fixed it at once.
+
+This matches an open issue, [signoz-otel-collector#965](https://github.com/SigNoz/signoz-otel-collector/issues/965)
+"clickhouselogsexporter: pushToClickhouse deadlocks when the consumer exits early", which others confirm on
+v0.144.15, the version here and the latest release at the time of writing. A commenter there reproduced it from
+a timeout during export. Until it's fixed:
+
+- Check the collectors' logs for `Dropping data`. A healthy pod status proves nothing here:
+  `kubectl -n signoz logs -l app.kubernetes.io/component=otel-collector --since=10m --tail=-1 | grep -c 'Dropping data'`
+- Restart the pod if you find it. Running two replicas doesn't protect you, because of the pinned connections.
+
+### 7. Smaller issues
 
 - **Span noise:** more than half of stored spans (47,450 of 84,695) are zero-length ASGI `http send` and
   `http receive` spans. `FastAPIInstrumentor.instrument_app` has an `exclude_spans` argument that
@@ -543,6 +565,80 @@ name has to allow for that. A test that matched the exact name reported that thi
 
 **`eval_window` in SigNoz's log is misleading.** It logs 300000 for every rule, because that's a legacy
 field that defaults to 5 minutes. The query uses `evaluation.spec.evalWindow`, as the timings confirm.
+
+## AI analysis
+
+Lab 5 connects Claude Code (2.1.319, Sonnet 5.5) to SigNoz through SigNoz's own MCP server, read-only. SigNoz's
+built-in AI assistant isn't an option when self-hosted: the UI has the code, but it needs a separate backend that
+SigNoz hasn't published, and `ai_assistant_url` is unset. OpenCode 2.2.5 connects to the same server. Codex wasn't
+tested.
+
+### Is it really read-only?
+
+| Limit | Enforced by | Result |
+|---|---|---|
+| `signoz-viewer` service account | SigNoz | `signoz_create_dashboard` through MCP: `403 ... not authorized to perform dashboard:create` |
+| `ai-reader` ServiceAccount | The API server | Pods, logs and events: yes. Secrets, ConfigMaps, `exec`, delete and patch: no |
+| Allow and deny lists | Claude Code | `kubectl delete` refused before it ran. These aren't a security boundary |
+
+### Interactive answers
+
+| Question | Result | Time | Cost |
+|---|---|---|---|
+| "lab3-workload restarted in the last 15 minutes. Find out why." | Correct: a kernel OOM kill at 253 MiB, with the probe and rollout ruled out | 18 s | $0.16 |
+| The same, on an overloaded machine, after starting the same leak | Correct, and **not what we expected**: a liveness kill, from probe timeouts. Kubernetes recorded `exit 137, reason: Error`, the kernel log had no OOM lines, and the app was holding only 192 MiB | 156 s | $0.11 |
+| Revenue and slowest product in Lab 2, for a finished 6 minutes | **Every number matched our own query**: orders, revenue, average, p50 and p99 for all four products. It also said no product was meaningfully slower | 23 s | $0.10 |
+
+An earlier attempt at the third looked 7% short. The time range hadn't finished, so it and our query counted
+different amounts. That mistake was ours.
+
+### Alert-triggered, on five known failures
+
+Each run: cause the real failure, wait for the real alert, read the report. One run each, so this is a demonstration,
+not a benchmark. `tutorial/data/ai-evaluation.json` has every report. Collectors dropped nothing during the last four.
+The slow SQL case ran first, just after the stuck collector in gap 6 began failing. Everything it cited still checked out.
+
+| Incident | Text check | Reading the report | Alert after | Report after | Cost |
+|---|---|---|---|---|---|
+| Slow SQL | Passed | Complete. Every number and trace ID verified | 301 s | 116 s | $0.24 |
+| API calls refused | Passed | Complete. Audit count of 3,269 exact | 213 s | 23 s | $0.14 |
+| Failing health check | Passed | Complete, including the request that started it | 240 s | 34 s | $0.20 |
+| CPU throttling | Passed | Partial. Mechanism right, didn't find what burned the CPU, and said so | 252 s | 23 s | $0.18 |
+| OOM kill | Passed | Partial. Best evidence, but called a 2 MiB/s leak a sudden spike | 331 s | 33 s | $0.24 |
+
+**Text checks passed all five, and reading gave 3 complete and 2 partial.** None was wrong about the mechanism.
+We didn't time a person, so we make no claim about speed against one.
+
+**It stated an absence that was false.** One OOM report said "zero OOM or kernel 'Killed' log lines in lab3 over 2h",
+but they were there. Those pods have no `service.name`, and its search missed them. Adding the exact filter to
+`AGENTS.md` fixed that search, though that run then missed the app's own log lines. Treat "I found nothing" as its
+weakest claim.
+
+**It read our testing as a pattern.** It called repeated test runs "recurring", which is reasonable and wrong. It also
+blamed a rollout that our first evaluation script had caused, so we stopped restarting the pod between cases.
+
+**It caught a weakness in our alert rule:** the OOM rule stays true after a single kill.
+
+### What the setup taught us
+
+- **An untrusted folder ignores its allow list.** Headless, Claude Code denied every call until we passed the same file
+  with `--settings`. The agent said so, and labelled its ideas as guesses.
+- **`kubectl -n lab3 get pods` doesn't match `Bash(kubectl get *)`.** Agents put flags first, so the settings also allow
+  `Bash(kubectl * get *)`, and deny the verbs that change things by name.
+- **User-level hooks still apply.** A command-rewriting hook in user settings made `kubectl` calls miss the allow list.
+  `--setting-sources project,local` leaves user settings out.
+- **MCP's HTTP transport needs `Accept: application/json, text/event-stream`.** curl's default `*/*` passes, but
+  Python's urllib sends none, and gets a 400.
+- **SigNoz can watch the AI.** The MCP server's traces show each tool call, and Claude Code's telemetry gives cost per
+  model call. For four investigations that added up to $0.73, exactly what their reports said.
+
+### Overload, and what it did to the evidence
+
+With Docker at 4 CPUs, three load generators, other containers and a 438 MB image import left Docker's VM with 2% idle
+and a load of about 100. ClickHouse inserts went from about 30 ms to 1.7 s on average. Probes timed out, and Kubernetes
+killed healthy pods, including ClickHouse. It also triggered gap 6, the stuck collector, so a real liveness kill raised no
+alert, and one OOM kill's kernel lines were lost. The agent can't see what never arrived. A test that expected an alert
+is what found it.
 
 ## Automating it
 

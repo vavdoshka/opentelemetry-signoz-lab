@@ -1,4 +1,14 @@
 # Overrides to the SigNoz chart. Everything else is default.
+signoz:
+  env:
+    # The address you open in a browser. SigNoz puts it in links, including the
+    # ones the MCP server gives AI agents, which otherwise point at an address
+    # inside the cluster.
+    signoz_global_external__url: http://signoz.localhost:8080
+    # Lab 5's MCP server. This only shows SigNoz's MCP settings page, with how to
+    # connect a client. The server itself is deployed by make lab5.
+    signoz_global_mcp__url: http://mcp.localhost:8080/mcp
+
 otelCollector:
   # HA: losing one node does not stop ingestion.
   replicaCount: 2
