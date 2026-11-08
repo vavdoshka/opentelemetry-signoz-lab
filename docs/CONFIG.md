@@ -11,6 +11,13 @@ Every change from a default, with the reason. If it isn't listed here, it's at i
 | Host port 8080 reaches the ingress | Both cluster configs | The UIs are at `*.localhost:8080` |
 | Traefik installed (kind only) | `cluster/traefik-kind-values.yaml` | kind has no ingress controller. k3s ships Traefik |
 | Control-plane taint removed (kind only) | `scripts/up.sh` | Lets workloads use both nodes, like k3d |
+| k3s also logs to `/var/log/k3s.log` (k3d only) | `cluster/k3d-config.yaml`: `--log`, `--alsologtostderr` | k3s runs the kubelet, API server, scheduler and controller manager in one process, which logs only to `docker logs` by default. Pods can't read that, but the node agents can read a file. `--alsologtostderr` keeps `docker logs` working, and k3d needs it: it waits for k3s's startup messages there. k3s rotates the file at 50 MB and keeps 3 compressed copies |
+| API server audit log | `cluster/audit-policy.yaml`, and both cluster configs | Records who made each API request. Off by default. The policy drops requests that aren't for an object (discovery, health checks, metrics), leases, events, token and permission checks, and reads by the cluster's own components. It records the rest at `Metadata` level: caller, verb, object and response code, never bodies. That took it from 219 events a minute at idle to about 12. Rotated at 20 MB, keeping 2 old files. On kind it's a kubeadm patch, plus mounts for the policy and the log directory, because the API server runs as a pod |
+
+These last two only take effect when the cluster is created. A cluster from before them needs `make down`
+and `make up`. Lab 3 collects both files; until then they're written but not read. The API server reads
+the policy file when it starts, so to apply a change to it, run `k3d cluster stop signoz-lab` and
+`make up`. Restarting only the server node gives it a new IP that k3d's load balancer doesn't follow.
 
 ## SigNoz
 
@@ -95,6 +102,7 @@ Lab 1. `k8s/app.yaml` sets what Labs 1 and 2 don't, because these give Kubernete
 | `Role` allowing `list pods` in `lab3` | Only used by the `api_flood` and `api_denied` scenarios |
 | Separate `lab3-loadgen` Deployment | Load keeps coming while the workload restarts |
 | `kernel-log` DaemonSet, privileged, in `k8s/kernel-log.yaml` | Reads each node's `/dev/kmsg` and prints it, so the agent collects the kernel log. The collector can't read it itself |
+| `audit-log` DaemonSet, root, in `k8s/audit-log.yaml` | Prints the audit log, which only root can read. The node agents run as user 10001. Running them as root would let them read every root-only file on the node, because they mount its filesystem. This pod has only the audit directory, read-only, with all capabilities dropped |
 
 `labs/lab3-kubernetes/k8s-infra-values.yaml` adds four scrape jobs to the `k8s-infra` cluster
 collector, and `k8s/metrics-rbac.yaml` gives that collector permission to read them:
@@ -109,6 +117,15 @@ collector, and `k8s/metrics-rbac.yaml` gives that collector permission to read t
 - **Each job has a keep-list,** because SigNoz stores everything it's sent. See `FINDINGS.md`.
 - **`presets.logsCollection.blacklist.namespaces: []`** collects `kube-system` pod logs, which the chart
   leaves out by default.
+- **`otelAgent.config` adds two file receivers** on the node agents. `filelog/k3s` reads `/var/log/k3s.log`
+  through the node's `/var/log`, which the agents already mount. It joins multi-line messages, sets the
+  level from each line, and sets `service.name` to `k3s`. `filelog/audit` reads the `audit-log` pod's
+  output, and `presets.logsCollection.blacklist.containers: [audit-log]` stops the chart's own receiver
+  reading it too. It copies the caller, user agent, verb, resource, namespace, path and response code
+  into `k8s.audit.*` attributes, keeps the whole event as the body, and sets `service.name` to
+  `kube-apiserver-audit`. Both run in their own `logs/node` pipeline, because Helm replaces lists:
+  adding them to the chart's `logs` pipeline would mean copying its receiver list. Both start at the
+  end of the file, like the chart's pod logs.
 - **`presets.prometheus.namespaces: [lab3]` matters.** `presets.prometheus.enabled` also turns on an
   annotation job that scrapes SigNoz's own pods. Limiting it to `lab3` turns it off.
 - **`make up` keeps these jobs.** `install_k8s_infra` in `scripts/lib.sh` adds this values file when

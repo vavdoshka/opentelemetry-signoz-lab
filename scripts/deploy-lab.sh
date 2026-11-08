@@ -23,11 +23,12 @@ k apply -f "$dir/k8s/instrumentation.yaml"
 k apply -f "$dir/k8s/app.yaml"
 
 if [ "$1" = 3 ]; then
-  k apply -f "$dir/k8s/kernel-log.yaml"
+  k apply -f "$dir/k8s/kernel-log.yaml" -f "$dir/k8s/audit-log.yaml"
   step "Extra scrape jobs and logs"
   k apply -f "$dir/k8s/metrics-rbac.yaml"
   install_k8s_infra
   k -n signoz rollout status deployment/k8s-infra-otel-deployment --timeout=180s
+  k -n signoz rollout status daemonset/k8s-infra-otel-agent --timeout=180s
 fi
 
 # The image tag does not change, so restart to pick up a new build.
@@ -40,8 +41,10 @@ done
 if [ "$1" != 3 ]; then
   k -n "$namespace" rollout status deployment/postgres --timeout=300s
 else
-  k -n "$namespace" rollout restart daemonset/kernel-log
-  k -n "$namespace" rollout status daemonset/kernel-log --timeout=180s
+  for daemonset in kernel-log audit-log; do
+    k -n "$namespace" rollout restart "daemonset/$daemonset"
+    k -n "$namespace" rollout status "daemonset/$daemonset" --timeout=180s
+  done
 fi
 
 # The Operator's webhook fails open: if it can't answer, pods start without the
@@ -62,7 +65,8 @@ if [ -n "$missing" ]; then
 fi
 
 step "Smoke test: Lab $1"
-python3 scripts/smoke_test.py "$1"
+# PROVIDER tells the Lab 3 test whether to expect k3s's log.
+PROVIDER="$PROVIDER" python3 scripts/smoke_test.py "$1"
 
 if [ "$1" != 1 ]; then
   step "Dashboard"

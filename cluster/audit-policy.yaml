@@ -1,0 +1,56 @@
+# API server audit policy, used by both cluster configs.
+#
+# The audit log records requests to the API server: who made each one, from
+# where, what it asked for, and the response code. Kubernetes writes none of it
+# unless the API server is started with a policy, so it can only be turned on
+# when the cluster is created.
+#
+# The API server checks each request against these rules in order, and the
+# first match decides the level. `None` writes nothing. `Metadata` writes the
+# caller, verb, object and response code, but never the request or response
+# body, so secrets' contents stay out of the log.
+#
+# Logging everything at Metadata level wrote 219 events a minute on this idle
+# cluster, about 290 MB a day. These rules cut that to about 12 a minute, and
+# keep every request from apps and people, and every change by anyone.
+apiVersion: audit.k8s.io/v1
+kind: Policy
+# By default every request is logged twice: when it arrives and when it
+# completes. The completed event has everything, including the response code.
+omitStages: [RequestReceived]
+rules:
+  # Requests that aren't for an object: API discovery, health checks, metrics
+  # and OpenAPI. That's 58% of all requests at idle, mostly controllers and
+  # kubectl asking which APIs exist.
+  - level: None
+    nonResourceURLs: ["*"]
+
+  # Heartbeats. Every node and every controller renews a lease every few seconds.
+  - level: None
+    resources: [{ group: coordination.k8s.io, resources: [leases] }]
+
+  # Kubernetes events. Lab 3 already collects them as logs.
+  - level: None
+    resources: [{ group: "", resources: [events] }, { group: events.k8s.io, resources: [events] }]
+
+  # The API server checking a token or a permission on another component's
+  # behalf, mostly for kubelets and metrics-server. These change nothing.
+  - level: None
+    resources:
+      - { group: authentication.k8s.io, resources: [tokenreviews] }
+      - { group: authorization.k8s.io, resources: [subjectaccessreviews] }
+
+  # Reads by the cluster's own components: the API server itself, the
+  # controllers, the scheduler, each node's kubelet, and service accounts in
+  # kube-system. They read constantly. Their changes are still logged below.
+  # A rule with both `users` and `userGroups` needs a request to match both,
+  # so these are two rules. k3s-cloud-controller-manager only exists on k3s.
+  - level: None
+    verbs: [get, list, watch]
+    users: [system:apiserver, system:kube-controller-manager, system:kube-scheduler, k3s-cloud-controller-manager]
+  - level: None
+    verbs: [get, list, watch]
+    userGroups: [system:nodes, "system:serviceaccounts:kube-system"]
+
+  # Everything else.
+  - level: Metadata

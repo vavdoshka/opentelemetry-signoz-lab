@@ -86,23 +86,23 @@
 
 <h2>The scrape jobs</h2>
 <p>All four are in <code>labs/lab3-kubernetes/k8s-infra-values.yaml</code>. This is the one that adds throttling:</p>
-<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code> lines 40–56</span></figcaption><pre><code><span class="ln">40</span>      # cAdvisor, which is built into the kubelet: throttling and OOM events.
-<span class="ln">41</span>      - job_name: cadvisor
-<span class="ln">42</span>        scrape_interval: 30s
-<span class="ln">43</span>        scheme: https
-<span class="ln">44</span>        metrics_path: /metrics/cadvisor
-<span class="ln">45</span>        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
-<span class="ln">46</span>        tls_config: { insecure_skip_verify: true }
-<span class="ln">47</span>        kubernetes_sd_configs: [{ role: node }]
-<span class="ln">48</span>        relabel_configs:
-<span class="ln">49</span>          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
-<span class="ln">50</span>        metric_relabel_configs:
-<span class="ln">51</span>          - source_labels: [__name__]
-<span class="ln">52</span>            action: keep
-<span class="ln">53</span>            regex: container_cpu_cfs_(throttled_)?periods_total|container_cpu_cfs_throttled_seconds_total|container_oom_events_total
-<span class="ln">54</span>          # An empty container label means the pod&#x27;s cgroup or its pause container.
-<span class="ln">55</span>          - { source_labels: [container], action: drop, regex: &quot;&quot; }
-<span class="ln">56</span>          - { action: labeldrop, regex: id|image|name }</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code> lines 42–58</span></figcaption><pre><code><span class="ln">42</span>      # cAdvisor, which is built into the kubelet: throttling and OOM events.
+<span class="ln">43</span>      - job_name: cadvisor
+<span class="ln">44</span>        scrape_interval: 30s
+<span class="ln">45</span>        scheme: https
+<span class="ln">46</span>        metrics_path: /metrics/cadvisor
+<span class="ln">47</span>        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
+<span class="ln">48</span>        tls_config: { insecure_skip_verify: true }
+<span class="ln">49</span>        kubernetes_sd_configs: [{ role: node }]
+<span class="ln">50</span>        relabel_configs:
+<span class="ln">51</span>          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
+<span class="ln">52</span>        metric_relabel_configs:
+<span class="ln">53</span>          - source_labels: [__name__]
+<span class="ln">54</span>            action: keep
+<span class="ln">55</span>            regex: container_cpu_cfs_(throttled_)?periods_total|container_cpu_cfs_throttled_seconds_total|container_oom_events_total
+<span class="ln">56</span>          # An empty container label means the pod&#x27;s cgroup or its pause container.
+<span class="ln">57</span>          - { source_labels: [container], action: drop, regex: &quot;&quot; }
+<span class="ln">58</span>          - { action: labeldrop, regex: id|image|name }</code></pre></figure>
 <p>Three things to notice:</p>
 <ul>
   <li><strong>The keep-list.</strong> <code>action: keep</code> throws away everything else before it reaches SigNoz. This endpoint has about 3,000 series per node, and this job keeps a handful.</li>
@@ -134,12 +134,14 @@
 </table>
 <p>CI proves the <code>apiserver</code> and kubelet jobs on kind. The ports for the other components are kubeadm's usual defaults, and weren't checked in this lab. <span class="badge untested">Untested</span> To reach those local endpoints, you change their bind address. SigNoz publishes dashboards for them in <a href="https://github.com/SigNoz/dashboards/tree/main/k8s-system-monitoring" target="_blank" rel="noopener">k8s-system-monitoring</a>. Managed services such as EKS and GKE usually hide these components, so check your provider's documentation. <span class="badge untested">Untested</span></p>
 
-<h2>Logs from the cluster and the node</h2>
+<h2 id="node-logs">Logs from the cluster and the node</h2>
 <p>Your apps' logs come in by default. The cluster's own logs mostly don't, and each has a different reason:</p>
 <table>
   <thead><tr><th>Log</th><th>Where it is</th><th>Collected?</th></tr></thead>
-  <tbody><tr><td><code>kube-system</code> pods: CoreDNS, Traefik</td><td><code>/var/log/pods</code>, like any pod</td><td><strong>Yes, Lab 3 turns it on.</strong> The chart leaves this namespace out by default</td></tr><tr><td>The kernel log: OOM kills, hardware, the network</td><td><code>/dev/kmsg</code> on each node</td><td><strong>Yes, Lab 3 adds a reader</strong></td></tr><tr><td>kubelet, API server and scheduler on k3s</td><td>k3s's output, which k3d sends to <code>docker logs</code></td><td>No. k3s needs its <code>--log</code> flag when the cluster is created</td></tr><tr><td>kubelet on kubeadm clusters, such as kind</td><td>journald</td><td>No. The <code>journald</code> receiver needs <code>journalctl</code>, and the collector image doesn't have it</td></tr><tr><td>The control plane on kubeadm clusters, such as kind: API server, scheduler, controller manager, etcd</td><td><code>kube-system</code> pods</td><td>Yes, now that <code>kube-system</code> is included. In CI on kind, the controller manager's logs arrived. The API server didn't log during that check, so it's collected the same way but not yet seen</td></tr><tr><td>The API server's audit log: who did what</td><td>Off by default</td><td>No. It needs API server flags when the cluster is created</td></tr></tbody>
+  <tbody><tr><td><code>kube-system</code> pods: CoreDNS, Traefik</td><td><code>/var/log/pods</code>, like any pod</td><td><strong>Yes, Lab 3 turns it on.</strong> The chart leaves this namespace out by default</td></tr><tr><td>The kernel log: OOM kills, hardware, the network</td><td><code>/dev/kmsg</code> on each node</td><td><strong>Yes, Lab 3 adds a reader</strong></td></tr><tr><td>k3s: its kubelet, API server, scheduler and controller manager</td><td>k3s's output, which k3d sends to <code>docker logs</code>. The cluster config also writes it to <code>/var/log/k3s.log</code></td><td><strong>Yes, Lab 3 reads the file</strong></td></tr><tr><td>The API server's audit log: who did what</td><td>Off by default. The cluster config turns it on, in a file only root can read</td><td><strong>Yes, Lab 3 adds a reader</strong></td></tr><tr><td>The control plane on kubeadm clusters, such as kind: API server, scheduler, controller manager, etcd</td><td><code>kube-system</code> pods</td><td>Yes, with <code>kube-system</code>. In CI on kind, the controller manager's logs arrived</td></tr><tr><td>kubelet on kubeadm clusters, such as kind</td><td>journald</td><td>No. The <code>journald</code> receiver needs <code>journalctl</code>, and the collector image doesn't have it</td></tr></tbody>
 </table>
+<p>Two of these need settings that only take effect when the cluster is created: k3s's log file, and the audit log. They're in <code>cluster/k3d-config.yaml</code> and <code>cluster/kind-config.yaml</code>, so <code>make up</code> turns them on. A cluster created before them needs <code>make down</code> and <code>make up</code>.</p>
+
 <p>Including <code>kube-system</code> costs almost nothing here: about 2 lines a minute. It's one setting in <code>labs/lab3-kubernetes/k8s-infra-values.yaml</code>:</p>
 <figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code> lines 11–16</span></figcaption><pre><code><span class="ln">11</span>  logsCollection:
 <span class="ln">12</span>    blacklist:
@@ -165,10 +167,73 @@
 <span class="ln">27</span>    print(f&quot;{level} {message.splitlines()[0]}&quot;, flush=True)</code></pre></figure>
 <p>It's the best evidence of an OOM kill, as <a href="incident-oom.html">that incident</a> shows. Two costs come with it. Reading <code>/dev/kmsg</code> needs a privileged container, which is a real trade-off on a shared cluster. And on k3d both nodes share one kernel, so every line arrives twice, once from each pod.</p>
 
+<h3>k3s's own log</h3>
+<p>k3s runs the kubelet, API server, scheduler and controller manager in one process, so they share one log. By default it only goes to the node's output, which on k3d is <code>docker logs</code>, and no pod can read that. Two k3s flags also write it to a file:</p>
+<figure class="code"><figcaption><span><code>cluster/k3d-config.yaml</code> lines 30–40</span></figcaption><pre><code><span class="ln">30</span>      # k3s runs the kubelet, API server, scheduler and controller manager in
+<span class="ln">31</span>      # one process, and by default it only logs to the node&#x27;s stdout, which is
+<span class="ln">32</span>      # `docker logs`. Pods can&#x27;t read that, so also write it to a file. Lab 3&#x27;s
+<span class="ln">33</span>      # node agents read it. k3s rotates the file at 50 MB and keeps 3
+<span class="ln">34</span>      # compressed copies.
+<span class="ln">35</span>      - arg: --log=/var/log/k3s.log
+<span class="ln">36</span>        nodeFilters: [server:*, agent:*]
+<span class="ln">37</span>      # Keep writing to stdout as well: k3d waits for k3s&#x27;s startup messages
+<span class="ln">38</span>      # there, and `docker logs` keeps working.
+<span class="ln">39</span>      - arg: --alsologtostderr
+<span class="ln">40</span>        nodeFilters: [server:*, agent:*]</code></pre></figure>
+<p>The node agents already mount each node's <code>/var/log</code>, so the <code>filelog/k3s</code> receiver in <code>labs/lab3-kubernetes/k8s-infra-values.yaml</code> reads it. It joins messages that run over several lines, takes the level from each line, and names the source:</p>
+<figure class="code"><pre><code>service.name = 'k3s' AND severity_text = 'ERROR'</code></pre></figure>
+<div data-query="l-lab3-k3s-errors">Loading saved query...</div>
+<p><strong>Not every ERROR is a problem.</strong> While a worker node restarted and the labs redeployed, k3s logged 52 ERROR lines in 7 minutes, and every one was routine:</p>
+<table>
+  <thead><tr><th>Lines</th><th>Message</th><th>What it means</th></tr></thead>
+  <tbody><tr><td>27</td><td><code>RemoveStaleState: removing container</code></td><td>The kubelet cleaning up after a container it replaced</td></tr><tr><td>23</td><td><code>ContainerStatus</code> or <code>StopContainer from runtime service failed</code>, <code>NotFound</code></td><td>It asked about a container that was already gone</td></tr><tr><td>2</td><td><code>Failed to get system UUID</code></td><td>k3d nodes have no <code>/etc/machine-id</code>. Every 5 minutes</td></tr></tbody>
+</table>
+<p>So don't alert on the count of ERROR lines. At idle, k3s writes a few lines every 5 minutes on each node.</p>
+
+<h3>The audit log</h3>
+<p>The API server's metrics show that something is busy, not who. The audit log records who made each request. Kubernetes writes none of it unless the API server starts with a policy, so the cluster config passes one:</p>
+<figure class="code"><figcaption><span><code>cluster/k3d-config.yaml</code> lines 42–51</span></figcaption><pre><code><span class="ln">42</span>      # The API server&#x27;s audit log. See cluster/audit-policy.yaml for what it
+<span class="ln">43</span>      # records. It&#x27;s rotated at 20 MB, keeping 2 old files.
+<span class="ln">44</span>      - arg: --kube-apiserver-arg=audit-policy-file=/etc/kubernetes/audit-policy.yaml
+<span class="ln">45</span>        nodeFilters: [server:*]
+<span class="ln">46</span>      - arg: --kube-apiserver-arg=audit-log-path=/var/log/kubernetes/audit/audit.log
+<span class="ln">47</span>        nodeFilters: [server:*]
+<span class="ln">48</span>      - arg: --kube-apiserver-arg=audit-log-maxsize=20
+<span class="ln">49</span>        nodeFilters: [server:*]
+<span class="ln">50</span>      - arg: --kube-apiserver-arg=audit-log-maxbackup=2
+<span class="ln">51</span>        nodeFilters: [server:*]</code></pre></figure>
+<p>On kind it's the same four settings, as a kubeadm patch in <code>cluster/kind-config.yaml</code>, plus mounts for the policy and the log, because there the API server runs as a pod.</p>
+<p>The policy, in <code>cluster/audit-policy.yaml</code>, decides what's worth writing. The API server checks each request against its rules in order, and the first match wins:</p>
+<table>
+  <thead><tr><th>Requests</th><th>Level</th><th>Why</th></tr></thead>
+  <tbody><tr><td>Requests that aren't for an object: API discovery, health checks, metrics</td><td>None</td><td>58% of all requests at idle, mostly controllers and <code>kubectl</code> asking which APIs exist</td></tr><tr><td>Leases and events</td><td>None</td><td>Every node and controller renews a lease every few seconds, and Lab 3 already collects events</td></tr><tr><td>Token and permission checks</td><td>None</td><td>The API server checking on another component's behalf</td></tr><tr><td>Reads by the cluster's own components</td><td>None</td><td>The API server, controllers, scheduler, kubelets and <code>kube-system</code> service accounts read constantly</td></tr><tr><td>Everything else</td><td>Metadata</td><td>Every request from apps and people, and every change by anyone</td></tr></tbody>
+</table>
+<p><code>Metadata</code> records the caller, verb, object and response code, but never the request or response body, so secrets' contents stay out of the log. Logging everything at that level wrote 219 events a minute on this idle cluster, about 290 MB a day. This policy writes about 12 a minute, or 14 KiB.</p>
+<div class="note"><p><strong>A rule that names users and groups needs both to match.</strong> The first version of this policy put the system users and the system groups in one rule, expecting either to match. Kubernetes requires both, so the rule matched nothing and those reads stayed in the log. Measure the log after changing the policy.</p><p>The API server reads the policy when it starts. To apply a change on k3d, run <code>k3d cluster stop signoz-lab</code>, then <code>make up</code>. Don&#x27;t restart just the server node: it comes back with a new IP, and k3d&#x27;s load balancer and the other node keep using the old one.</p></div>
+
+<h4>Why it needs its own reader</h4>
+<p>The API server writes the file so only root can read it: mode 0600, in a 0700 directory. The node agents run as user 10001, so they get <code>permission denied</code>. Running the agents as root would fix that, but they also mount the node's whole filesystem, so they could then read every root-only file on it, including the kubelet's keys. Instead, a small DaemonSet in <code>labs/lab3-kubernetes/k8s/audit-log.yaml</code> runs as root with only the audit directory mounted, read-only, and prints each new line:</p>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s/audit-log.yaml</code> lines 37–45</span></figcaption><pre><code><span class="ln">37</span>          # -F keeps following the file after the API server rotates it.
+<span class="ln">38</span>          # -n 0 starts at the end, like the agents do.
+<span class="ln">39</span>          command: [&quot;tail&quot;, &quot;-n&quot;, &quot;0&quot;, &quot;-F&quot;, &quot;/var/log/kubernetes/audit/audit.log&quot;]
+<span class="ln">40</span>          securityContext:
+<span class="ln">41</span>            # Root owns the file, so root can read it with no capabilities.
+<span class="ln">42</span>            runAsUser: 0
+<span class="ln">43</span>            capabilities: { drop: [ALL] }
+<span class="ln">44</span>            allowPrivilegeEscalation: false
+<span class="ln">45</span>            readOnlyRootFilesystem: true</code></pre></figure>
+<p>Its output is a pod log. The chart's own pod log receiver skips it, and the <code>filelog/audit</code> receiver reads it instead. That receiver keeps the whole event as the body, and copies the fields worth searching on into attributes:</p>
+<table>
+  <thead><tr><th>Attribute</th><th>What it holds</th></tr></thead>
+  <tbody><tr><td><code>k8s.audit.user</code></td><td>Who: a user, or <code>system:serviceaccount:&lt;namespace&gt;:&lt;name&gt;</code></td></tr><tr><td><code>k8s.audit.user_agent</code></td><td>The client program, such as <code>python-httpx/0.28.1</code></td></tr><tr><td><code>k8s.audit.verb</code></td><td><code>get</code>, <code>list</code>, <code>watch</code>, <code>create</code>, <code>update</code>, <code>patch</code>, <code>delete</code></td></tr><tr><td><code>k8s.audit.resource</code>, <code>k8s.audit.namespace</code></td><td>What they asked for</td></tr><tr><td><code>k8s.audit.uri</code></td><td>The full path</td></tr><tr><td><code>k8s.audit.code</code></td><td>The answer: 200, 403 and so on</td></tr></tbody>
+</table>
+<figure class="code"><pre><code>service.name = 'kube-apiserver-audit'   count, grouped by k8s.audit.user, k8s.audit.verb and k8s.audit.resource</code></pre></figure>
+<p><a href="incident-apiserver.html">The API server incident</a> uses it to find who flooded the API server, and the refused requests its metrics never counted.</p>
+
 <h3>What you miss without them</h3>
 <p>While checking this, we found the worker node logging about 5,800 lines an hour, which nobody would have seen. It's k3d 5.5.0's own start-up script on worker nodes, retrying this every 3 seconds, forever:</p>
 <figure class="code"><pre><code>until kubectl uncordon "$HOSTNAME"; do sleep 3; done</code></pre></figure>
-<p>Worker nodes have no <code>kubectl</code> login, so it never succeeds. It's harmless, but it's exactly the sort of thing these logs are for. To read k3s's logs yourself, run <code>docker logs k3d-signoz-lab-agent-0</code>.</p>
+<p>Worker nodes have no <code>kubectl</code> login, so it never succeeds. It's harmless, but it's exactly the sort of thing these logs are for. It's not in k3s's log file, because the script isn't part of k3s. To see it, run <code>docker logs k3d-signoz-lab-agent-0</code>.</p>
 
 <h2>What it costs</h2>
 <p>You asked SigNoz to store more, so it costs something. Measured idle, with all the labs running:</p>
@@ -176,7 +241,7 @@
   <thead><tr><th></th><th>Before Lab 3</th><th>With Lab 3</th></tr></thead>
   <tbody><tr><td>Samples a minute, all of SigNoz</td><td>32,636</td><td>51,493</td></tr><tr><td>ClickHouse CPU</td><td>0.12 to 0.17 core</td><td>0.12 to 0.17 core</td></tr><tr><td>ClickHouse memory</td><td>2.6 GiB</td><td>3.1 GiB</td></tr><tr><td>Cluster collector memory</td><td>67 MiB</td><td>About 220 MiB</td></tr><tr><td>All pods, memory</td><td>4.3 GiB</td><td>5.2 GiB</td></tr></tbody>
 </table>
-<p>The scrape jobs add about 6,000 series. The sample count also includes Lab 3's own two instrumented pods, and the memory figures include those pods and Lab 4's sink. We can't say how much of ClickHouse's rise is new data and how much is caching from opening dashboards.</p>
+<p>The node logs cost little next to the metrics: at idle, about 12 audit events and a few k3s lines a minute, roughly 15 KiB. The scrape jobs add about 6,000 series. The sample count also includes Lab 3's own two instrumented pods, and the memory figures include those pods and Lab 4's sink. We can't say how much of ClickHouse's rise is new data and how much is caching from opening dashboards.</p>
 <p>Each job started with a shorter keep-list, which left some community dashboard panels empty. Filling them all added 17% more samples, and made no measurable difference to ClickHouse's CPU or memory at this size. So the lab keeps them. On a big cluster these series multiply, so measure before you copy this.</p>
 <ul>
   <li><strong>Collector memory rises whatever you keep,</strong> because it has to read about 73,000 lines every 30 seconds before throwing most of them away.</li>
@@ -195,6 +260,7 @@
 <div class="quiz" data-quiz="k1"><p class="q">Check yourself: Why does average CPU not tell you whether a pod is throttled?</p><button type="button" data-right="false" data-why="In this lab a pod read 0.23 of its limit while being throttled.">It does, because throttling always shows as 100% CPU.</button><button type="button" data-right="true" data-why="That&#x27;s why you need the cfs metrics, which the defaults don&#x27;t collect.">Throttling happens within 100 ms periods, and averages hide that.</button><button type="button" data-right="false" data-why="Memory limits cause OOM kills, not throttling.">Throttling only affects memory.</button></div>
 <div class="quiz" data-quiz="k2"><p class="q">Check yourself: Why does every scrape job here have a keep-list?</p><button type="button" data-right="false" data-why="They work, and that&#x27;s the problem.">Scrape jobs fail without one.</button><button type="button" data-right="true" data-why="On k3s, two endpoints even return nearly the same data.">SigNoz stores everything it&#x27;s sent, and these endpoints expose tens of thousands of series.</button><button type="button" data-right="false" data-why="The kubelet sends everything it has.">The kubelet requires it.</button></div>
 
+<div class="quiz" data-quiz="k3"><p class="q">Check yourself: Why does the audit log need its own reader pod?</p><button type="button" data-right="false" data-why="It parses it fine. It can&#x27;t open the file.">The collector can&#x27;t parse JSON.</button><button type="button" data-right="true" data-why="So a tiny pod gets root, with only that directory mounted.">Only root can read the file, and running the node agents as root would expose every root-only file on the node.</button><button type="button" data-right="false" data-why="It&#x27;s on the control-plane node, where the API server runs.">The audit log is only on worker nodes.</button></div>
 
 <section class="page-end" id="page-end" aria-label="Page navigation"></section>
 </main>

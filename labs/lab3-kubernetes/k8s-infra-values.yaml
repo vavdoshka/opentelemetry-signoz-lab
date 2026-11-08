@@ -14,6 +14,8 @@ presets:
       # you're debugging: CoreDNS and Traefik here. On kubeadm clusters such as
       # kind, the API server, scheduler, controller manager and etcd too.
       namespaces: []
+      # The audit log pod's output is read by filelog/audit below instead.
+      containers: [audit-log]
 
   prometheus:
     enabled: true
@@ -86,3 +88,102 @@ presets:
           - source_labels: [__name__]
             action: keep
             regex: apiserver_request_total|apiserver_request_sli_duration_seconds_(bucket|sum|count)|apiserver_current_inflight_requests|apiserver_longrunning_requests|apiserver_storage_objects|workqueue_depth|process_cpu_seconds_total|process_resident_memory_bytes|go_goroutines
+
+# Two node logs that aren't ordinary pod logs. Both are only written because
+# cluster/k3d-config.yaml and cluster/kind-config.yaml turn them on when the
+# cluster is created.
+otelAgent:
+  config:
+    receivers:
+      # k3s's own log: its kubelet, API server, scheduler and controller manager
+      # all run in the k3s process and write here. Each node has one. The agents
+      # already mount the node's /var/log. kind has no such file, so on kind
+      # this receiver finds nothing.
+      filelog/k3s:
+        include: [/var/log/k3s.log]
+        # Read only new lines, like the chart's pod logs. Lines written while an
+        # agent restarts are missed.
+        start_at: end
+        operators:
+          # Some messages run over several lines. Join every line that doesn't
+          # start a new message onto the one before it.
+          - type: recombine
+            combine_field: body
+            is_first_entry: body matches "^([IWEF]\\d{4} |time=)"
+            # Which lines belong together. There's one file, so its name does.
+            source_identifier: attributes["log.file.name"]
+          # Kubernetes components log like this:
+          #   E1107 21:07:14.366878  23 info.go:114] Failed to get system UUID
+          # The first letter is the level. There's no year, so the timestamp is
+          # when the agent read the line, a fraction of a second later.
+          - type: regex_parser
+            if: body matches "^[IWEF]\\d{4} "
+            regex: '^(?P<level>[IWEF])\d{4} '
+            severity:
+              parse_from: attributes.level
+              mapping: { info: I, warn: W, error: E, fatal: F }
+              overwrite_text: true
+          # k3s itself logs like this:
+          #   time="2026-11-07T21:13:43Z" level=warning msg="Proxy error: ..."
+          - type: regex_parser
+            if: body matches "^time="
+            regex: '^time="(?P<time>[^"]+)" level=(?P<level>\w+)'
+            timestamp: { parse_from: attributes.time, layout_type: gotime, layout: "2006-01-02T15:04:05Z07:00" }
+            severity:
+              parse_from: attributes.level
+              mapping: { warn: warning }
+              overwrite_text: true
+          - { type: remove, field: attributes.level, if: "attributes.level != nil" }
+          - { type: remove, field: attributes.time, if: "attributes.time != nil" }
+          # Name the source, so you can search for service.name = 'k3s'.
+          - { type: add, field: 'resource["service.name"]', value: k3s }
+
+      # The API server's audit log, one JSON object per request. The agents
+      # can't open the file itself, so k8s/audit-log.yaml runs a pod that
+      # prints it, and this reads that pod's output. The body keeps the whole
+      # event, and these operators copy the fields worth searching on into
+      # attributes.
+      filelog/audit:
+        include: [/var/log/pods/lab3_audit-log-*/audit-log/*.log]
+        # The file name is the pod log's, 0.log, which says nothing.
+        include_file_name: false
+        start_at: end
+        operators:
+          # The container runtime writes each line as "<time> <stream> <tag> <line>".
+          # Keep the line, and drop anything tail writes to stderr, such as a
+          # note that the file was rotated.
+          - type: regex_parser
+            regex: '^\S+ (?P<stream>stdout|stderr) \S+ (?P<line>.*)$'
+          - { type: filter, expr: 'attributes.stream != "stdout"' }
+          - { type: move, from: attributes.line, to: body }
+          - { type: remove, field: attributes.stream }
+          - type: json_parser
+            parse_to: attributes.event
+            timestamp: { parse_from: attributes.event.requestReceivedTimestamp, layout_type: gotime, layout: "2006-01-02T15:04:05.999999999Z07:00" }
+          # Who called: a user, or system:serviceaccount:<namespace>:<name>.
+          - { type: move, from: attributes.event.user.username, to: 'attributes["k8s.audit.user"]' }
+          - { type: move, from: attributes.event.userAgent, to: 'attributes["k8s.audit.user_agent"]', if: "attributes.event.userAgent != nil" }
+          # What they asked for. Requests that aren't for an object, such as
+          # /api, have no resource, and cluster-wide objects have no namespace.
+          # A move fails if its field is missing, hence the `if`s.
+          - { type: move, from: attributes.event.verb, to: 'attributes["k8s.audit.verb"]' }
+          - { type: move, from: attributes.event.objectRef.resource, to: 'attributes["k8s.audit.resource"]', if: "attributes.event.objectRef?.resource != nil" }
+          - { type: move, from: attributes.event.objectRef.namespace, to: 'attributes["k8s.audit.namespace"]', if: "attributes.event.objectRef?.namespace != nil" }
+          - { type: move, from: attributes.event.requestURI, to: 'attributes["k8s.audit.uri"]' }
+          # The answer: 200, 403 and so on.
+          - { type: move, from: attributes.event.responseStatus.code, to: 'attributes["k8s.audit.code"]', if: "attributes.event.responseStatus?.code != nil" }
+          - { type: remove, field: attributes.event }
+          - { type: add, field: 'resource["service.name"]', value: kube-apiserver-audit }
+
+    service:
+      pipelines:
+        # A pipeline of their own, so the chart's `logs` pipeline is left as it
+        # is. Helm replaces lists rather than merging them, so adding these
+        # receivers there would mean copying the chart's list too.
+        # resourcedetection adds the node and cluster names. k8sattributes is
+        # left out: these lines are about the node and the API server, not
+        # about the pod that relays the audit log.
+        logs/node:
+          receivers: [filelog/k3s, filelog/audit]
+          processors: [resourcedetection, batch]
+          exporters: [otlphttp]

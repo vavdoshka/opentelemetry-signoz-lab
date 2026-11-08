@@ -413,8 +413,19 @@ while `latest` reads 3. The alert uses the Kubernetes event instead.
 (`response_status_code = '403'`) found all 549. That's measured on k3s 1.26.4, and newer versions are
 **Untested**.
 
-**The API server can't say who's calling.** `apiserver_request_total` has no client or user label. An
-app's own client spans can, for that app. Otherwise you need the audit log, which is off by default.
+**The API server's metrics can't say who's calling, and its audit log can.** `apiserver_request_total`
+has no client or user label. With the audit log on, a 2-minute `api_flood` showed 2,014 `list pods` from
+`system:serviceaccount:lab3:workload`, exactly the app's own count, and no other caller above 3. An app's
+own client spans show the same, but only for apps you instrument.
+
+**Refused requests: the metric had none, the audit log had all of them.** In a second `api_denied` run the
+app counted 1,975 403s. `apiserver_request_total` again had no 403 series, and the audit log recorded
+1,975, all from the workload's ServiceAccount.
+
+**Span counts can run high.** The client spans for that run said 2,039. At 00:48:20 SigNoz's collector
+timed out writing a batch to ClickHouse (`context deadline exceeded`) and retried the whole batch, so 64
+spans were stored twice, all from that batch, each with the same span ID as its twin.
+`count_distinct(span_id)` gave 1,975. Delivery is at least once.
 
 **Disk shows on the node, not the pod.** Writing 512 MiB to an `emptyDir` raised
 `k8s.node.filesystem.usage` by about 467 MiB, on both nodes, because k3d nodes share a disk.
@@ -426,10 +437,41 @@ app's own client spans can, for that app. Otherwise you need the audit log, whic
 |---|---|---|
 | `kube-system` pods | No: the chart excludes the namespace | Yes. About 2 lines a minute here |
 | Kernel log | No | Yes, through a DaemonSet |
-| kubelet, API server and scheduler on k3s | No: they go to k3s's output, which k3d sends to `docker logs` | No. Needs k3s's `--log` flag at cluster creation |
+| kubelet, API server and scheduler on k3s | No: they go to k3s's output, which k3d sends to `docker logs` | Yes. k3s's `--log` flag, set when the cluster is created, also writes `/var/log/k3s.log`, and the agents read it |
 | kubelet on kubeadm clusters | No: it's in journald | No. The `journald` receiver needs `journalctl` |
-| Control plane on kubeadm clusters | No: it runs in `kube-system` | Yes. In CI on kind, `kube-controller-manager` logs arrived. The API server didn't log during that check |
-| API server audit log | No: off by default | No. Needs API server flags at cluster creation |
+| Control plane on kubeadm clusters | No: it runs in `kube-system` | Yes. In CI on kind, `kube-controller-manager` logs arrived |
+| API server audit log | No: off by default | Yes. API server flags set when the cluster is created, and a reader pod, because only root can read the file |
+
+**Unfiltered, the audit log is mostly noise.** Logging every request at `Metadata` level wrote 219 events
+a minute on the idle cluster, about 205 KiB a minute or 290 MB a day. 58% were API discovery requests and
+95% were reads. `cluster/audit-policy.yaml` drops requests that aren't for an object, leases, events,
+token and permission checks, and reads by the cluster's own components. Measured idle for 5 minutes after
+that: 11.8 events a minute, 13.9 KiB a minute. It still keeps every request from apps and people, and
+every change by anyone.
+
+**A policy rule with both `users` and `userGroups` needs both to match.** The first version put the
+system users and groups in one rule, expecting either to match, and it matched nothing. Kubernetes'
+`ruleMatches` returns false unless every field the rule sets matches. Split them into two rules.
+
+**Only root can read the audit log.** The API server creates it with mode 0600 in a 0700 directory. The
+node agents run as user 10001 in group 0, which is how they read pod logs (mode 0640), but not this file:
+`permission denied`. Running the agents as root would also let them read every root-only file under the
+node filesystem they mount, such as the kubelet's keys. So `labs/lab3-kubernetes/k8s/audit-log.yaml`
+runs `tail -F` as root, with only the audit directory mounted read-only and all capabilities dropped,
+and the agents read its output.
+
+**Most of k3s's ERROR lines are routine.** While a worker restarted and the labs redeployed, k3s logged 52
+ERROR lines in 7 minutes: 27 `RemoveStaleState: removing container`, 23 lookups of containers that were
+already gone, and 2 `Failed to get system UUID`, because k3d nodes have no `/etc/machine-id`. Don't alert
+on the count. At idle it writes a few lines every 5 minutes on each node.
+
+**Restarting one k3d node changes its IP.** Restarting only the server node, to reload the audit policy,
+moved it from 192.168.144.3 to .2. k3d's load balancer kept using the old address, so `kubectl` got
+`EOF`, and after the next restart the worker went NotReady. Restarting the load balancer and then the
+worker fixed both. `scripts/up.sh` now waits for the API server, and says what to restart if it doesn't
+answer. Restarting the whole cluster instead, with `k3d cluster stop signoz-lab` and `make up`, also gave
+the nodes new IPs, but everything restarts together, so nothing broke. Both smoke tests passed within 5
+minutes. That's the way to apply a policy change.
 
 **k3d 5.5.0 logs about 5,800 lines an hour on the worker node,** unseen. Its start-up script runs
 `until kubectl uncordon "$HOSTNAME"; do sleep 3; done`, and worker nodes have no `kubectl` login, so it

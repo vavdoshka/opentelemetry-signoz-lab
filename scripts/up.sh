@@ -7,6 +7,21 @@ cd "$ROOT"
 
 scripts/check-prereqs.sh
 
+# After Docker or a node restarts, the API server takes a while to come back,
+# and `kubectl wait` fails at once if it can't connect.
+wait_for_api_server() {
+  for _ in $(seq 90); do
+    k get --raw /readyz >/dev/null 2>&1 && return
+    sleep 2
+  done
+  echo "The API server did not come up within 3 minutes." >&2
+  if [ "$PROVIDER" = k3d ]; then
+    echo "If you restarted one node by itself, its IP may have changed, and k3d's load" >&2
+    echo "balancer still uses the old one. Run: docker restart k3d-$CLUSTER_NAME-serverlb" >&2
+  fi
+  exit 1
+}
+
 k3d_up() {
   if k3d_cluster_exists; then
     k3d cluster start "$CLUSTER_NAME"
@@ -14,6 +29,7 @@ k3d_up() {
     k3d cluster create --config cluster/k3d-config.yaml
   fi
   scripts/k3d-shared-mount.sh
+  wait_for_api_server
   k wait --for=condition=Ready node --all --timeout=180s
 
   # A Docker restart can reassign node IPs, leaving k3s routing a node's kubelet

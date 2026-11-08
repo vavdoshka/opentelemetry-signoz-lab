@@ -1,0 +1,52 @@
+# Puts the API server's audit log into SigNoz.
+#
+# The API server writes the log readable only by root (mode 0600, in a 0700
+# directory). The node agents run as user 10001, so they can't open it. Running
+# the agents as root would fix that, but they also mount the node's whole
+# filesystem, so they could then read every root-only file on it, such as the
+# kubelet's keys. Instead, this pod runs as root with only the audit directory
+# mounted, read-only, and prints each new line. The agents read that output
+# with the filelog/audit receiver in ../k8s-infra-values.yaml.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: audit-log
+  namespace: lab3
+spec:
+  selector: { matchLabels: { app: audit-log } }
+  template:
+    metadata:
+      labels: { app: audit-log }
+      annotations:
+        # This isn't an app to trace, so opt out of the namespace's injection.
+        instrumentation.opentelemetry.io/inject-python: "false"
+    spec:
+      # Only control-plane nodes run an API server, so only they have the log.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions: [{ key: node-role.kubernetes.io/control-plane, operator: Exists }]
+      # Most clusters keep control-plane nodes for system pods only.
+      tolerations:
+        - { key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule }
+      containers:
+        - name: audit-log
+          image: telemetry-lab3:dev
+          imagePullPolicy: IfNotPresent
+          # -F keeps following the file after the API server rotates it.
+          # -n 0 starts at the end, like the agents do.
+          command: ["tail", "-n", "0", "-F", "/var/log/kubernetes/audit/audit.log"]
+          securityContext:
+            # Root owns the file, so root can read it with no capabilities.
+            runAsUser: 0
+            capabilities: { drop: [ALL] }
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          resources:
+            requests: { cpu: 5m, memory: 16Mi }
+            limits: { memory: 32Mi }
+          volumeMounts: [{ name: audit, mountPath: /var/log/kubernetes/audit, readOnly: true }]
+      volumes:
+        - name: audit
+          hostPath: { path: /var/log/kubernetes/audit, type: Directory }

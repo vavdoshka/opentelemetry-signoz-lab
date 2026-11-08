@@ -13,14 +13,14 @@ breaks. One command, on k3d or kind.
 |---|---|---|---|
 | **1. Hands-off** | Get telemetry from an app with no OpenTelemetry code | How much you get for free, through six incidents | `make up` |
 | **2. Custom dimensions** | Add a few OpenTelemetry API calls, only where they help | How to slice telemetry by things only your code knows, through four incidents | `make lab2` |
-| **3. Kubernetes** | Run a workload with real limits, scrape the kubelet, cAdvisor and API server, and collect cluster and kernel logs | How to debug throttling, OOM kills and failed probes, through five incidents, and which metrics quietly miss them | `make lab3` |
+| **3. Kubernetes** | Run a workload with real limits, scrape the kubelet, cAdvisor and API server, and collect cluster, kernel and API audit logs | How to debug throttling, OOM kills and failed probes, through five incidents, and which metrics quietly miss them | `make lab3` |
 | **4. Alerts** | Add eight alert rules, and a page showing what they send | How to write alerts that fire for real failures, and how long they take | `make lab4` |
 
 Each lab builds on the one before and adds only what it needs. They run side by side on a local
 two-node cluster and send to the same SigNoz.
 
 An interactive tutorial walks you through all of it: 26 pages, with buttons that trigger real
-failures, 91 saved searches, and code quoted straight from this repo.
+failures, 94 saved searches, and code quoted straight from this repo.
 
 ## What you'll learn
 
@@ -51,7 +51,8 @@ failures, 91 saved searches, and code quoted straight from this repo.
 - Find an OOM kill, when the metric named after it reads 0
 - Read pod, node, kubelet and API server metrics, and tell a pod problem from a node problem
 - Scrape Prometheus endpoints into SigNoz with a keep-list, and see what that costs
-- Collect `kube-system` and kernel logs, and find an OOM kill's process and container in the kernel log
+- Collect `kube-system`, k3s, kernel and API server audit logs. Find an OOM kill's process in the kernel
+  log, and who flooded the API server in the audit log
 - How k3s differs from a real API server
 - See what collects what, and why there's no node-exporter or kube-state-metrics
 
@@ -197,8 +198,9 @@ Lab 4 adds no app of its own. Its rules watch Labs 1 and 3, so these same scenar
 
 ## Use it on your own cluster
 
-Everything in Labs 3 and 4 is scripted, so you can reuse it. The metrics are a Helm values file and an
-RBAC manifest. The dashboards and alerts come from two scripts that work on any SigNoz, with a service
+Everything in Labs 3 and 4 is scripted, so you can reuse it. The metrics and logs are a Helm values file
+and three manifests. k3s's log file and the API server's audit log need settings made when the cluster is
+created, which are in `cluster/`. The dashboards and alerts come from two scripts that work on any SigNoz, with a service
 account's key:
 
 ```bash
@@ -223,8 +225,13 @@ were surprises:
   counts page cache, and 86% just before a real kill.
 - **Average CPU hid throttling.** A pod showing 23% of its limit was throttled in 19 to 32% of its CPU
   periods. With a little more load, the same limit got a healthy pod killed by its liveness probe.
-- **549 denied API calls never reached `apiserver_request_total`,** on k3s 1.26. The app's own client
-  spans showed all of them.
+- **Denied API calls never reached `apiserver_request_total`,** on k3s 1.26. The API server's audit log
+  recorded every one, 1,975 of 1,975, and named the ServiceAccount that made them.
+- **Span counts can run high.** A ClickHouse write timed out and SigNoz retried the batch, storing 64
+  spans twice. Counting distinct span IDs gave the true number.
+- **Unfiltered, the audit log wrote 219 events a minute on an idle cluster,** 95% of them reads, mostly
+  by the cluster itself. A policy that skips those brought it to 12, and still keeps every request from
+  apps and people.
 - **Alerts took about 4 minutes to arrive,** and that's by design: SigNoz reads data that's 2 minutes
   old, so late data can land.
 

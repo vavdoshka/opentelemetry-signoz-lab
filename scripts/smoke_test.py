@@ -4,6 +4,7 @@
 Usage: smoke_test.py 1|2|3
 """
 
+import os
 import sys
 
 from signoz_client import LAB3_URL, LABS, count, fire, login, metric_exists, query, read_credentials, request, wait_for
@@ -41,7 +42,16 @@ def smoke_test_lab3(token):
     result = query(token, "logs", spec, "scalar", minutes=10) or {}
     pods = sorted({row[0] for row in result.get("data") or []})
     print(f"kube-system logs in the last 10 minutes, from: {', '.join(pods) or 'none yet'}")
-    print("Smoke test passed: the workload and all four scrape jobs are reaching SigNoz.")
+    # The node log files. Both need settings made when the cluster is created, so
+    # a cluster created before them fails here. Rerun `make down` and `make up`.
+    wait_for(
+        "the API server's audit log",
+        lambda: count(token, "logs", "service.name = 'kube-apiserver-audit' AND k8s.audit.user EXISTS", minutes=3),
+        timeout=180,
+    )
+    if os.environ.get("PROVIDER") == "k3d":
+        wait_for("k3s's own log", lambda: count(token, "logs", "service.name = 'k3s'", minutes=10), timeout=420)
+    print("Smoke test passed: the workload, all four scrape jobs and the node logs are reaching SigNoz.")
 
 
 def main():

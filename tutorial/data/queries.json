@@ -8222,6 +8222,340 @@
     "end": "2026-11-07T22:10:00Z"
    },
    "verified": "api"
+  },
+  {
+   "id": "a-lab3-audit-callers",
+   "group": "Lab 3: logs",
+   "lab": "lab3",
+   "signal": "logs",
+   "title": "Who calls the API server",
+   "why": "From the audit log. The API server's metrics have no user or client label.",
+   "expr": "service.name = 'kube-apiserver-audit'",
+   "neg": false,
+   "aggs": [
+    "count()"
+   ],
+   "by": [
+    "k8s.audit.user",
+    "k8s.audit.verb",
+    "k8s.audit.resource"
+   ],
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "scalar",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name = 'kube-apiserver-audit'"
+    },
+    "aggregations": [
+     {
+      "expression": "count()"
+     }
+    ],
+    "limit": 20,
+    "groupBy": [
+     {
+      "name": "k8s.audit.user"
+     },
+     {
+      "name": "k8s.audit.verb"
+     },
+     {
+      "name": "k8s.audit.resource"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "table",
+    "columns": [
+     "k8s.audit.user",
+     "k8s.audit.verb",
+     "k8s.audit.resource",
+     "__result_0"
+    ],
+    "data": [
+     [
+      "system:serviceaccount:lab3:workload",
+      "list",
+      "pods",
+      2014
+     ],
+     [
+      "system:kube-proxy",
+      "watch",
+      "nodes",
+      3
+     ],
+     [
+      "system:serviceaccount:signoz:k8s-infra-otel-agent",
+      "watch",
+      "nodes",
+      3
+     ],
+     [
+      "system:serviceaccount:signoz:k8s-infra-otel-deployment",
+      "watch",
+      "services",
+      2
+     ],
+     [
+      "system:admin",
+      "watch",
+      "clusterrolebindings",
+      2
+     ],
+     [
+      "system:serviceaccount:signoz:k8s-infra-otel-deployment",
+      "watch",
+      "jobs",
+      2
+     ],
+     [
+      "system:serviceaccount:signoz:k8s-infra-otel-deployment",
+      "watch",
+      "pods",
+      2
+     ],
+     [
+      "system:serviceaccount:signoz:signoz-clickhouse-operator",
+      "watch",
+      "pods",
+      2
+     ],
+     [
+      "system:serviceaccount:signoz:k8s-infra-otel-agent",
+      "watch",
+      "replicasets",
+      2
+     ],
+     [
+      "system:k3s-controller",
+      "watch",
+      "pods",
+      2
+     ],
+     [
+      "system:serviceaccount:signoz:signoz-clickhouse-operator",
+      "watch",
+      "clickhouseinstallations",
+      2
+     ],
+     [
+      "system:node:k3d-signoz-lab-server-0",
+      "patch",
+      "nodes",
+      1
+     ],
+     [
+      "system:admin",
+      "watch",
+      "nodes",
+      1
+     ],
+     [
+      "system:serviceaccount:signoz:signoz-clickhouse-operator",
+      "watch",
+      "clickhouseoperatorconfigurations",
+      1
+     ],
+     [
+      "system:serviceaccount:signoz:k8s-infra-otel-deployment",
+      "watch",
+      "replicasets",
+      1
+     ],
+     [
+      "system:serviceaccount:opentelemetry-operator-system:opentelemetry-operator",
+      "watch",
+      "daemonsets",
+      1
+     ],
+     [
+      "system:serviceaccount:opentelemetry-operator-system:opentelemetry-operator",
+      "watch",
+      "targetallocators",
+      1
+     ],
+     [
+      "system:serviceaccount:opentelemetry-operator-system:opentelemetry-operator",
+      "watch",
+      "ingresses",
+      1
+     ],
+     [
+      "system:admin",
+      "watch",
+      "serviceaccounts",
+      1
+     ],
+     [
+      "system:k3s-controller",
+      "watch",
+      "endpoints",
+      1
+     ]
+    ],
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-08T00:44:00Z",
+    "end": "2026-11-08T00:46:15Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "a-lab3-audit-denied",
+   "group": "Lab 3: logs",
+   "lab": "lab3",
+   "signal": "logs",
+   "title": "Requests the API server refused",
+   "why": "apiserver_request_total has no 403 series for these on k3s 1.26. The audit log has every one.",
+   "expr": "service.name = 'kube-apiserver-audit' AND k8s.audit.code = 403",
+   "neg": false,
+   "aggs": [
+    "count()"
+   ],
+   "by": [
+    "k8s.audit.user",
+    "k8s.audit.verb",
+    "k8s.audit.resource"
+   ],
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "scalar",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name = 'kube-apiserver-audit' AND k8s.audit.code = 403"
+    },
+    "aggregations": [
+     {
+      "expression": "count()"
+     }
+    ],
+    "limit": 20,
+    "groupBy": [
+     {
+      "name": "k8s.audit.user"
+     },
+     {
+      "name": "k8s.audit.verb"
+     },
+     {
+      "name": "k8s.audit.resource"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "table",
+    "columns": [
+     "k8s.audit.user",
+     "k8s.audit.verb",
+     "k8s.audit.resource",
+     "__result_0"
+    ],
+    "data": [
+     [
+      "system:serviceaccount:lab3:workload",
+      "list",
+      "secrets",
+      1975
+     ]
+    ],
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-08T00:46:30Z",
+    "end": "2026-11-08T00:48:45Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-lab3-k3s-errors",
+   "group": "Lab 3: logs",
+   "lab": "lab3",
+   "signal": "logs",
+   "title": "Errors in k3s's own log",
+   "why": "The kubelet, API server, scheduler and controller manager on k3s. Not every ERROR is a problem.",
+   "expr": "service.name = 'k3s' AND severity_text = 'ERROR'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name = 'k3s' AND severity_text = 'ERROR'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-08T00:38:59.518211585Z",
+      "service": "k3s",
+      "severity": "ERROR",
+      "body": "E1108 00:38:59.406884      42 info.go:114] Failed to get system UUID: open /etc/machine-id: no such file or directory",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-08T00:37:06.21570113Z",
+      "service": "k3s",
+      "severity": "ERROR",
+      "body": "E1108 00:37:06.026372      42 cpu_manager.go:395] \"RemoveStaleState: removing container\" podUID=\"3ad2640e-ab25-4e2d-8ac6-d24ba93972ce\" containerName=\"audit-log\"",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-08T00:37:06.215700672Z",
+      "service": "k3s",
+      "severity": "ERROR",
+      "body": "E1108 00:37:06.026366      42 cpu_manager.go:395] \"RemoveStaleState: removing container\" podUID=\"cac14ee4-da78-4c1d-bea1-4f7ea6abd1f6\" containerName=\"loadgen\"",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-08T00:37:06.215700172Z",
+      "service": "k3s",
+      "severity": "ERROR",
+      "body": "E1108 00:37:06.026357      42 cpu_manager.go:395] \"RemoveStaleState: removing container\" podUID=\"2c63e73d-bcdb-4033-9195-3170c9ad88c7\" containerName=\"kernel-log\"",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-08T00:37:06.015299547Z",
+      "service": "k3s",
+      "severity": "ERROR",
+      "body": "E1108 00:37:06.003678      42 remote_runtime.go:415] \"ContainerStatus from runtime service failed\" err=\"rpc error: code = NotFound desc = an error occurred when try to find container \\\"a6120a4a63050b198bf55e374087b3648fb2dd49f941796f2ae9525380a62784\\\": not found\" containerID=\"a6120a4a63050b198bf55e374087b3648fb2dd49f941796f2ae9525380a62784\"",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 5
+   },
+   "savedWindow": {
+    "start": "2026-11-08T00:33:00Z",
+    "end": "2026-11-08T00:40:00Z"
+   },
+   "verified": "api"
   }
  ]
 }

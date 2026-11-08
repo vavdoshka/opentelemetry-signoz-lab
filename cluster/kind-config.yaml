@@ -1,6 +1,9 @@
 # kind cluster: two Kubernetes nodes running in Docker.
 # kind has no ingress controller, so scripts/up.sh installs Traefik on the
 # control-plane node. Host port 8080 maps to Traefik's port 80 there.
+#
+# The audit settings below only take effect when the cluster is created. To
+# change them, run `make down` and `make up`.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: signoz-lab
@@ -12,4 +15,43 @@ nodes:
       - containerPort: 80
         hostPort: 8080
         protocol: TCP
+
+    # The API server's audit log. See cluster/audit-policy.yaml for what it
+    # records. kind builds the API server with kubeadm, so these are kubeadm
+    # settings. The API server runs as a pod, so it also needs the policy and
+    # the log directory mounted into it.
+    #
+    # This patch has no apiVersion on purpose, so it applies whichever kubeadm
+    # config version kind generates. kind converts these `extraArgs` for newer
+    # versions, which take a list instead.
+    kubeadmConfigPatches:
+      - |
+        kind: ClusterConfiguration
+        apiServer:
+          extraArgs:
+            audit-policy-file: /etc/kubernetes/audit-policy.yaml
+            audit-log-path: /var/log/kubernetes/audit/audit.log
+            audit-log-maxsize: "20"
+            audit-log-maxbackup: "2"
+          extraVolumes:
+            - name: audit-policy
+              hostPath: /etc/kubernetes/audit-policy.yaml
+              mountPath: /etc/kubernetes/audit-policy.yaml
+              readOnly: true
+              pathType: File
+            - name: audit-log
+              hostPath: /var/log/kubernetes/audit
+              mountPath: /var/log/kubernetes/audit
+              pathType: DirectoryOrCreate
+    # Mounts the policy from this repo into the node. kind resolves the path
+    # from the directory it runs in, and scripts/up.sh runs it from the repo root.
+    extraMounts:
+      - hostPath: ./cluster/audit-policy.yaml
+        containerPath: /etc/kubernetes/audit-policy.yaml
+        readOnly: true
+
   - role: worker
+
+# On both nodes the kubelet runs under systemd and logs to journald. The node
+# agents can't read that, because their image has no journalctl, so on kind the
+# kubelet's logs aren't collected.

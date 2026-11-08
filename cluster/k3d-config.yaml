@@ -2,6 +2,9 @@
 # k3s ships Traefik as its ingress controller. Host port 8080 reaches Traefik
 # through the k3d load balancer, so http://signoz.localhost:8080 and
 # http://lab1.localhost:8080 reach the cluster.
+#
+# The k3s arguments and the volume below only take effect when the cluster is
+# created. To change them, run `make down` and `make up`.
 apiVersion: k3d.io/v1alpha5
 kind: Simple
 metadata:
@@ -13,3 +16,36 @@ ports:
   - port: 8080:80
     nodeFilters:
       - loadbalancer
+
+volumes:
+  # The audit policy, read by the API server. k3d replaces ${PWD} with the
+  # directory it runs in, and scripts/up.sh runs it from the repo root.
+  - volume: ${PWD}/cluster/audit-policy.yaml:/etc/kubernetes/audit-policy.yaml
+    nodeFilters:
+      - server:*
+
+options:
+  k3s:
+    extraArgs:
+      # k3s runs the kubelet, API server, scheduler and controller manager in
+      # one process, and by default it only logs to the node's stdout, which is
+      # `docker logs`. Pods can't read that, so also write it to a file. Lab 3's
+      # node agents read it. k3s rotates the file at 50 MB and keeps 3
+      # compressed copies.
+      - arg: --log=/var/log/k3s.log
+        nodeFilters: [server:*, agent:*]
+      # Keep writing to stdout as well: k3d waits for k3s's startup messages
+      # there, and `docker logs` keeps working.
+      - arg: --alsologtostderr
+        nodeFilters: [server:*, agent:*]
+
+      # The API server's audit log. See cluster/audit-policy.yaml for what it
+      # records. It's rotated at 20 MB, keeping 2 old files.
+      - arg: --kube-apiserver-arg=audit-policy-file=/etc/kubernetes/audit-policy.yaml
+        nodeFilters: [server:*]
+      - arg: --kube-apiserver-arg=audit-log-path=/var/log/kubernetes/audit/audit.log
+        nodeFilters: [server:*]
+      - arg: --kube-apiserver-arg=audit-log-maxsize=20
+        nodeFilters: [server:*]
+      - arg: --kube-apiserver-arg=audit-log-maxbackup=2
+        nodeFilters: [server:*]

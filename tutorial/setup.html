@@ -20,6 +20,7 @@
 <table>
   <thead><tr><th>Piece</th><th>What it does</th><th>Configured in</th></tr></thead>
   <tbody>
+    <tr><td><strong>Cluster</strong></td><td>Two nodes, on k3d or kind. Also turns on k3s's log file and the API server's audit log</td><td><code>cluster/k3d-config.yaml</code>, <code>cluster/kind-config.yaml</code>, <code>cluster/audit-policy.yaml</code></td></tr>
     <tr><td><strong>SigNoz</strong></td><td>UI, API, ClickHouse, ZooKeeper and the collectors, from the official Helm chart</td><td><code>signoz/signoz-values.yaml</code></td></tr>
     <tr><td><strong>k8s-infra</strong></td><td>Node agents and a cluster collector: pod and node metrics, container logs, Kubernetes events</td><td><code>signoz/k8s-infra-values.yaml</code></td></tr>
     <tr><td><strong>OpenTelemetry Operator</strong></td><td>Injects the agent into your pods. Not part of SigNoz</td><td><code>cluster/otel-operator-values.yaml</code></td></tr>
@@ -43,9 +44,12 @@
     <tr><td><code>otelCollectorEndpoint</code> in k8s-infra</td><td>Required, with no default. It must include <code>http://</code>, or exports fail while pods stay Running</td></tr>
     <tr><td><code>global.clusterName</code> in k8s-infra</td><td>Labels data with a cluster name. It's blank by default</td></tr>
     <tr><td><code>autoGenerateCert.recreate: false</code> on the Operator</td><td>Stops <code>helm upgrade</code> briefly breaking injection, which fails silently</td></tr>
+    <tr><td>k3s's <code>--log</code> and <code>--alsologtostderr</code>, on k3d</td><td>k3s runs the kubelet, API server and scheduler in one process, which only logs to <code>docker logs</code>. This also writes <code>/var/log/k3s.log</code>, which the node agents can read</td></tr>
+    <tr><td>The API server's audit policy and log</td><td>Records who made each API request. Kubernetes writes none of it by default</td></tr>
   </tbody>
 </table>
 <p>Everything else is a chart default, including retention: 15 days for traces and logs, 30 days for metrics.</p>
+<p>The last two only take effect when the cluster is created, so a cluster from before them needs <code>make down</code> and <code>make up</code>. <a href="lab3.html#node-logs">Lab 3</a> collects both.</p>
 
 <h2>Why ZooKeeper, and not ClickHouse Keeper?</h2>
 <p>ClickHouse has its own coordination service, <a href="https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper" target="_blank" rel="noopener">ClickHouse Keeper</a>, which it describes as replacing ZooKeeper. ZooKeeper still works, and this lab runs what SigNoz supports: chart 0.149.0 installs ClickHouse 25.12.5 with ZooKeeper 3.7.1, and has no Keeper option.</p>

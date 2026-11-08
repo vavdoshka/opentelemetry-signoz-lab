@@ -14,7 +14,7 @@
 <main id="main">
 <p class="eyebrow">Lab 3: incident 5 of 5</p>
 <h1>The API server</h1>
-<p class="lead">The API server is the front door to your cluster. Its metrics show when a client gets noisy, but not which client, and they miss some denied requests completely.</p>
+<p class="lead">The API server is the front door to your cluster. Its metrics show when a client gets noisy, but not which client, and they miss some denied requests completely. Its audit log fills both gaps.</p>
 <ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#evidence">4. Evidence</a></li><li><a href="#cause">5. Root cause</a></li><li><a href="#fix">6. Resolution</a></li></ul>
 
 <h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
@@ -29,6 +29,8 @@
 <p>Open the <strong>Kubernetes API Server</strong> dashboard, and look at <strong>Request Rate By Verb</strong>.</p>
 <figure class="code"><pre><code>apiserver_request_total   rate, sum, grouped by verb
                           add the filter verb = 'LIST' and group by resource to narrow it down</code></pre></figure>
+<p>Then the audit log, in Logs, to see who:</p>
+<figure class="code"><pre><code>service.name = 'kube-apiserver-audit'   count, grouped by k8s.audit.user, k8s.audit.verb and k8s.audit.resource</code></pre></figure>
 
 <h2 class="step" id="evidence"><span class="n">4</span>Evidence</h2>
 <h3>The flood</h3>
@@ -36,17 +38,20 @@
   <thead><tr><th></th><th>Before</th><th>During</th></tr></thead>
   <tbody><tr><td><code>LIST</code> requests a second, 1-minute average</td><td>0.02 to 0.17</td><td><strong>9.9</strong></td></tr><tr><td>Average <code>LIST pods</code> latency</td><td>Too few requests to say</td><td>About 2 ms</td></tr><tr><td>CPU of the k3s process</td><td>0.1 to 0.17 core</td><td>0.07 to 0.09 core</td></tr></tbody>
 </table>
-<p>The rate jumped about 100-fold and the API server didn't notice. The app sent 1,007 requests in 60 seconds, which is nothing for an API server. On a busy cluster, this panel is how you'd spot a client that matters.</p>
+<p>The rate jumped about 100-fold and the API server didn't notice. In this first run, the app sent 1,007 requests in 60 seconds, which is nothing for an API server. On a busy cluster, this panel is how you'd spot a client that matters.</p>
 
 <h3>Who did it?</h3>
-<p>The metric can't tell you. These are all the labels on <code>apiserver_request_total</code>:</p>
+<p>The metric can&#x27;t tell you. These are all the labels on <code>apiserver_request_total</code>:</p>
 <figure class="code"><pre><code>code, component, dry_run, group, resource, scope, subresource, verb, version</code></pre></figure>
-<p>There's no client or user. Real clusters answer this with the API server's audit log, which isn't on by default. But if the client is your own app, you already have the answer, because Lab 1's setup traces its outgoing calls:</p>
+<p>There&#x27;s no client or user. The audit log has both, because <a href="lab3.html#node-logs">Lab 3 turns it on</a>. In a second run, two minutes long, this is every request it recorded, grouped by caller:</p>
+<div data-query="a-lab3-audit-callers">Loading saved query...</div>
+<p>One caller made 2,014 of them: the workload&#x27;s ServiceAccount, <code>system:serviceaccount:lab3:workload</code>, using <code>python-httpx/0.28.1</code>. That&#x27;s exactly the number the app counted itself. Nothing else made more than 3. On a real cluster, a ServiceAccount usually belongs to one app, so this tells you whose code to look at.</p>
+<p>If the client is your own app, its client spans show the same calls, with their URLs, because Lab 1&#x27;s setup traces outgoing calls:</p>
 <figure class="code"><pre><code>service.name = 'lab3-workload' AND kind_string = 'Client'</code></pre></figure>
-<p>That search found all 1,007 calls, with their URLs.</p>
+<p>That search found all 1,007 calls in the first run, and all 2,014 in the second. The audit log also covers clients you didn&#x27;t instrument, such as an operator you installed.</p>
 
 <h3>The denied requests</h3>
-<p>This one is a trap. The app made 549 requests, and every one came back 403:</p>
+<p>This one is a trap. In the first run the app made 549 requests, and every one came back 403:</p>
 <figure class="code"><pre><code>finished calling /api/v1/namespaces/lab3/secrets: {403: 549}</code></pre></figure>
 <p>So <code>apiserver_request_total</code> with <code>code = '403'</code> should be climbing. It isn't there at all:</p>
 <table>
@@ -54,6 +59,15 @@
   <tbody><tr><td><code>apiserver_request_total</code>, in SigNoz</td><td><strong>0</strong></td></tr><tr><td><code>apiserver_request_total</code>, straight from the API server</td><td><strong>0</strong>: no <code>code="403"</code> series exists</td></tr><tr><td>Client spans: <code>response_status_code = '403'</code></td><td><strong>549</strong></td></tr><tr><td>The app's log</td><td><strong>549</strong></td></tr></tbody>
 </table>
 <p>Requests refused at authorization didn't reach this counter. That's what we measured on k3s 1.26.4. Newer Kubernetes versions may report it differently, which is <span class="badge untested">Untested</span>.</p>
+
+<h3>The audit log has every one</h3>
+<p>In the second run the app counted 1,975 refusals, and <code>apiserver_request_total</code> again had no 403 series. The audit log recorded 1,975, all from the workload&#x27;s ServiceAccount, and nobody else was refused that hour:</p>
+<div data-query="a-lab3-audit-denied">Loading saved query...</div>
+<p>The API server writes each audit event around the whole request, including the decision to refuse it, so a refusal is logged like any other request, with its 403.</p>
+<h4>When the spans count too many</h4>
+<p>The client spans said 2,039, not 1,975. Those weren&#x27;t 64 extra calls: 64 spans were stored twice. At 00:48:20 SigNoz&#x27;s collector timed out writing a batch of spans to ClickHouse, and retried the whole batch. Every duplicate is in that batch, with the same span ID as its twin. Counting distinct span IDs gives 1,975 again:</p>
+<figure class="code"><pre><code>count_distinct(span_id)   with the same filter</code></pre></figure>
+<p>Telemetry is delivered at least once. A retry can store something twice, so a count of spans or logs can run slightly high.</p>
 <figure class="shot"><img src="screenshots/lab3-api-server.png" alt="SigNoz dashboard Kubernetes API Server, with request rates by verb and by status code, and a spike in LIST requests" width="1440" height="900" loading="lazy"><figcaption>The community <strong>Kubernetes API Server</strong> dashboard, in UTC+1. The <code>LIST</code> spike at about 20:28 is <code>api_flood</code>. The status code legend has no 403, although requests were denied in this hour. The latency panel labels its axis <code>req/s</code>, but it plots seconds. <span class="badge ui">Seen in SigNoz UI</span></figcaption></figure>
 
 <h2 class="step" id="cause"><span class="n">5</span>Root cause</h2>
@@ -69,12 +83,13 @@
 <ul>
   <li><strong>Use watches and informers, not polling.</strong> A controller that watches gets told about changes. One that lists in a loop does this to the API server all day.</li>
   <li><strong>Fix the permission or the client.</strong> A client that keeps getting 403s is either misconfigured or broken, and retrying won't help.</li>
-  <li><strong>Turn on audit logging</strong> if you need to know which client did what.</li>
+  <li><strong>Keep the audit log on.</strong> It&#x27;s the only record of who called, and here the only one on the API server&#x27;s side of the refused requests.</li>
 </ul>
 
 <div class="quiz" data-quiz="a1"><p class="q">Check yourself: Which client caused the LIST spike?</p><button type="button" data-right="false" data-why="That metric has no client or user label.">Read the user label on apiserver_request_total.</button><button type="button" data-right="true" data-why="If it&#x27;s your own app, Lab 1&#x27;s setup already traces those calls.">Search your app&#x27;s client spans, or the API server&#x27;s audit log.</button><button type="button" data-right="false" data-why="The API server isn&#x27;t an instrumented service here.">The Service Map shows it.</button></div>
 <div class="quiz" data-quiz="a2"><p class="q">Check yourself: An app gets 549 403s from the API server. What does apiserver_request_total show here?</p><button type="button" data-right="false" data-why="That&#x27;s what you&#x27;d expect, but no such series exists.">549, with code 403.</button><button type="button" data-right="true" data-why="So the client&#x27;s spans and logs are your evidence.">Nothing: they never reach that counter on this version.</button><button type="button" data-right="false" data-why="They weren&#x27;t counted as successes either.">549, with code 200.</button></div>
 
+<div class="quiz" data-quiz="a3"><p class="q">Check yourself: Client spans show 2,039 refused calls, and the audit log 1,975. Which is right?</p><button type="button" data-right="false" data-why="Its policy keeps every request from apps.">The spans. The audit log drops some requests.</button><button type="button" data-right="true" data-why="Telemetry is delivered at least once, so counts can run slightly high.">The audit log. A retried write stored 64 spans twice, and counting distinct span IDs gives 1,975.</button><button type="button" data-right="false" data-why="The app counted 1,975 itself.">Neither. The app made 2,039 calls and the API server lost 64.</button></div>
 
 <section class="page-end" id="page-end" aria-label="Page navigation"></section>
 </main>
