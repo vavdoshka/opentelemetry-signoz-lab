@@ -250,7 +250,7 @@ The full write-ups:
 | macOS, Apple Silicon | k3d 5.5.0 | Yes | Yes, every scenario and alert |
 | macOS, Apple Silicon | kind 0.22.0 | Yes | Not tested. Its audit log settings were checked on a bare cluster |
 | Ubuntu, x86 (the e2e workflow) | k3d 5.9.0 | Yes | Yes, scrape jobs, k3s and audit logs, and one real alert |
-| Ubuntu, x86 (the e2e workflow) | kind 0.33.0 | Yes | Yes, scrape jobs, audit log, and one real alert |
+| Ubuntu, x86 (the e2e workflow) | kind 0.33.0 | Yes | Yes, scrape jobs, audit and kubelet logs, and one real alert |
 
 "Yes" for Labs 1 and 2 means they boot from nothing and `make compare` gives the same results.
 Rerunning `make up` is tested in the e2e workflow and on k3d on macOS. Recovery after stopping the
