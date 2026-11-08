@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Incident: revenue dropped with no errors | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>Revenue dropped with no errors · Lab 2 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -110,9 +111,18 @@
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>Apply the discount properly:</p>
-<figure class="code"><figcaption><span>Proposed fix for labs/lab2-custom-dimensions/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code>         if order.coupon == &quot;SAVE10&quot;:
+<figure class="code"><figcaption><span>The fix for labs/lab2-custom-dimensions/app/backend.py. Tried on 2026-11-08, then undone <span class="badge api">Query API only</span></span></figcaption><pre><code>         if order.coupon == &quot;SAVE10&quot;:
              span.set_attribute(&quot;order.coupon&quot;, order.coupon)
 <span class="del">-            total = 0.0</span><span class="add">+            total = round(total * 0.9, 2)</span></code></pre></figure>
+<h3>Try the fix</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> Make that edit in <code>labs/lab2-custom-dimensions/app/backend.py</code>, and save it.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab2</code></pre></figure></li>
+  <li><strong>Fire the same request in Lab 2.</strong> <code>revenue</code> in the response should now be above 0.<div data-fire="free_orders" data-lab="lab2"></div></li>
+  <li><strong>Re-run the search, Orders priced at zero,</strong> with a time range that starts after you deployed. It should match nothing. In our run it went from 5 matches to 0.</li>
+  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it.<figure class="code"><pre><code>git restore labs/lab2-custom-dimensions/app/backend.py
+make lab2</code></pre></figure></li>
+</ol>
 <p>Then make sure you hear about it next time. A fresh install has no alerts, so you would write a rule on <code>orders.value.sum</code> yourself (<a href="gaps.html#setup">gap 5</a>).</p>
 
 <div class="quiz" data-quiz="fo1"><p class="q">Check yourself: Why does db.statement show VALUES (%s, %s, %s) instead of the real numbers?</p><button type="button" data-right="false" data-why="SigNoz stores what it receives.">SigNoz removes them.</button><button type="button" data-right="true" data-why="That also keeps personal data out of spans by default.">The values are passed separately, and the instrumentation records only the statement.</button><button type="button" data-right="false" data-why="It succeeded, and the order was stored.">The INSERT failed.</button></div>

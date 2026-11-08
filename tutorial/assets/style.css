@@ -459,6 +459,45 @@ details > summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; }
 .page-end { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line); }
 .page-end .row { justify-content: space-between; }
 
+ol.try > li { margin-bottom: 0.7rem; }
+ol.try figure.code, ol.try [data-fire] { margin-top: 0.5rem; }
+
+/* ---------- architecture diagram ---------- */
+
+.arch { margin-top: 1rem; margin-bottom: 1.2rem; }
+.arch-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.arch svg { display: block; width: 100%; min-width: 780px; height: auto; }
+.arch text { font-family: inherit; font-size: 13px; fill: var(--ink); }
+.arch .region { fill: var(--ink); fill-opacity: 0.025; stroke: var(--line); }
+.arch .region-label { font-size: 12px; fill: var(--muted); }
+.arch .box { fill: var(--surface); stroke: var(--muted); stroke-width: 1; }
+.arch .title { font-weight: 600; }
+.arch .detail, .arch .wire-label, .arch .chip text { font-size: 11.5px; fill: var(--muted); }
+.arch .chip rect { fill: var(--surface-2); stroke: var(--line); }
+.arch .outside .box { stroke-dasharray: 5 4; }
+.arch .part.covered .box, .arch .part.seen .box, .arch .chip.covered rect { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2; }
+.arch .chip.covered text { fill: var(--ink); font-weight: 600; }
+.arch .part.seen .box { stroke-dasharray: 6 4; }
+.arch .wire { fill: none; stroke: var(--muted); stroke-width: 1.3; }
+.arch .wire.inject { stroke-dasharray: 3 3; }
+.arch .wire.outside { stroke-dasharray: 2 3; }
+.arch .covered > .wire { stroke: var(--accent); stroke-width: 2; }
+.arch .covered > .wire-label { fill: var(--ink); }
+.arch .off { opacity: 0.22; }
+.arch .chip.off { opacity: 0.3; }
+.arch .arrow-plain { fill: var(--muted); }
+.arch .arrow-on { fill: var(--accent); }
+.arch .dot { fill: var(--ink); }
+.arch .dot-num, .arch .chip text.dot-num { font-size: 11px; font-weight: 700; text-anchor: middle; fill: var(--bg); }
+.arch-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.1rem; margin-top: 0.5rem; font-size: 0.85rem; color: var(--muted); }
+.arch-legend .key { display: inline-flex; align-items: center; gap: 0.4rem; }
+.arch-legend .swatch { display: inline-block; width: 1.5rem; height: 0.85rem; border-radius: 3px; border: 1px solid var(--muted); background: var(--surface); }
+.arch-legend .swatch.covered { background: var(--accent-soft); border: 2px solid var(--accent); }
+.arch-legend .swatch.seen { background: var(--accent-soft); border: 2px dashed var(--accent); }
+.arch-legend .swatch.seen-plain { border-style: dashed; }
+.arch-legend .swatch.off { opacity: 0.3; }
+.arch-legend .swatch.num { width: 0.95rem; height: 0.95rem; border: 0; border-radius: 50%; background: var(--ink); }
+
 @media (max-width: 860px) {
   body { display: block; }
   #sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }

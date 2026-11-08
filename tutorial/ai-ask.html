@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ask it questions | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>Ask it questions · Lab 5 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -91,7 +92,7 @@ If you allow Bash again, I can run the `kubectl` checks. I can also retry SigNoz
 <p>It also shows what the agent can't do when the platform is struggling. Three of its SigNoz queries timed out, because ClickHouse was starved too. It said so, and it lowered its confidence. Don't rely on an agent that reads SigNoz to explain SigNoz being down.</p>
 
 <h2 class="step" id="analytics"><span class="n">2</span>A business question</h2>
-<p>Telemetry with business data is a database of what your customers did, as <a href="lab2.html">Lab 2</a> showed. You can ask it things directly. Start Lab 2's load generator, wait a while, then ask about a time range that's already over:</p>
+<p>Telemetry with business data is a database of what your customers did, as <a href="dimensions.html">Lab 2</a> showed. You can ask it things directly. Start Lab 2's load generator, wait a while, then ask about a time range that's already over:</p>
 <div data-load-panel="lab2"></div>
 <figure class="code"><pre><code>In Lab 2's shop, between 12:59 and 13:05 UTC today: which product brought in the
 most revenue, and which product's orders were slowest to price? Give the numbers

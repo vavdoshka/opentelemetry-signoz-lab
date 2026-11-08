@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The API server | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>The API server · Lab 3 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -43,7 +44,7 @@
 <h3>Who did it?</h3>
 <p>The metric can&#x27;t tell you. These are all the labels on <code>apiserver_request_total</code>:</p>
 <figure class="code"><pre><code>code, component, dry_run, group, resource, scope, subresource, verb, version</code></pre></figure>
-<p>There&#x27;s no client or user. The audit log has both, because <a href="lab3.html#node-logs">Lab 3 turns it on</a>. In a second run, two minutes long, this is every request it recorded, grouped by caller:</p>
+<p>There&#x27;s no client or user. The audit log has both, because <a href="lab3-collection.html#node-logs">Lab 3 turns it on</a>. In a second run, two minutes long, this is every request it recorded, grouped by caller:</p>
 <div data-query="a-lab3-audit-callers">Loading saved query...</div>
 <p>One caller made 2,014 of them: the workload&#x27;s ServiceAccount, <code>system:serviceaccount:lab3:workload</code>, using <code>python-httpx/0.28.1</code>. That&#x27;s exactly the number the app counted itself. Nothing else made more than 3. On a real cluster, a ServiceAccount usually belongs to one app, so this tells you whose code to look at.</p>
 <p>If the client is your own app, its client spans show the same calls, with their URLs, because Lab 1&#x27;s setup traces outgoing calls:</p>

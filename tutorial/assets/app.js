@@ -8,16 +8,17 @@
 
   const PAGES = [
     { id: 'start', href: 'index.html', title: 'Start here', group: 'Start' },
-    { id: 'concepts', href: 'concepts.html', title: 'Traces, metrics and logs', group: 'Learn' },
     { id: 'lab1', href: 'lab1.html', title: 'Telemetry with no code', group: 'Lab 1: hands-off' },
+    { id: 'concepts', href: 'concepts.html', title: 'Traces, metrics and logs', group: 'Lab 1: hands-off' },
     { id: 'error', href: 'incident-error.html', title: 'An unhandled error', group: 'Lab 1: hands-off' },
     { id: 'latency', href: 'incident-latency.html', title: 'A latency spike', group: 'Lab 1: hands-off' },
     { id: 'cross', href: 'incident-cross-service.html', title: 'A cross-service failure', group: 'Lab 1: hands-off' },
     { id: 'sql', href: 'incident-slow-sql.html', title: 'A slow SQL query', group: 'Lab 1: hands-off' },
     { id: 'timeout', href: 'incident-timeout.html', title: 'A timeout', group: 'Lab 1: hands-off' },
     { id: 'cpu', href: 'incident-cpu.html', title: 'CPU saturation', group: 'Lab 1: hands-off' },
-    { id: 'code', href: 'instrumentation.html', title: 'The instrumentation code', group: 'Lab 2: custom dimensions' },
+    { id: 'lab1-review', href: 'lab1-review.html', title: 'What hands-off gets you', group: 'Lab 1: hands-off' },
     { id: 'dimensions', href: 'dimensions.html', title: 'Dimensions and granularity', group: 'Lab 2: custom dimensions' },
+    { id: 'code', href: 'instrumentation.html', title: 'The instrumentation code', group: 'Lab 2: custom dimensions' },
     { id: 'slowitem', href: 'incident-slow-item.html', title: 'Only one product is slow', group: 'Lab 2: custom dimensions' },
     { id: 'freeorders', href: 'incident-free-orders.html', title: 'Revenue dropped with no errors', group: 'Lab 2: custom dimensions' },
     { id: 'cachemiss', href: 'incident-cache-miss.html', title: 'Slow for no visible reason', group: 'Lab 2: custom dimensions' },
@@ -28,6 +29,7 @@
     { id: 'liveness', href: 'incident-liveness.html', title: 'A failing health check', group: 'Lab 3: Kubernetes' },
     { id: 'node', href: 'incident-node.html', title: 'Is it the pod or the node?', group: 'Lab 3: Kubernetes' },
     { id: 'apiserver', href: 'incident-apiserver.html', title: 'The API server', group: 'Lab 3: Kubernetes' },
+    { id: 'lab3-collection', href: 'lab3-collection.html', title: "How it's collected, and what it costs", group: 'Lab 3: Kubernetes' },
     { id: 'lab4', href: 'lab4.html', title: 'Alerts that reach you', group: 'Lab 4: alerts' },
     { id: 'lab5', href: 'lab5.html', title: 'Connect an AI agent', group: 'Lab 5: AI analysis' },
     { id: 'ai-ask', href: 'ai-ask.html', title: 'Ask it questions', group: 'Lab 5: AI analysis' },
@@ -243,27 +245,12 @@
         saveState(current);
         renderPageEnd();
         renderSidebar();
-        renderPath();
       },
     });
     host.append(el('div', { class: 'row' },
       previous ? el('a', { class: 'alt', href: previous.href, text: '← ' + previous.title }) : el('span'),
       toggle,
       next ? el('a', { class: 'alt', href: next.href, text: next.title + ' →' }) : el('span')));
-  }
-
-  function renderPath() {
-    const host = document.getElementById('path');
-    if (!host) return;
-    const state = loadState();
-    host.textContent = '';
-    host.className = 'path';
-    PAGES.filter((page) => page.id !== 'start').forEach((page) => {
-      host.append(el('a', { href: page.href },
-        el('span', { class: 'kicker', text: page.group }),
-        el('span', { class: 'title', text: page.title }),
-        state.done[page.id] ? el('span', { class: 'state', text: '✓ Complete' }) : null));
-    });
   }
 
   /* ---------- lab status ---------- */
@@ -290,7 +277,7 @@
     }
     const running = Object.keys(LAB_NAMES).filter((labId) => labUp(labId) && lab.labs[labId].load && lab.labs[labId].load.running);
     add(host,
-      Object.keys(LAB_NAMES).map((labId) => el('strong', {
+      Object.keys(LAB_START).map((labId) => el('strong', {
         text: LAB_NAMES[labId] + ': ' + (labUp(labId) ? 'up' : 'not running. Start it with: ' + LAB_START[labId]),
       })),
       el('strong', { text: 'SigNoz: ' + (lab.signoz.up ? 'up' : 'not reachable') }),
@@ -684,6 +671,158 @@
 
   /* ---------- load generator ---------- */
 
+  /* ---------- architecture diagram ---------- */
+
+  // One drawing, on Start here and on each lab's first page. A view only says
+  // what that lab covers. Each page also has the same facts in a table.
+  const ARCH_REGIONS = [
+    { x: 10, y: 10, w: 980, h: 72, label: 'Your machine', parts: ['browser', 'ai'] },
+    { x: 10, y: 100, w: 980, h: 525, label: 'Kubernetes cluster: k3d or kind, two nodes', labelX: 120 },
+    { x: 30, y: 128, w: 445, h: 148, label: 'Demo app: namespaces lab1 and lab2', parts: ['frontend', 'backend', 'postgres'] },
+    { x: 490, y: 128, w: 140, h: 148, label: 'Namespace lab3', parts: ['workload'] },
+    { x: 650, y: 128, w: 190, h: 320, label: 'SigNoz: namespace signoz', parts: ['signoz', 'clickhouse', 'collectors'] },
+    { x: 30, y: 460, w: 600, h: 150, label: 'What it all runs on', parts: ['kubelet', 'nodes', 'apiserver'] },
+  ];
+  const ARCH_PARTS = [
+    { id: 'browser', x: 40, y: 28, w: 170, h: 42, title: ['Your browser'] },
+    { id: 'ai', lab: 5, x: 800, y: 28, w: 170, h: 42, title: ['AI agent'], detail: ['Claude Code, or your own'] },
+    { id: 'frontend', lab: 1, x: 45, y: 152, w: 125, h: 112, title: ['frontend'], detail: ['FastAPI'],
+      chips: [{ id: 'frontend.agent', text: 'Python agent' }, { id: 'frontend.code', text: 'OTel API calls', lab: 2 }] },
+    { id: 'backend', lab: 1, x: 190, y: 152, w: 125, h: 112, title: ['backend'], detail: ['FastAPI'],
+      chips: [{ id: 'backend.agent', text: 'Python agent' }, { id: 'backend.code', text: 'OTel API calls', lab: 2 }] },
+    { id: 'postgres', lab: 1, x: 335, y: 152, w: 125, h: 112, outside: true, title: ['Postgres'],
+      detail: ['No agent inside.', 'Seen from outside:', 'queries, logs, CPU'] },
+    { id: 'workload', lab: 3, x: 500, y: 152, w: 120, h: 112, title: ['lab3-workload'], detail: ['FastAPI'],
+      chips: [{ id: 'workload.agent', text: 'Python agent' }] },
+    { id: 'operator', lab: 1, x: 518, y: 296, w: 112, h: 54, title: ['OpenTelemetry', 'Operator'] },
+    { id: 'nodeagents', lab: 1, x: 30, y: 370, w: 600, h: 62, title: ['Node agents and a cluster collector (k8s-infra)'],
+      detail: ['Add pod and node names to everything. Read container output. Collect pod and node metrics.'] },
+    { id: 'signoz', lab: 1, x: 665, y: 152, w: 160, h: 82, title: ['SigNoz UI and API'], detail: ['What you read'],
+      chips: [{ id: 'signoz.rules', text: 'Alert rules', lab: 4 }] },
+    { id: 'clickhouse', lab: 1, x: 665, y: 268, w: 160, h: 56, title: ['ClickHouse'], detail: ['Stores all of it'] },
+    { id: 'collectors', lab: 1, x: 665, y: 370, w: 160, h: 62, title: ['2 SigNoz collectors'], detail: ['Receive and write'] },
+    { id: 'mcp', lab: 5, x: 860, y: 152, w: 110, h: 72, title: ['MCP server'], detail: ['Read-only key'] },
+    { id: 'sink', lab: 4, x: 860, y: 290, w: 110, h: 72, title: ['Alert sink'], detail: ['Stands in for', 'Slack or PagerDuty'] },
+    { id: 'kubelet', lab: 3, x: 45, y: 492, w: 180, h: 104, title: ['kubelet'], detail: ['Pod and node metrics,', 'container limits and', 'probe results'] },
+    { id: 'nodes', lab: 3, x: 240, y: 492, w: 180, h: 104, title: ['Nodes and kernel'], detail: ['Host metrics, the kernel', 'log with its OOM kills,', 'k3s log or journal'] },
+    { id: 'apiserver', lab: 3, x: 435, y: 492, w: 180, h: 104, title: ['API server'], detail: ['Request metrics, and', 'an audit log of who', 'asked for what'] },
+  ];
+  const ARCH_WIRES = [
+    { d: 'M107,70 V152', from: 'browser', to: 'frontend', label: ['your clicks', 113, 95] },
+    { d: 'M210,60 H560 V152', from: 'browser', to: 'workload' },
+    { d: 'M210,44 H745 V152', from: 'browser', to: 'signoz', label: ['you read the results here', 440, 38] },
+    { d: 'M170,180 H190', from: 'frontend', to: 'backend' },
+    { d: 'M315,180 H335', from: 'backend', to: 'postgres' },
+    { d: 'M545,296 V284 H125 V264', from: 'operator', to: 'frontend', kind: 'inject' },
+    { d: 'M270,284 V264', from: 'operator', to: 'backend', kind: 'inject', label: ['adds the agent as a pod starts', 278, 298] },
+    { d: 'M580,296 V264', from: 'operator', to: 'workload', kind: 'inject' },
+    { d: 'M90,264 V370', from: 'frontend', to: 'nodeagents', label: ['OTLP: traces,', 97, 330, 'logs, metrics'] },
+    { d: 'M235,264 V370', from: 'backend', to: 'nodeagents' },
+    { d: 'M508,264 V370', from: 'workload', to: 'nodeagents' },
+    { d: 'M397,264 V370', from: 'postgres', to: 'nodeagents', kind: 'outside', label: ['its logs and pod metrics,', 390, 330, 'read from outside', 'end'] },
+    { d: 'M630,401 H665', from: 'nodeagents', to: 'collectors' },
+    { d: 'M745,370 V324', from: 'collectors', to: 'clickhouse' },
+    { d: 'M745,268 V234', from: 'clickhouse', to: 'signoz' },
+    { d: 'M825,214 H843 V326 H860', from: 'signoz', to: 'sink', label: ['webhook', 862, 284] },
+    { d: 'M860,188 H825', from: 'mcp', to: 'signoz', covers: ['lab5'], label: ['reads', 843, 180, null, 'middle'] },
+    { d: 'M915,70 V152', from: 'ai', to: 'mcp', label: ['asks through MCP', 908, 95, null, 'end'] },
+    { d: 'M970,49 H982 V326 H970', from: 'ai', to: 'sink', covers: ['lab5'], label: ['polls', 968, 284, null, 'end'] },
+    { d: 'M982,326 V544 H615', from: 'ai', to: 'apiserver', covers: ['lab5'], label: ['kubectl, read-only', 800, 536, null, 'middle'] },
+    { d: 'M190,492 V432', from: 'kubelet', to: 'nodeagents', label: ['scraped and read', 197, 450] },
+    { d: 'M330,492 V432', from: 'nodes', to: 'nodeagents' },
+    { d: 'M525,492 V432', from: 'apiserver', to: 'nodeagents' },
+  ];
+  const ARCH_APP = ['frontend', 'frontend.agent', 'backend', 'backend.agent'];
+  const ARCH_PIPELINE = ['nodeagents', 'collectors', 'clickhouse', 'signoz'];
+  const ARCH_CODE = ['frontend.code', 'backend.code'];
+  const ARCH_VIEWS = {
+    lab1: {
+      covered: [...ARCH_APP, 'operator', ...ARCH_PIPELINE],
+      seen: ['postgres'],
+      off: [...ARCH_CODE, 'workload', 'workload.agent', 'signoz.rules', 'apiserver', 'sink', 'mcp', 'ai'],
+    },
+    lab2: {
+      covered: ['frontend', 'backend', ...ARCH_CODE],
+      seen: ['postgres'],
+      off: ['workload', 'workload.agent', 'signoz.rules', 'apiserver', 'sink', 'mcp', 'ai'],
+    },
+    lab3: {
+      covered: ['workload', 'workload.agent', 'nodeagents', 'kubelet', 'nodes', 'apiserver'],
+      off: [...ARCH_APP, ...ARCH_CODE, 'postgres', 'signoz.rules', 'sink', 'mcp', 'ai'],
+    },
+    lab4: {
+      covered: ['signoz', 'signoz.rules', 'sink'],
+      off: [...ARCH_CODE, 'mcp', 'ai'],
+    },
+    lab5: {
+      covered: ['ai', 'mcp'],
+      off: [],
+    },
+  };
+
+  function archState(view, id) {
+    const parts = ARCH_VIEWS[view];
+    if (!parts) return 'used';
+    if (parts.covered.includes(id)) return 'covered';
+    if ((parts.seen || []).includes(id)) return 'seen';
+    return parts.off.includes(id) ? 'off' : 'used';
+  }
+
+  function archWireState(view, wire) {
+    const ends = [archState(view, wire.from), archState(view, wire.to)];
+    if (ends.includes('off')) return 'off';
+    if ((wire.covers || []).includes(view)) return 'covered';
+    return ends.every((state) => state === 'covered' || state === 'seen') ? 'covered' : 'used';
+  }
+
+  function archSvg(view) {
+    const badge = (x, y, lab) => (view === 'start' && lab
+      ? `<circle class="dot" cx="${x}" cy="${y}" r="8"/><text class="dot-num" x="${x}" y="${y + 4}">${lab}</text>` : '');
+    const regions = ARCH_REGIONS.map((region) => {
+      const off = region.parts && region.parts.every((id) => archState(view, id) === 'off');
+      return `<g class="${off ? 'off' : ''}"><rect class="region" x="${region.x}" y="${region.y}" width="${region.w}" height="${region.h}" rx="9"/>`
+        + `<text class="region-label" x="${region.labelX || region.x + 10}" y="${region.y + 16}">${region.label}</text></g>`;
+    }).join('');
+    const wires = ARCH_WIRES.map((wire) => {
+      const state = archWireState(view, wire);
+      const [text, x, y, second, anchor] = wire.label || [];
+      // A label's fourth item is a second line, and its fifth (or a fourth of "end") is its alignment.
+      const align = anchor || (wire.label && wire.label[4]) || 'start';
+      const lines = text ? [text, second && second !== 'end' && second].filter(Boolean) : [];
+      const label = lines.map((line, i) => `<text class="wire-label" text-anchor="${align}" x="${x}" y="${y + i * 14}">${line}</text>`).join('');
+      return `<g class="${state}"><path class="wire ${wire.kind || ''}" d="${wire.d}" marker-end="url(#arch-arrow-${state === 'covered' ? 'on' : 'plain'})"/>${label}</g>`;
+    }).join('');
+    const parts = ARCH_PARTS.map((part) => {
+      const state = archState(view, part.id);
+      const titles = part.title.map((line, i) => `<text class="title" x="${part.x + 10}" y="${part.y + 19 + i * 16}">${line}</text>`).join('');
+      const top = part.y + 19 + (part.title.length - 1) * 16 + 16;
+      const details = (part.detail || []).map((line, i) => `<text class="detail" x="${part.x + 10}" y="${top + i * 14}">${line}</text>`).join('');
+      const chipRows = (part.chips || []).length;
+      const chips = (part.chips || []).map((chip, i) => {
+        const y = part.y + part.h - 7 - (chipRows - i) * 25 + 3;
+        const on = archState(view, chip.id);
+        return `<g class="chip ${on}"><rect x="${part.x + 7}" y="${y}" width="${part.w - 14}" height="22" rx="5"/>`
+          + `<text x="${part.x + 14}" y="${y + 15}">${chip.text}</text>${badge(part.x + part.w - 16, y + 11, chip.lab)}</g>`;
+      }).join('');
+      return `<g class="part ${state}${part.outside ? ' outside' : ''}"><rect class="box" x="${part.x}" y="${part.y}" width="${part.w}" height="${part.h}" rx="7"/>`
+        + `${titles}${details}${chips}${badge(part.x + part.w - 3, part.y + 3, part.lab)}</g>`;
+    }).join('');
+    const marker = (id) => `<marker id="arch-arrow-${id}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-${id}" d="M0,0 L8,4 L0,8 Z"/></marker>`;
+    return `<svg viewBox="0 0 1000 635" role="img" aria-label="Architecture diagram. The table next to it says the same thing in words."><defs>${marker('plain')}${marker('on')}</defs>${regions}${wires}${parts}</svg>`;
+  }
+
+  function renderArch(node) {
+    const view = node.dataset.arch;
+    const key = (cls, text) => `<span class="key"><span class="swatch ${cls}"></span>${text}</span>`;
+    const legend = view === 'start'
+      ? key('num', 'The lab that adds this part') + key('seen-plain', 'Nothing runs inside it: seen from outside')
+      : key('covered', 'Covered in this lab')
+        + (ARCH_VIEWS[view].seen ? key('seen', 'Nothing runs inside it: seen from outside') : '')
+        + key('used', 'Running, and nothing new here')
+        + (ARCH_VIEWS[view].off.length ? key('off', 'Not part of this lab') : '');
+    node.innerHTML = `<div class="arch-scroll">${archSvg(view)}</div><div class="arch-legend">${legend}</div>`;
+  }
+
   function renderLoad(host) {
     const labId = host.dataset.loadPanel || 'lab1';
     host.classList.add('panel');
@@ -705,9 +844,23 @@
         ? 'Running at ' + load.rps + ' requests/s' + (hasErrors ? ' with ' + load.error_pct + '% errors' : '') + '. Sent ' + load.sent + '. Please stop it when you finish.'
         : 'Stopped.';
     };
+    /* Several labs' traffic at once can overload a small Docker VM, as Lab 5 found. */
+    const others = el('p', { class: 'meta', style: 'margin:.5rem 0 0' });
+    const showOthers = () => {
+      others.textContent = '';
+      const running = Object.keys(LAB_START).filter((other) => other !== labId && labUp(other) && lab.labs[other].load && lab.labs[other].load.running);
+      if (!running.length) return;
+      others.append(running.map((other) => LAB_NAMES[other]).join(' and ') + ' traffic is also running. Run one at a time, because several can overload Docker. ');
+      running.forEach((other) => others.append(el('button', {
+        class: 'alt',
+        text: 'Stop ' + LAB_NAMES[other],
+        onclick: async () => { await getJSON('/live/load/' + other, { method: 'DELETE' }); refreshLab(); },
+      })));
+    };
     const update = () => {
       start.disabled = !labUp(labId);
       stop.disabled = !labUp(labId);
+      showOthers();
       if (labUp(labId)) show(lab.labs[labId].load);
       else status.textContent = 'Live button off: ' + LAB_NAMES[labId] + ' is not running. Start it with: ' + LAB_START[labId];
     };
@@ -734,7 +887,8 @@
         el('label', { style: 'font-size:.9rem' }, 'Requests/s ', rps),
         hasErrors ? el('label', { style: 'font-size:.9rem' }, 'Error % ', pct) : null,
         start, stop),
-      status);
+      status,
+      others);
   }
 
   /* ---------- alerts received by Lab 4's sink ---------- */
@@ -1214,10 +1368,10 @@
 
   renderSidebar();
   renderPageEnd();
-  renderPath();
   setupZoom();
   setupCodeCopy();
   setupResetButton();
+  document.querySelectorAll('[data-arch]').forEach(renderArch);
   document.querySelectorAll('[data-quiz]').forEach(setupQuiz);
   document.querySelectorAll('[data-evidence]').forEach(renderEvidence);
   document.querySelectorAll('[data-fire]').forEach(renderFire);

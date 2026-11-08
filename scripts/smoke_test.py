@@ -10,6 +10,13 @@ import sys
 from signoz_client import LAB3_URL, LABS, count, fire, login, metric_exists, query, read_credentials, request, wait_for
 
 
+COLLECTORS_STUCK = """Spans are arriving but logs aren't, so a SigNoz collector may be stuck while reporting Running.
+Count its failures:
+  kubectl -n signoz logs -l app.kubernetes.io/component=otel-collector --since=10m --tail=-1 | grep -c 'Dropping data'
+If that isn't 0, restart the collectors, then run this again:
+  kubectl -n signoz delete pod -l app.kubernetes.io/component=otel-collector"""
+
+
 def smoke_test_lab3(token):
     """Lab 3 has no orders. It's there to prove the extra scrape jobs work."""
 
@@ -86,11 +93,17 @@ def main():
     wait_for("the app", order_succeeds, timeout=300)
     wait_for("spans in SigNoz", spans_arrive, timeout=300, interval=8)
     wait_for("a trace crossing both services", cross_service_span, timeout=120)
-    wait_for(
-        "logs linked to traces",
-        lambda: count(token, "logs", f"service.name = '{backend}' AND trace_id != ''", minutes=2),
-        timeout=60,
-    )
+    try:
+        wait_for(
+            "logs linked to traces",
+            lambda: count(token, "logs", f"service.name = '{backend}' AND trace_id != ''", minutes=2),
+            timeout=60,
+        )
+    except SystemExit:
+        # Spans got through above, so the app and its agent work. After an overload,
+        # SigNoz's collectors can stop writing logs and still report Running.
+        print(COLLECTORS_STUCK, file=sys.stderr)
+        raise
     wait_for(
         "pod names on spans",
         lambda: count(token, "traces", f"service.name = '{backend}' AND k8s.pod.name EXISTS", minutes=2),

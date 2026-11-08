@@ -3,7 +3,7 @@
 The OpenTelemetry Operator injects the agent, exactly as in Lab 1, so there is no
 SDK setup here. This file only uses the API, to add what the agent can't know:
   - lab.scenario on the automatic server span
-  - the scenario.runs and loadgen.target_rps metrics
+  - the scenario.runs metric
   - the trace ID in API responses
 """
 
@@ -20,7 +20,6 @@ import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from opentelemetry import metrics, trace
-from opentelemetry.metrics import CallbackOptions, Observation
 from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
@@ -196,16 +195,6 @@ class LoadGen:
 
 
 loadgen = LoadGen()
-
-
-def _observe_loadgen(_options: CallbackOptions):
-    yield Observation(loadgen.rps if loadgen.status()["running"] else 0.0)
-
-
-meter.create_observable_gauge(
-    "loadgen.target_rps", callbacks=[_observe_loadgen], unit="{request}/s",
-    description="Requests per second the load generator aims for",
-)
 
 
 async def _loadgen_loop() -> None:

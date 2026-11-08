@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Incident: a slow SQL query | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>A slow SQL query · Lab 1 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -66,9 +67,18 @@
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>Fix the query itself first. Then add a safety net, so that one bad query cannot hold a request open:</p>
-<figure class="code"><figcaption><span>Proposed safety net for labs/lab1-hands-off/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> def db() -&gt; psycopg.Connection:
+<figure class="code"><figcaption><span>The safety net for labs/lab1-hands-off/app/backend.py. Tried on 2026-11-08, then undone <span class="badge ui">Seen in SigNoz UI</span></span></figcaption><pre><code> def db() -&gt; psycopg.Connection:
 <span class="del">-    return psycopg.connect(DSN, autocommit=True)</span><span class="add">+    return psycopg.connect(DSN, autocommit=True, options=&quot;-c statement_timeout=1000&quot;)</span></code></pre></figure>
-<p>With this in place the statement would fail after one second. You would see a failed <code>SELECT</code> span instead of a slow one, which you can find with the failed database calls search.</p>
+<p>With this in place the statement fails after one second. You see a failed <code>SELECT</code> span instead of a slow one, which you can find with the <strong>Failed database calls</strong> search.</p>
+<h3>Try the safety net</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> Make that edit in <code>labs/lab1-hands-off/app/backend.py</code>, and save it.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
+  <li><strong>Fire the same request.</strong> It should now fail with HTTP 500 after about 1.4 seconds. Before, it answered 200 after about 2.2 seconds.<div data-fire="slow_query" data-lab="lab1"></div></li>
+  <li><strong>Check SigNoz.</strong> The <strong>Failed database calls</strong> search should find the failed <code>SELECT</code>, and the Exceptions page should list <code>psycopg.errors.QueryCanceled</code>.</li>
+  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs the slow query to succeed.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/backend.py
+make lab1</code></pre></figure></li>
+</ol>
 
 <div class="quiz" data-quiz="s1"><p class="q">Check yourself: db.statement shows SELECT pg_sleep(%s). Why not the real value?</p><button type="button" data-right="false" data-why="SigNoz stores what it receives.">SigNoz redacts it.</button><button type="button" data-right="true" data-why="That keeps user data out of spans. The value is visible elsewhere here: http.url has seconds=2.">The instrumentation records the parameterised statement, not the bound values.</button><button type="button" data-right="false" data-why="It captured the statement as the app sent it.">It failed to capture the query.</button></div>
 <div class="quiz" data-quiz="s2"><p class="q">Check yourself: Which span tells you the time went to Postgres rather than to Python?</p><button type="button" data-right="false" data-why="That shows the total for the whole request.">The frontend server span.</button><button type="button" data-right="true" data-why="A CLIENT span with db.system shows the time waiting for the database: 2002 ms of the 2015 ms backend span.">The backend client span named SELECT, about as long as its parent.</button><button type="button" data-right="false" data-why="That is the span the SELECT sits inside. It only tells you the backend took 2 seconds, not why.">The backend server span, GET /work/slow-query.</button></div>

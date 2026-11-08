@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Incident: only one product is slow | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>Only one product is slow · Lab 2 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -85,8 +86,16 @@
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>In this lab the sleep is deliberate, so removing it is the fix.</p>
-<figure class="code"><figcaption><span>Proposed fix for labs/lab2-custom-dimensions/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code><span class="del">-        time.sleep(1.5 if order.item == &quot;catering&quot; else random.uniform(0.005, 0.03))</span><span class="add">+        time.sleep(random.uniform(0.005, 0.03))</span></code></pre></figure>
-<p>To confirm a fix in real life, deploy it and re-run the latency-by-product search. <code>catering</code> should drop to the same level as the others.</p>
+<figure class="code"><figcaption><span>The fix for labs/lab2-custom-dimensions/app/backend.py. Tried on 2026-11-08, then undone <span class="badge api">Query API only</span></span></figcaption><pre><code><span class="del">-        time.sleep(1.5 if order.item == &quot;catering&quot; else random.uniform(0.005, 0.03))</span><span class="add">+        time.sleep(random.uniform(0.005, 0.03))</span></code></pre></figure>
+<h3>Try the fix</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> Make that edit in <code>labs/lab2-custom-dimensions/app/backend.py</code>, and save it.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab2</code></pre></figure></li>
+  <li><strong>Fire the same request in Lab 2.</strong> It should now take well under a second, not about 4 seconds.<div data-fire="slow_item" data-lab="lab2"></div></li>
+  <li><strong>Re-run the latency-by-product search,</strong> <strong>Pricing latency by product</strong>, with a time range that starts after you deployed. <code>catering</code> should drop to the same level as the others. In our run its P99 went from 1,507 ms to 23 ms.</li>
+  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it.<figure class="code"><pre><code>git restore labs/lab2-custom-dimensions/app/backend.py
+make lab2</code></pre></figure></li>
+</ol>
 
 <div class="quiz" data-quiz="si1"><p class="q">Check yourself: Lab 1 has order.item on its logs. Why can it still not give you P99 latency by product?</p><button type="button" data-right="false" data-why="They can. Lab 1 can count and sum by order.item.">Logs cannot be grouped.</button><button type="button" data-right="true" data-why="The two facts are on different signals. Only a join outside the search box connects them.">A log has no duration, and the span has no product.</button><button type="button" data-right="false" data-why="It does, on every span.">Lab 1 does not record latency.</button></div>
 <div class="quiz" data-quiz="si2"><p class="q">Check yourself: What does the price_order span add that no log line could?</p><button type="button" data-right="false" data-why="The log already has that.">The product name.</button><button type="button" data-right="true" data-why="That is what turns an unexplained gap into an answer.">A measured duration for the pricing step, tied to the product.</button><button type="button" data-right="false" data-why="The log has that too.">The trace ID.</button></div>

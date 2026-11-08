@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Traces, metrics and logs | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>Traces, metrics and logs · Lab 1 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -12,7 +13,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <nav id="sidebar" aria-label="Tutorial pages"></nav>
 <main id="main">
-<p class="eyebrow">Learn</p>
+<p class="eyebrow">Lab 1: hands-off</p>
 <h1>Traces, metrics and logs</h1>
 <p class="lead">Three kinds of telemetry answer three different questions. This page follows one real order through all of them.</p>
 
@@ -72,6 +73,22 @@
 <div class="flow"><span class="box">App</span><span class="arrow">→ OTLP/HTTP :4318 →</span><span class="box">k8s-infra agent on the node</span><span class="arrow">→</span><span class="box">SigNoz collector</span><span class="arrow">→</span><span class="box">ClickHouse</span><span class="arrow">→</span><span class="box">SigNoz UI</span></div>
 <div class="flow"><span class="box">k8s-infra agent</span><span class="arrow">→ pod metrics, stdout logs, events →</span><span class="box">SigNoz collector</span></div>
 <p>The app's traces, metrics and logs take the first path, as standard OTLP with no SigNoz code. Passing through the agent is what puts pod names on them (<a href="gaps.html#k8s">gap 3</a>). The second path adds things like pod CPU. It also reads the same log lines from stdout, so app logs get stored twice (<a href="gaps.html#logs">gap 4</a>).</p>
+
+<h2>Try it yourself</h2>
+<p>Fire these three, then search. They give you an order, a database failure and a crash to look at.</p>
+<div data-fire="order" data-lab="lab1"></div>
+<div data-fire="db_error" data-lab="lab1"></div>
+<div data-fire="crash" data-lab="lab1"></div>
+<table>
+  <thead><tr><th>What to look for</th><th>Where</th><th>Search</th></tr></thead>
+  <tbody>
+    <tr><td>SQL statements, with no database code changed</td><td>Traces</td><td><code>service.name = 'lab1-backend' AND db.statement EXISTS</code></td></tr>
+    <tr><td>Failed requests</td><td>Traces</td><td><code>service.name = 'lab1-frontend' AND has_error = true</code></td></tr>
+    <tr><td>Error logs, each linked to its trace</td><td>Logs</td><td><code>service.name = 'lab1-backend' AND severity_text = 'ERROR' AND trace_id != ''</code></td></tr>
+  </tbody>
+</table>
+<p>Each of these ran successfully through the query API <span class="badge api">Query API only</span>.</p>
+<p>Open any of those traces. It runs from <code>lab1-frontend</code> through <code>lab1-backend</code> to the SQL statement, with the pod name on every span.</p>
 
 <div class="quiz" data-quiz="c1"><p class="q">Check yourself: A user reports one failed checkout. Which signal do you open first to see what happened to that request?</p><button type="button" data-right="false" data-why="A metric is a total across many requests. It cannot show you one request.">A metric, because it is cheapest to query.</button><button type="button" data-right="true" data-why="A trace follows one request through frontend, backend and Postgres, with timings and errors on each span.">A trace, because it shows that one request across every service.</button><button type="button" data-right="false" data-why="That finds error messages from every request. Start from the trace, then read the logs that share its trace ID.">A log search for the word error.</button></div>
 <div class="quiz" data-quiz="c2"><p class="q">Check yourself: What connects a log line to its trace in this app?</p><button type="button" data-right="false" data-why="Time only narrows it down. Under load, many requests overlap.">The timestamp, because they happen at the same moment.</button><button type="button" data-right="true" data-why="The bridge attaches the active trace_id and span_id to each record, so the link is exact.">The trace_id stamped on the log record by the OTLP log bridge.</button><button type="button" data-right="false" data-why="Logs do carry a pod name here, but one pod serves many requests, so it cannot identify a trace.">The pod name.</button></div>

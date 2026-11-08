@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>A container that disappears | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>A container that disappears · Lab 3 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -96,6 +97,9 @@ time="2026-11-08T12:22:13.767302464Z" level=info msg="TaskOOM event container_id
   <li><strong>If it isn't a leak,</strong> raise the limit to fit real usage.</li>
   <li><strong>Alert on the exit reason,</strong> not on the OOM counter. <a href="lab4.html">Lab 4</a> does this. The kernel's log line would also work for a log-based alert. <span class="badge untested">Untested</span></li>
 </ul>
+<div class="note"><p><strong>To try this here:</strong> raise <code>memory: 256Mi</code> on the <code>limits</code> line in <code>labs/lab3-kubernetes/k8s/app.yaml</code>, and save it. Then deploy it. <a href="index.html#deploy">What this command does</a>.</p><figure class="code"><pre><code>make lab3</code></pre></figure><p>Check the pod got it, then put the original back, because the other pages need the low limit:</p><figure class="code"><pre><code>kubectl -n lab3 get pod -l app=workload -o jsonpath='{.items[0].spec.containers[0].resources.limits}'
+git restore labs/lab3-kubernetes/k8s/app.yaml
+make lab3</code></pre></figure></div>
 
 <div class="quiz" data-quiz="o1"><p class="q">Check yourself: Why did container_oom_events_total stay at 0 during a real OOM kill?</p><button type="button" data-right="false" data-why="Reading cAdvisor directly also showed 0.">The scrape job was misconfigured.</button><button type="button" data-right="true" data-why="The replacement container starts counting from 0.">The counter belongs to the container&#x27;s cgroup, which the kill destroyed.</button><button type="button" data-right="false" data-why="Kubernetes recorded OOMKilled with exit code 137.">It wasn&#x27;t really an OOM kill.</button></div>
 <div class="quiz" data-quiz="o2"><p class="q">Check yourself: The pod died, so where is the best evidence of failed requests?</p><button type="button" data-right="false" data-why="Spans still in memory die with the process.">In the dead pod&#x27;s spans.</button><button type="button" data-right="true" data-why="lab3-loadgen survived, and recorded 38 failed calls.">In the caller&#x27;s spans.</button><button type="button" data-right="false" data-why="It shows how services connect, and its counts can be unreliable.">In the Service Map.</button></div>

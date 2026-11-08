@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Incident: an unhandled error | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>An unhandled error · Lab 1 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -75,10 +76,18 @@
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>Handle the empty basket, and return a clear client error instead of crashing.</p>
-<figure class="code"><figcaption><span>Proposed fix for labs/lab1-hands-off/app/frontend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> async def s_crash(_p: dict) -&gt; dict:
+<figure class="code"><figcaption><span>The fix for labs/lab1-hands-off/app/frontend.py. Tried on 2026-11-08, then undone <span class="badge ui">Seen in SigNoz UI</span></span></figcaption><pre><code> async def s_crash(_p: dict) -&gt; dict:
      basket = {&quot;items&quot;: 0}
 <span class="del">-    return {&quot;avg&quot;: 100 / basket[&quot;items&quot;]}  # ZeroDivisionError -&gt; unhandled 500</span><span class="add">+    if not basket[&quot;items&quot;]:</span><span class="add">+        raise HTTPException(status_code=422, detail=&quot;basket is empty&quot;)</span><span class="add">+    return {&quot;avg&quot;: 100 / basket[&quot;items&quot;]}</span></code></pre></figure>
-<p>To confirm a fix in real life: deploy it, fire the same request, and check that <code>ZeroDivisionError</code> stops growing on the Exceptions page.</p>
+<h3>Try the fix</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> Make that edit in <code>labs/lab1-hands-off/app/frontend.py</code>, and save it.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
+  <li><strong>Fire the same request.</strong> It should now answer HTTP 422 with <code>basket is empty</code>, not 500.<div data-fire="crash" data-lab="lab1"></div></li>
+  <li><strong>Check the Exceptions page.</strong> <code>ZeroDivisionError</code> should stop growing. Watch <strong>Last Seen</strong>: it stays at the time before you deployed. The count doesn&#x27;t go down, because older exceptions stay until they leave the time range. In our run it stayed at 8 after six more requests. The table has more than one page, so look on the next one if you don&#x27;t see it.</li>
+  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it. <code>git restore</code> throws away your edit.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/frontend.py
+make lab1</code></pre></figure></li>
+</ol>
 
 <h2>Related: a failure that is not an error</h2>
 <p>The <code>bad_input</code> scenario returns HTTP 400. Try it, then look at the span.</p>

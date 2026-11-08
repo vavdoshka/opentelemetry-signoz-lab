@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How SigNoz is configured | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>How SigNoz is configured · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -15,6 +16,7 @@
 <p class="eyebrow">Reference</p>
 <h1>How SigNoz is configured</h1>
 <p class="lead">Nothing here is hidden. This page lists every piece of SigNoz configuration in the lab, where it lives, and why it exists. If something isn't listed, it's at its default.</p>
+<p>To change any of it, follow <a href="index.html#deploy">When you change code</a>.</p>
 
 <h2>The pieces</h2>
 <table>
@@ -53,7 +55,7 @@
   </tbody>
 </table>
 <p>Everything else is a chart default, including retention: 15 days for traces and logs, 30 days for metrics.</p>
-<p>The last two only take effect when the cluster is created, so a cluster from before them needs <code>make down</code> and <code>make up</code>. <a href="lab3.html#node-logs">Lab 3</a> collects both.</p>
+<p>The last two only take effect when the cluster is created, so a cluster from before them needs <code>make down</code> and <code>make up</code>. <a href="lab3-collection.html#node-logs">Lab 3</a> collects both.</p>
 
 <h2>Why ZooKeeper, and not ClickHouse Keeper?</h2>
 <p>ClickHouse has its own coordination service, <a href="https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper" target="_blank" rel="noopener">ClickHouse Keeper</a>, which it describes as replacing ZooKeeper. ZooKeeper still works, and this lab runs what SigNoz supports: chart 0.149.0 installs ClickHouse 25.12.5 with ZooKeeper 3.7.1, and has no Keeper option.</p>

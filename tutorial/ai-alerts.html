@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Investigate alerts by itself | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>Investigate alerts by itself · Lab 5 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -18,7 +19,7 @@
 <ul class="steps" aria-label="Steps on this page"><li><a href="#start">1. Start it</a></li><li><a href="#trigger">2. Trigger it</a></li><li><a href="#how">3. What happens</a></li><li><a href="#report">4. What it found</a></li><li><a href="#limits">5. What keeps it under control</a></li></ul>
 
 <h2 class="step" id="start"><span class="n">1</span>Start it</h2>
-<p>There's nothing new to install or log in to. The agent is the one you already use, in the workspace from <a href="lab5.html">the last page</a>. In a terminal, from the repo's root:</p>
+<p>There's nothing new to install or log in to. The agent is the one you already use, in the workspace from <a href="lab5.html">the start of this lab</a>. In a terminal, from the repo's root:</p>
 <figure class="code"><pre><code>make investigate</code></pre></figure>
 <p>It runs until you stop it with Ctrl-C. It uses Claude Code unless you choose another. Only Claude Code has run an investigation here, so the others are <span class="badge untested">Untested</span>:</p>
 <figure class="code"><pre><code>make investigate HARNESS=opencode

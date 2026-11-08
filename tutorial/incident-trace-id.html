@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Incident: a customer quotes a trace ID | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>A customer quotes a trace ID · Lab 2 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -47,19 +48,28 @@
 <h2 class="step" id="cause"><span class="n">6</span>Root cause</h2>
 <p>This incident is about the ID, not the crash. The crash itself is covered in <a href="incident-error.html">An unhandled error</a>.</p>
 <p>Lab 1's trace has an ID too. The agent creates one for every request. But the app has no code that reads it, so it can't put it in a response. Lab 2 adds that code:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 245–247</span></figcaption><pre><code><span class="ln">245</span>def current_trace_id() -&gt; str | None:
-<span class="ln">246</span>    ctx = trace.get_current_span().get_span_context()
-<span class="ln">247</span>    return format(ctx.trace_id, &quot;032x&quot;) if ctx.is_valid else None</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 234–236</span></figcaption><pre><code><span class="ln">234</span>def current_trace_id() -&gt; str | None:
+<span class="ln">235</span>    ctx = trace.get_current_span().get_span_context()
+<span class="ln">236</span>    return format(ctx.trace_id, &quot;032x&quot;) if ctx.is_valid else None</code></pre></figure>
 <p>The exception handler then includes it in the error response:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 250–254</span></figcaption><pre><code><span class="ln">250</span>@app.exception_handler(Exception)
-<span class="ln">251</span>async def unhandled(request: Request, exc: Exception) -&gt; JSONResponse:
-<span class="ln">252</span>    # Common app pattern: log unhandled errors and return JSON.
-<span class="ln">253</span>    log.exception(&quot;unhandled error on %s %s&quot;, request.method, request.url.path)
-<span class="ln">254</span>    return JSONResponse({&quot;status&quot;: 500, &quot;error&quot;: repr(exc), &quot;trace_id&quot;: current_trace_id()}, status_code=500)</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 239–243</span></figcaption><pre><code><span class="ln">239</span>@app.exception_handler(Exception)
+<span class="ln">240</span>async def unhandled(request: Request, exc: Exception) -&gt; JSONResponse:
+<span class="ln">241</span>    # Common app pattern: log unhandled errors and return JSON.
+<span class="ln">242</span>    log.exception(&quot;unhandled error on %s %s&quot;, request.method, request.url.path)
+<span class="ln">243</span>    return JSONResponse({&quot;status&quot;: 500, &quot;error&quot;: repr(exc), &quot;trace_id&quot;: current_trace_id()}, status_code=500)</code></pre></figure>
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>There's no bug to fix here. It is a habit worth copying: return the trace ID on errors, and show it to the user, so that a support ticket points straight at the evidence.</p>
 <p>Lab 1 can get the same thing with the change you just read. It needs the <code>opentelemetry-api</code> package and these few lines. Nothing else about its setup has to change.</p>
+<h3>Try it in Lab 1</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> Add <code>opentelemetry-api==1.45.2</code> to <code>labs/lab1-hands-off/app/requirements.txt</code>. Then, in <code>labs/lab1-hands-off/app/frontend.py</code>, add <code>from opentelemetry import trace</code> at the top, add the <code>current_trace_id</code> function above <code>unhandled</code>, and add <code>&quot;trace_id&quot;: current_trace_id()</code> to its response. Save both files.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
+  <li><strong>Fire a crash in Lab 1.</strong> The response should now include <code>trace_id</code>. <span class="badge api">Query API only</span><div data-fire="crash" data-lab="lab1"></div></li>
+  <li><strong>Open that trace</strong> at <code>http://signoz.localhost:8080/trace/&lt;trace ID&gt;</code>.</li>
+  <li><strong>Put the bug back,</strong> because Lab 1 is meant to have no OpenTelemetry code.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/requirements.txt labs/lab1-hands-off/app/frontend.py
+make lab1</code></pre></figure></li>
+</ol>
 
 <div class="quiz" data-quiz="ti1"><p class="q">Check yourself: Why does Lab 1 return no trace ID, when the agent creates one for every request?</p><button type="button" data-right="false" data-why="It does. Every Lab 1 trace has one.">Lab 1 does not create trace IDs.</button><button type="button" data-right="true" data-why="The agent traces the request, but the app never asks for the ID. A few API lines change that.">The app has no code that reads the ID.</button><button type="button" data-right="false" data-why="SigNoz shows it. The app never receives it to pass on.">SigNoz hides it.</button></div>
 <div class="quiz" data-quiz="ti2"><p class="q">Check yourself: A customer gives you a trace ID from Lab 2. What is the fastest way to the evidence?</p><button type="button" data-right="false" data-why="That finds every crash, not this one.">Search logs for the error message.</button><button type="button" data-right="true" data-why="It goes straight to that one request, and the same ID finds its logs.">Open /trace/ with that ID in SigNoz.</button><button type="button" data-right="false" data-why="That shows a trend, not one request.">Look at the error rate chart.</button></div>

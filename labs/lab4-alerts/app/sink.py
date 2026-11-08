@@ -26,6 +26,7 @@ def row(alert):
 
 PAGE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>Lab 4: alert sink</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22 role=%22img%22 aria-label=%22Spans in a trace%2C the last one failing%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%231f62b5%22/%3E%3Crect x=%225%22 y=%227%22 width=%2222%22 height=%224.5%22 rx=%222.25%22 fill=%22%23fff%22/%3E%3Crect x=%229%22 y=%2214%22 width=%2213%22 height=%224.5%22 rx=%222.25%22 fill=%22%23fff%22/%3E%3Crect x=%2214%22 y=%2221%22 width=%2213%22 height=%224.5%22 rx=%222.25%22 fill=%22%23ffa26e%22/%3E%3C/svg%3E">
 <meta http-equiv="refresh" content="5">
 <style>
   body { margin:28px; font:14px/1.45 system-ui, -apple-system, sans-serif; color:#1d1d1b; background:#f7f7f5; }

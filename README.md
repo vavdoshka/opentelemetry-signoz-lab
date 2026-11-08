@@ -20,7 +20,7 @@ breaks. One command, on k3d or kind.
 Each lab builds on the one before and adds only what it needs. They run side by side on a local
 two-node cluster and send to the same SigNoz.
 
-An interactive tutorial walks you through all of it: 30 pages, with buttons that trigger real
+An interactive tutorial walks you through all of it: 32 pages, with buttons that trigger real
 failures, 96 saved searches, and code quoted straight from this repo.
 
 ## What you'll learn
@@ -146,7 +146,7 @@ make lab5      # AI analysis: connects your own agent, such as Claude Code
 | What | Where |
 |---|---|
 | Tutorial | http://127.0.0.1:8765, after `make tutorial` |
-| SigNoz | http://signoz.localhost:8080 (the generated login is in `.lab-credentials`) |
+| SigNoz | http://signoz.localhost:8080. `make up` generates the login: to see it, `cat .lab-credentials` |
 | Labs 1 to 3 | http://lab1.localhost:8080, and `lab2`, `lab3` in the same form |
 | Alerts received | http://lab4.localhost:8080 |
 | MCP server, for agents | http://mcp.localhost:8080/mcp |
@@ -296,6 +296,14 @@ data.
 ```
 SIGNOZ_EMAIL=you@example.com
 SIGNOZ_PASSWORD=your-password
+```
+
+**Logs stopped arriving, but traces didn't.** After an overload, SigNoz's collectors can stop writing logs
+and keep reporting `1/1 Running`. Check, and if the count isn't 0, restart them:
+
+```
+kubectl -n signoz logs -l app.kubernetes.io/component=otel-collector --since=10m --tail=-1 | grep -c 'Dropping data'
+kubectl -n signoz delete pod -l app.kubernetes.io/component=otel-collector
 ```
 
 **A dashboard says "No data in this time range".** The Pod dashboard's namespace selector starts on

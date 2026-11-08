@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>What is missing, and how to fix it | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>What is missing, and fixes · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -15,6 +16,7 @@
 <p class="eyebrow">Reference</p>
 <h1>What is missing, and how to fix it</h1>
 <p class="lead">Plain OpenTelemetry plus a simple SigNoz install gives you a lot, as the incidents showed. It also leaves real gaps, and one of them can mislead you. Fixes marked <span class="badge untested">Untested</span> are proposals only, and have not been tried here.</p>
+<p>To try a change from this page, follow <a href="index.html#deploy">When you change code</a>. Collector settings live in <code>signoz/</code>, so you deploy those with <code>make up</code>.</p>
 <p>The history behind each gap is in <code>docs/FINDINGS.md</code>. Saved results on this page come from the current labs, and say which lab they are for.</p>
 
 <h2 id="signup">Gap 1: a new install rejects telemetry until someone signs up</h2>
@@ -93,8 +95,12 @@
 
 <h2 id="collector">Gap 6: a collector can silently stop writing logs</h2>
 <p>During an overload in <a href="ai-measured.html">Lab 5</a>, one of the two <code>signoz-otel-collector</code> pods stopped writing logs to ClickHouse, and never recovered. For 84 minutes it stayed <code>1/1 Running</code> with 0 restarts, while the other pod and ClickHouse were fine. It dropped 19,131 log records and 3,445 spans. Because agents hold long-lived connections, whatever was pinned to that pod lost its logs, including Kubernetes events, so a real alert never fired.</p>
-<p>This matches an open issue, <a href="https://github.com/SigNoz/signoz-otel-collector/issues/965" target="_blank" rel="noopener">signoz-otel-collector#965</a>, &quot;clickhouselogsexporter: pushToClickhouse deadlocks when the consumer exits early&quot;, which others confirm on v0.144.15, the version here. Running two replicas doesn&#x27;t protect you. A healthy pod status proves nothing, so check the logs, and delete the pod if you find it:</p>
+<p>This matches an open issue, <a href="https://github.com/SigNoz/signoz-otel-collector/issues/965" target="_blank" rel="noopener">signoz-otel-collector#965</a>, &quot;clickhouselogsexporter: pushToClickhouse deadlocks when the consumer exits early&quot;, which others confirm on v0.144.15, the version here. Running two replicas doesn&#x27;t protect you. A healthy pod status proves nothing, so check the logs:</p>
 <figure class="code"><pre><code>kubectl -n signoz logs -l app.kubernetes.io/component=otel-collector --since=10m --tail=-1 | grep -c 'Dropping data'</code></pre></figure>
+<p>If that isn&#x27;t 0, restart them. Logs came back within 14 seconds when we did:</p>
+<figure class="code"><pre><code>kubectl -n signoz delete pod -l app.kubernetes.io/component=otel-collector</code></pre></figure>
+<p><strong>It can stop all logs, not just some.</strong> It happened again on 2026-11-08, when two load generators and an image build, running together, overloaded the VM at about 21:40 UTC. ClickHouse restarted twice, and was healthy again by 21:51. This time both collectors got stuck, repeating <code>couldn&#x27;t PrepareBatch for inserting resource fingerprints: context deadline exceeded</code>. No log was written after 21:39:57, and nothing recovered by itself: 45 minutes later both pods were still <code>1/1 Running</code> with 0 restarts, and spans were still arriving, so traces looked fine. The Logs page just showed nothing new. So if logs stop and traces don&#x27;t, check this first. The smoke test in <code>make lab1</code> and <code>make lab2</code> now suggests it. <span class="badge api">API</span></p>
+<p>It&#x27;s why this tutorial asks you to run one load generator at a time.</p>
 
 <h2 id="noise">Gap 7: smaller issues</h2>
 <h3>Span noise</h3>

@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Learn telemetry by breaking a real app | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>Telemetry with SigNoz: learn by breaking a real app</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -14,42 +15,101 @@
 <main id="main">
 <p class="eyebrow">Hands-on tutorial</p>
 <h1>Learn telemetry by breaking a real app</h1>
-<p class="lead">This tutorial teaches you what OpenTelemetry can do for an app with no code at all, how to add detail only where you need it, how to watch the Kubernetes underneath, and how to get alerted. You work on small Python apps that fail on demand.</p>
+<p class="lead">This tutorial teaches you what OpenTelemetry can do for an app with no code at all, how to add detail only where you need it, how to watch the Kubernetes underneath, how to get alerted, and how to let an AI agent investigate. You work on small Python apps that fail on demand.</p>
 
-<div class="flow" aria-label="The lab app">
-  <span class="box">Your browser</span><span class="arrow">→</span>
-  <span class="box"><code>frontend</code> (FastAPI)</span><span class="arrow">→</span>
-  <span class="box"><code>backend</code> (FastAPI)</span><span class="arrow">→</span>
-  <span class="box">Postgres</span>
+<h2 id="architecture">What you&#x27;re working with</h2>
+<p>Everything runs on your machine, in one Kubernetes cluster. The number on each part is the lab that adds it. Each lab&#x27;s first page shows this diagram again, with that lab&#x27;s parts highlighted.</p>
+<div class="wide arch" data-arch="start"></div>
+<p>In words, from the top:</p>
+<ol>
+  <li><strong>The apps.</strong> Your browser calls <code>frontend</code>, which calls <code>backend</code>, which uses Postgres. It&#x27;s a small shop that fails on demand. Lab 3 adds <code>lab3-workload</code>, which fails in ways only Kubernetes can show.</li>
+  <li><strong>Getting telemetry out.</strong> The OpenTelemetry Operator adds a Python agent to each app pod as it starts. The agent sends traces, logs and metrics over OTLP to a node agent.</li>
+  <li><strong>Collecting the rest.</strong> Node agents also read every container&#x27;s output, and collect pod and node metrics. Lab 3 adds more from the kubelet, the kernel and the API server.</li>
+  <li><strong>Storing and reading it.</strong> Two SigNoz collectors write everything to ClickHouse, and the SigNoz UI and API read it from there.</li>
+  <li><strong>Acting on it.</strong> Lab 4&#x27;s alert rules post to a small alert sink. Lab 5&#x27;s AI agent runs on your machine, and reads through an MCP server and a read-only Kubernetes account.</li>
+</ol>
+
+<h3 id="instrumented">What has an agent inside it</h3>
+<table>
+  <thead><tr><th>Part</th><th>Anything running inside it?</th><th>What SigNoz gets</th></tr></thead>
+  <tbody>
+    <tr><td><code>frontend</code>, <code>backend</code></td><td><strong>Yes.</strong> A Python agent, added by the Operator. Lab 2 also adds OpenTelemetry API calls to their code</td><td>Traces, logs and metrics, from inside the app</td></tr>
+    <tr><td>Postgres</td><td><strong>No</strong></td><td>Only what can be seen from outside it, as explained below</td></tr>
+    <tr><td><code>lab3-workload</code></td><td><strong>Yes.</strong> The same Python agent, with no OpenTelemetry code</td><td>Traces, logs and metrics, from inside the app</td></tr>
+    <tr><td>Load generators</td><td>Labs 1 and 2: <strong>no</strong>, because they only make traffic. Lab 3: <strong>yes</strong>, because a killed pod can&#x27;t report itself, so its caller records the failures</td><td>Their output and pod metrics. Lab 3&#x27;s also sends spans</td></tr>
+    <tr><td>kubelet, nodes, API server</td><td><strong>No</strong></td><td>What they already publish: metrics and log files, collected by Lab 3</td></tr>
+  </tbody>
+</table>
+
+<div class="note" id="postgres">
+  <p><strong>Is Postgres auto-instrumented? No.</strong> The agent only works inside Python processes, so nothing runs inside Postgres, and its pod <a href="lab1.html#which-pods">opts out</a>. SigNoz still learns about it from three places outside it <span class="badge api">API</span>:</p>
+  <ul>
+    <li><strong>Its queries, from the backend.</strong> The agent in <code>backend</code> wraps its database driver, and records one client span per query, with the SQL in <code>db.statement</code> and how long the backend waited.</li>
+    <li><strong>Its log lines, from the node agents.</strong> They read what Postgres prints. Those lines have no <code>service.name</code>, so search with <code>k8s.container.name = &#x27;postgres&#x27;</code>.</li>
+    <li><strong>Its pod&#x27;s CPU and memory,</strong> from the kubelet.</li>
+  </ul>
+  <p>What you don&#x27;t get is anything from inside it, such as locks, cache hit rate or query plans. None of the 268 metric names SigNoz had on 2026-11-08 came from Postgres <span class="badge data">ClickHouse SQL</span>. So a trace can show you that a query was slow, but not why.</p>
 </div>
 
 <h2>Five labs, in order</h2>
 <table>
-  <thead><tr><th></th><th>Lab 1: hands-off</th><th>Lab 2: custom dimensions</th></tr></thead>
-  <tbody>
-    <tr><td><strong>The app</strong></td><td>Contains no OpenTelemetry code</td><td>Lab 1's app, plus a few OpenTelemetry API lines</td></tr>
-    <tr><td><strong>Telemetry comes from</strong></td><td>The OpenTelemetry Operator, at pod start</td><td>The same Operator, plus those lines</td></tr>
-    <tr><td><strong>You learn</strong></td><td>How much you get for free, and how to debug six real incidents with it</td><td>How to add detail where you need it, through four failures Lab 1 can't fully explain</td></tr>
-    <tr><td><strong>Start it with</strong></td><td><code>make up</code></td><td><code>make lab2</code></td></tr>
-  </tbody>
+  <thead><tr><th>Lab</th><th>What you do</th><th>What you learn</th><th>Start it</th></tr></thead>
+  <tbody><tr><td><strong>1. Hands-off</strong></td><td>Get telemetry from an app with no OpenTelemetry code</td><td>How much you get for free, through six incidents</td><td><code>make up</code></td></tr><tr><td><strong>2. Custom dimensions</strong></td><td>Add a few OpenTelemetry API calls, only where they help</td><td>How to slice telemetry by things only your code knows, through four incidents</td><td><code>make lab2</code></td></tr><tr><td><strong>3. Kubernetes</strong></td><td>Watch what the app runs on: pods, nodes, the kubelet and the API server</td><td>How to debug throttling, OOM kills and failed probes, and which metrics quietly miss them</td><td><code>make lab3</code></td></tr><tr><td><strong>4. Alerts</strong></td><td>Add eight alert rules, and a place to receive them</td><td>How to write alerts that fire for real failures, and how long they take</td><td><code>make lab4</code></td></tr><tr><td><strong>5. AI analysis</strong></td><td>Connect your own AI agent, with read-only access</td><td>How to set it up safely, what to ask it, and how good its answers are</td><td><code>make lab5</code></td></tr></tbody>
 </table>
-<p>You move from Lab 1 to Lab 2 only for the cases that need it. You keep the hands-off setup, and nothing gets re-instrumented. Both labs run side by side and send to the same SigNoz, so you can compare them. <code>make compare</code> sends both the same requests and shows what each one captured.</p>
+<p>Each lab builds on the last, and they all run side by side and send to the same SigNoz. You move on only for what the last lab couldn&#x27;t show.</p>
+
+<h2>Before you start</h2>
+<h3>1. Start the lab</h3>
+<p>In a terminal, from the repo&#x27;s root:</p>
+<figure class="code"><pre><code>make up</code></pre></figure>
+<p>It creates the cluster, and installs SigNoz and Lab 1.</p>
+
+<h3 id="login">2. Log in to SigNoz</h3>
+<p>SigNoz is at <a href="http://signoz.localhost:8080" target="_blank" rel="noopener">signoz.localhost:8080</a>. There&#x27;s nothing to sign up for: <code>make up</code> created an admin account and saved its login in <code>.lab-credentials</code>, in the repo&#x27;s root. Git ignores that file, and only your user can read it. To see the login:</p>
+<figure class="code"><pre><code>cat .lab-credentials</code></pre></figure>
+<p>Then, on SigNoz&#x27;s login page:</p>
+<ol>
+  <li>Enter the <code>SIGNOZ_EMAIL</code> value, which is <code>admin@lab.local</code>, and choose <strong>Next</strong>.</li>
+  <li>Enter the <code>SIGNOZ_PASSWORD</code> value, which was generated for your lab, and choose <strong>Sign in with Password</strong>.</li>
+</ol>
+<p>Stay logged in, in the browser you&#x27;re reading this in. This tutorial&#x27;s links into SigNoz open in new tabs and use that login. If you aren&#x27;t logged in, they stop at the login page, and carry on to where they were going once you sign in. The live buttons and searches on these pages don&#x27;t need it, because the tutorial&#x27;s server reads the same file.</p>
+<p>The file is only missing if someone created the admin by hand on SigNoz&#x27;s sign-up page before <code>make up</code> could. Use that login instead, and save it in the file as the README&#x27;s troubleshooting section shows.</p>
+
+<h3>3. Go to Lab 1</h3>
+<p>That&#x27;s all for now. Each lab&#x27;s first page tells you how to start that lab and its traffic.</p>
+
+<h2 id="deploy">When you change code</h2>
+<p>Some pages suggest a fix or a change. Saving a file changes nothing by itself, because the pods keep running the image from the last build. To try a change:</p>
+<ol>
+  <li><strong>Edit the file,</strong> and save it.</li>
+  <li><strong>Deploy it</strong> with that lab&#x27;s <code>make</code> command, from the repo&#x27;s root.</li>
+  <li><strong>Check it.</strong> Fire the same scenario again, and look in the same place in SigNoz.</li>
+  <li><strong>Put the bug back,</strong> because other pages need it: run <code>git restore</code> on the file, then the same <code>make</code> command again.</li>
+</ol>
 <table>
-  <thead><tr><th></th><th>Lab 3: Kubernetes</th><th>Lab 4: alerts</th></tr></thead>
+  <thead><tr><th>What you changed</th><th>Run</th></tr></thead>
   <tbody>
-    <tr><td><strong>What it adds</strong></td><td>A workload with real limits and probes, plus scrape jobs for the kubelet, cAdvisor and the API server</td><td>Eight alert rules, and a place to receive them</td></tr>
-    <tr><td><strong>You learn</strong></td><td>How to debug throttling, OOM kills and failed probes, and which metrics quietly miss them</td><td>How to write alerts that fire for real failures, and how long they take</td></tr>
-    <tr><td><strong>Start it with</strong></td><td><code>make lab3</code></td><td><code>make lab4</code></td></tr>
+    <tr><td><code>labs/lab1-hands-off/</code></td><td><code>make lab1</code></td></tr>
+    <tr><td><code>labs/lab2-custom-dimensions/</code></td><td><code>make lab2</code></td></tr>
+    <tr><td><code>labs/lab3-kubernetes/</code></td><td><code>make lab3</code></td></tr>
+    <tr><td><code>labs/lab4-alerts/</code></td><td><code>make lab4</code></td></tr>
+    <tr><td><code>signoz/</code></td><td><code>make up</code></td></tr>
+    <tr><td><code>cluster/</code></td><td><code>make down</code>, then <code>make up</code>. These settings only apply when a cluster is created, and this deletes all its data</td></tr>
   </tbody>
 </table>
-<table>
-  <thead><tr><th></th><th>Lab 5: AI analysis</th></tr></thead>
-  <tbody>
-    <tr><td><strong>What it adds</strong></td><td>SigNoz&#x27;s MCP server, and read-only access for your own AI agent. You ask it questions, and alerts can start it by themselves</td></tr>
-    <tr><td><strong>You learn</strong></td><td>How to connect an agent safely, what to ask it, and how good its answers are, measured on incidents whose causes we already know</td></tr>
-    <tr><td><strong>Start it with</strong></td><td><code>make lab5</code></td></tr>
-  </tbody>
-</table>
+<p>The same commands work on k3d and kind. For example, <code>make lab1</code> does this:</p>
+<ol>
+  <li>Builds the image from <code>labs/lab1-hands-off/app</code>, with <code>docker build</code>.</li>
+  <li>Loads it into the cluster, because nothing here is pulled from a registry.</li>
+  <li>Applies the lab&#x27;s manifests in <code>k8s/</code>, so changes to its YAML take effect too.</li>
+  <li>Restarts the lab&#x27;s pods. The image&#x27;s tag, <code>telemetry-lab1:dev</code>, never changes, so Kubernetes wouldn&#x27;t notice a new build otherwise.</li>
+  <li>Checks that every pod that should have an agent got one.</li>
+  <li>Runs the smoke test, which sends orders until traces, logs and metrics reach SigNoz.</li>
+</ol>
+<p><code>make lab1</code> and <code>make lab2</code> took 45 to 101 seconds here, and <code>make lab3</code> about 3 minutes. They restart the load generator too, so any traffic you started stops, and you need to start it again. Postgres doesn&#x27;t restart, so your test orders stay. Once, while we rebuilt several times in a row, <code>docker build</code> failed with <code>failed to prepare extraction snapshot</code>. Running the same command again worked.</p>
+
+<h2>Your path</h2>
+<p>Go in order if this is new to you, using the sidebar or the links at the bottom of each page. Each incident stands alone, so you can also jump straight to one. Mark a page complete at the bottom of it. Your progress stays in this browser.</p>
 
 <h2>What you will be able to do</h2>
 <ul>
@@ -60,22 +120,10 @@
   <li>Work through four incidents that show what those dimensions buy you.</li>
   <li>Debug throttling, OOM kills, failed probes, and node and API server problems.</li>
   <li>Write alerts on metrics, traces and logs, and prove that they reach you.</li>
+  <li>Connect an AI agent with read-only access, and judge how far to trust its reports.</li>
   <li>Write SigNoz searches for traces, logs and metrics.</li>
   <li>Spot what a plain install leaves out, including the places where SigNoz can mislead you.</li>
 </ul>
-
-<h2>Before you start</h2>
-<ol>
-  <li>Run <code>make up</code>. That is all you need for Lab 1. Run <code>make lab2</code>, <code>make lab3</code> and <code>make lab4</code> when you reach each one.</li>
-  <li>Log in to <a href="http://signoz.localhost:8080" target="_blank" rel="noopener">SigNoz</a> in another tab. The login is in <code>.lab-credentials</code>. Links in this tutorial land on the login page if you skip this.</li>
-  <li>Start some background traffic, so that charts have data. Stop it when you finish.</li>
-</ol>
-<div data-load-panel="lab1"></div>
-<div data-load-panel="lab2"></div>
-
-<h2>Your path</h2>
-<p>Go in order if this is new to you. Each incident stands alone, so you can also jump straight to one. Mark a page complete at the bottom of it. Your progress stays in this browser.</p>
-<div id="path"></div>
 
 <h2>How far to trust what you read</h2>
 <p>Everything shown as real came from this lab. Each claim says how it was checked, using the same labels as <code>docs/FINDINGS.md</code>:</p>
@@ -91,7 +139,7 @@
 
 <h2>About the saved examples</h2>
 <ul>
-  <li>Saved trace IDs, numbers and screenshots come from real runs on 2026-11-07, on the labs as they are now. Each page's saved examples come from the lab it teaches. Load figures come from a run from 11:10 to 11:21 UTC at 5 requests/s with 10% errors, on both labs. Your live numbers will differ.</li>
+  <li>Saved trace IDs, numbers and screenshots come from real runs on 2026-11-07 and 2026-11-08. Some older ones also list <code>lab1-loadgen</code> and <code>loadgen</code>: Labs 1 and 2 traced their load generators then, and don&#x27;t now. Each page's saved examples come from the lab it teaches. Load figures come from a run from 11:10 to 11:21 UTC at 5 requests/s with 10% errors, on both labs. Your live numbers will differ.</li>
   <li>Screenshots show UTC+1, so 11:00 UTC appears as 12:00. Saved trace IDs exist only in the lab that made them, so their SigNoz links will not open in yours. Use the live buttons to create your own.</li>
   <li>SigNoz keeps traces and logs for 15 days, so saved trace links stop working after about 2026-11-22. The pages still show the saved copy.</li>
   <li>The scenarios fail on purpose, so each root cause is a known line of code. The method is what carries over to real incidents.</li>

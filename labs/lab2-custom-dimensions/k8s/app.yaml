@@ -135,7 +135,12 @@ spec:
   replicas: 1
   selector: { matchLabels: { app: loadgen } }
   template:
-    metadata: { labels: { app: loadgen } }
+    metadata:
+      labels: { app: loadgen }
+      annotations:
+        # Opt out: this only makes traffic. Traced, it would add spans that aren't
+        # the app, and traces would start somewhere different from a real click.
+        instrumentation.opentelemetry.io/inject-python: "false"
     spec:
       containers:
         - name: loadgen

@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The instrumentation code | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>The instrumentation code · Lab 2 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -88,8 +89,8 @@
 <span class="ln">139</span>    cache_lookups.add(1, {&quot;cache.hit&quot;: hit})
 <span class="ln">140</span>    return {&quot;item&quot;: item, &quot;price&quot;: PRICES.get(item, 5.0)}</code></pre></figure>
 <p>The frontend does the same thing to label each request with its scenario, because all scenarios share one operation name:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 282–283</span></figcaption><pre><code><span class="ln">282</span>    trace_id = current_trace_id()
-<span class="ln">283</span>    trace.get_current_span().set_attribute(&quot;lab.scenario&quot;, name)</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 271–272</span></figcaption><pre><code><span class="ln">271</span>    trace_id = current_trace_id()
+<span class="ln">272</span>    trace.get_current_span().set_attribute(&quot;lab.scenario&quot;, name)</code></pre></figure>
 
 <h2>Metrics of your own</h2>
 <p>Create instruments once, at the top of the file:</p>
@@ -106,21 +107,13 @@
 <figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/backend.py</code> lines 111–112</span></figcaption><pre><code><span class="ln">111</span>    orders_created.add(1, {&quot;order.item&quot;: order.item})
 <span class="ln">112</span>    order_value.record(total, {&quot;order.item&quot;: order.item})</code></pre></figure>
 <p>Attributes such as <code>order.item</code> become dimensions you can group by. Keep their values to a small set. <code>order.item</code> has five values here, which is fine. A per-user value would create a separate time series for each user.</p>
-<p>A gauge is different. Instead of recording events, you give the API a callback, and the agent reads the current value at each export:</p>
-<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 201–207</span></figcaption><pre><code><span class="ln">201</span>def _observe_loadgen(_options: CallbackOptions):
-<span class="ln">202</span>    yield Observation(loadgen.rps if loadgen.status()[&quot;running&quot;] else 0.0)
-<span class="ln">203</span>
-<span class="ln">204</span>
-<span class="ln">205</span>meter.create_observable_gauge(
-<span class="ln">206</span>    &quot;loadgen.target_rps&quot;, callbacks=[_observe_loadgen], unit=&quot;{request}/s&quot;,
-<span class="ln">207</span>    description=&quot;Requests per second the load generator aims for&quot;,</code></pre></figure>
-<p>Three instrument types are in use here: a <strong>counter</strong> for totals (<code>orders.created</code>, <code>cache.lookups</code>, <code>scenario.runs</code>), a <strong>histogram</strong> for distributions (<code>orders.value</code>) and a <strong>gauge</strong> for a current level (<code>loadgen.target_rps</code>).</p>
+<p>Two instrument types are in use here: a <strong>counter</strong> for totals (<code>orders.created</code>, <code>cache.lookups</code>, <code>scenario.runs</code>) and a <strong>histogram</strong> for distributions (<code>orders.value</code>). OpenTelemetry also has a <strong>gauge</strong> for a current level, such as how many items are in a queue. This app has nothing that needs one.</p>
 
 <h2>Giving users a trace ID</h2>
 <p>Lab 1's app can't return a trace ID, because it doesn't know one exists. With the API, three lines fetch it, and Lab 2 adds it to every response. That is also why this tutorial's Lab 2 buttons link straight to SigNoz with no search.</p>
-<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 245–247</span></figcaption><pre><code><span class="ln">245</span>def current_trace_id() -&gt; str | None:
-<span class="ln">246</span>    ctx = trace.get_current_span().get_span_context()
-<span class="ln">247</span>    return format(ctx.trace_id, &quot;032x&quot;) if ctx.is_valid else None</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab2-custom-dimensions/app/frontend.py</code> lines 234–236</span></figcaption><pre><code><span class="ln">234</span>def current_trace_id() -&gt; str | None:
+<span class="ln">235</span>    ctx = trace.get_current_span().get_span_context()
+<span class="ln">236</span>    return format(ctx.trace_id, &quot;032x&quot;) if ctx.is_valid else None</code></pre></figure>
 <p>This is a cheap trick worth copying: a support ticket that quotes a trace ID takes you straight to the evidence. See <a href="incident-trace-id.html">A customer quotes a trace ID</a>.</p>
 
 <h2>Choosing where to put a dimension</h2>
@@ -166,6 +159,15 @@
 <span class="ln">129</span>        ]</code></pre></figure>
   <p>The automatic <code>SELECT</code> span now nests under <code>list_orders</code>. Lab 2 also logs the count, which adds a field you could search.</p>
 </details>
+<h3>Run your span</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> Lab 1 has no OpenTelemetry package yet, so add <code>opentelemetry-api==1.45.2</code> to <code>labs/lab1-hands-off/app/requirements.txt</code>. Then edit <code>list_orders</code> in <code>labs/lab1-hands-off/app/backend.py</code>, and add <code>from opentelemetry import trace</code> at the top. Without Lab 2&#x27;s <code>tracer</code> variable, you can write <code>trace.get_tracer(&quot;lab.backend&quot;).start_as_current_span(&quot;list_orders&quot;)</code>. Save both files.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
+  <li><strong>List some orders.</strong><div data-fire="list" data-lab="lab1"></div></li>
+  <li><strong>Find your span</strong> in SigNoz, with this search on Traces. It should match once per request, with <code>orders.returned</code> on each: <code>service.name = &#x27;lab1-backend&#x27; AND name = &#x27;list_orders&#x27;</code>. <span class="badge api">Query API only</span></li>
+  <li><strong>Put the bug back,</strong> because Lab 1 is meant to have no OpenTelemetry code.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/requirements.txt labs/lab1-hands-off/app/backend.py
+make lab1</code></pre></figure></li>
+</ol>
 
 <div class="quiz" data-quiz="i1"><p class="q">Check yourself: You want to know whether a slow request hit the cache, and the request already has a span from the agent. What is the smallest change?</p><button type="button" data-right="true" data-why="trace.get_current_span().set_attribute() adds it to the span the agent made. Lab 2 does this with cache.hit.">Set an attribute on the current span.</button><button type="button" data-right="false" data-why="The agent already provides the SDK. You only need the API.">Install the full SDK and set up a provider.</button><button type="button" data-right="false" data-why="Nothing gets re-instrumented. You keep the hands-off setup.">Re-instrument the app by hand.</button></div>
 <div class="quiz" data-quiz="i2"><p class="q">Check yourself: You want a value to be searchable on a log line. What do you do?</p><button type="button" data-right="false" data-why="Then you can only substring-search it, and it cannot be compared as a number.">Put it in the message string.</button><button type="button" data-right="true" data-why="The app does this with order.item and order.total, so order.total &gt; 10 works as a filter. It needs no OpenTelemetry code.">Pass it in extra= so it becomes a log attribute.</button><button type="button" data-right="false" data-why="Resource attributes describe the service. They are the same on every record.">Add it to resourceAttributes in the Instrumentation.</button></div>

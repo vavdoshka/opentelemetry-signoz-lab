@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Connect an AI agent | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>Connect an AI agent · Lab 5 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -15,6 +16,14 @@
 <p class="eyebrow">Lab 5: AI analysis</p>
 <h1>Connect an AI agent</h1>
 <p class="lead">An AI agent can query SigNoz the way you do, read the answer, and decide what to ask next. This lab connects one with read-only access, then measures how well it works.</p>
+
+<h2 id="fits">Where this lab fits</h2>
+<p>The new parts connect to the rest from outside, with read-only access. Everything else stays as it was.</p>
+<div class="wide arch" data-arch="lab5"></div>
+<table>
+  <thead><tr><th>Part</th><th>In this lab</th></tr></thead>
+  <tbody><tr><td>AI agent</td><td>Runs on your machine, with the login it already has. Nothing of it runs in the cluster</td></tr><tr><td>MCP server</td><td>New, in namespace <code>lab5</code>. Lets the agent query SigNoz with a Viewer key, so SigNoz refuses any write</td></tr><tr><td>API server</td><td>Now also read by the agent, through <code>kubectl</code> with a read-only account. It can&#x27;t read Secrets</td></tr><tr><td>Alert sink</td><td>Polled by the agent&#x27;s script, to find new alerts to investigate</td></tr><tr><td>Everything else</td><td>Unchanged. The agent can only see what SigNoz has, so it also sees Postgres only from outside</td></tr></tbody>
+</table>
 
 <h2>Start it</h2>
 <figure class="code"><pre><code>make lab5</code></pre></figure>

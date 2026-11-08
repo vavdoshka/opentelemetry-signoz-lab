@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Telemetry with no code | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>Telemetry with no code · Lab 1 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -16,9 +17,18 @@
 <h1>Telemetry with no code</h1>
 <p class="lead">Lab 1's app has no OpenTelemetry code: no imports, no setup, no settings. One Kubernetes resource and one annotation still give you traces, logs and metrics in SigNoz.</p>
 
+<h2 id="fits">Where this lab fits</h2>
+<p>This lab covers the whole path telemetry takes, with no OpenTelemetry code in the app.</p>
+<div class="wide arch" data-arch="lab1"></div>
+<table>
+  <thead><tr><th>Part</th><th>In this lab</th></tr></thead>
+  <tbody><tr><td><code>frontend</code>, <code>backend</code></td><td><strong>Auto-instrumented.</strong> The Operator adds a Python agent as each pod starts. Their code doesn&#x27;t change</td></tr><tr><td>Postgres</td><td><strong>Not instrumented.</strong> Nothing runs inside it. You see its queries in the backend&#x27;s spans, plus its log lines and its pod&#x27;s CPU and memory. <a href="index.html#postgres">What you do and don&#x27;t get</a></td></tr><tr><td>OpenTelemetry Operator</td><td>Adds the agent. <code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> is its whole configuration</td></tr><tr><td>Node agents</td><td>Receive what the Python agents send and add pod and node names. Read every container&#x27;s output, and collect pod and node metrics</td></tr><tr><td>SigNoz</td><td>Collectors, ClickHouse and the UI, from the official Helm chart</td></tr><tr><td>Not in this lab</td><td>Facts only your code knows (Lab 2), what Kubernetes itself does (Lab 3), alerts (Lab 4) and AI (Lab 5)</td></tr></tbody>
+</table>
+
 <h2>Start it</h2>
 <p><code>make up</code> already deployed this lab. Start some background traffic, so SigNoz has data to show. Stop it when you finish.</p>
 <div data-load-panel="lab1"></div>
+<p>You&#x27;ll look at the results in SigNoz, at <a href="http://signoz.localhost:8080" target="_blank" rel="noopener">signoz.localhost:8080</a>. If it asks you to log in, <a href="index.html#login">Start here</a> shows where the login is.</p>
 
 <h2>Everything here is built in</h2>
 <p>Lab 1 adds nothing to SigNoz. Every screen you'll use comes with it: no dashboards, saved views, queries or alerts are created for you.</p>
@@ -36,7 +46,7 @@
 </table>
 
 <h2>The whole configuration</h2>
-<p>This is every piece of OpenTelemetry configuration in Lab 1. The app's code and its Kubernetes manifest don't mention OpenTelemetry at all. (Its image does contain the <code>opentelemetry-api</code> package, because FastAPI depends on it, but the app never imports it.)</p>
+<p>This is every piece of OpenTelemetry configuration in Lab 1. The app's code doesn't mention OpenTelemetry at all, and its Kubernetes manifest only opts two pods out, as explained below. (Its image does contain the <code>opentelemetry-api</code> package, because FastAPI depends on it, but the app never imports it.)</p>
 <figure class="code"><figcaption><span><code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> lines 1–40</span></figcaption><pre><code><span class="ln">1</span># This file is all the OpenTelemetry configuration Lab 1 has.
 <span class="ln">2</span>#
 <span class="ln">3</span># The annotation on the Namespace opts in every pod created here. The
@@ -78,14 +88,25 @@
 <span class="ln">39</span>      # Export metrics every 10 seconds (default 60), so the lab feels responsive.
 <span class="ln">40</span>      - { name: OTEL_METRIC_EXPORT_INTERVAL, value: &quot;10000&quot; }</code></pre></figure>
 
-<h2>Logs need one setting</h2>
-<p>Traces and metrics work as soon as a pod is injected. Python logs don't: the agent leaves them off by default, so without line 34 above, SigNoz would receive no application logs from it. That one setting is all it takes:</p>
+<h2>Logs need one environment variable</h2>
+<p>Traces and metrics work as soon as a pod is injected. Python logs don&#x27;t: the agent leaves them off by default. One environment variable turns them on, on line 34 above:</p>
+<figure class="code"><pre><code>OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true</code></pre></figure>
+<p>You don&#x27;t set it on your app. Everything under <code>python.env</code> in the <code>Instrumentation</code> is added to each injected pod by the Operator, so your code and your Deployment stay as they are. Without it, SigNoz would receive no application logs from the agent. With it:</p>
 <ul>
-  <li>Everything your app writes with Python's <code>logging</code> goes to SigNoz.</li>
-  <li>Each log written during a request carries that request's <code>trace_id</code> and <code>span_id</code>, so logs link to their span.</li>
+  <li>Everything your app writes with Python&#x27;s <code>logging</code> goes to SigNoz.</li>
+  <li>Each log written during a request carries that request&#x27;s <code>trace_id</code> and <code>span_id</code>, so logs link to their span.</li>
   <li>Fields in <code>extra={...}</code> become searchable log attributes, with no OpenTelemetry code.</li>
 </ul>
 <p>Other languages have their own defaults, so check yours. The node agent also collects container stdout, but those copies have no trace link. See <a href="gaps.html">What is missing</a>.</p>
+
+<h3>The other variables are nice to have</h3>
+<p>The rest of <code>python.env</code> isn&#x27;t needed for telemetry to work. Each one tidies something up:</p>
+<table>
+  <thead><tr><th>Environment variable</th><th>What it does</th><th>Why it&#x27;s here</th></tr></thead>
+  <tbody><tr><td><code>OTEL_PYTHON_FASTAPI_EXCLUDED_URLS=healthz</code></td><td>Excludes matching paths from tracing. It takes a comma-separated list, so you can add your own</td><td>The kubelet checks <code>/healthz</code> every few seconds, and those spans would only be noise. The backend had 0 such spans among 3,023</td></tr><tr><td><code>OTEL_METRIC_EXPORT_INTERVAL=10000</code></td><td>Exports metrics every 10 seconds, not every 60</td><td>So charts react quickly in a lab. In production you may prefer the default</td></tr><tr><td><code>OTEL_BSP_SCHEDULE_DELAY=500</code></td><td>Sends finished spans sooner</td><td>A fix for the Service Map, explained in <a href="gaps.html#services">gap 2</a></td></tr></tbody>
+</table>
+<p>To change any of these, edit <code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> and deploy it. The Operator only adds them when a pod starts, and this command applies the file and restarts the pods. <a href="index.html#deploy">What this command does</a>.</p>
+<figure class="code"><pre><code>make lab1</code></pre></figure>
 
 <h2>What happens when a pod starts</h2>
 <ol>
@@ -94,64 +115,22 @@
   <li>It sets <code>PYTHONPATH</code> and the <code>OTEL_*</code> variables, and names the service after its Deployment, such as <code>lab1-backend</code>.</li>
   <li>Python loads the agent before your app, and the agent patches FastAPI, httpx, psycopg and logging.</li>
 </ol>
-<p>Datadog's Single Step Instrumentation works the same way: a webhook and an init container. Injection happens at pod creation, so the <code>Instrumentation</code> has to exist first. Postgres opts out with <code>inject-python: "false"</code>, because the namespace annotation applies to every pod.</p>
-<p>The agent patches every matching library in the pod, including the load generator's HTTP client. That is why load traffic starts at a <code>POST</code> span in <code>lab1-loadgen</code>, while a click on a scenario button starts at the frontend.</p>
+<p>Injection happens at pod creation, so the <code>Instrumentation</code> has to exist first, and pods that are already running need a restart.</p>
+
+<h3 id="which-pods">Which pods get the agent</h3>
+<p>Line 11 above opts in the whole namespace: <code>inject-python: "true"</code> on the <code>lab1</code> Namespace covers every pod created in it, so no Deployment has to change. A pod can opt out by setting the same annotation to <code>"false"</code> on itself, which overrides the Namespace. Two pods here do:</p>
+<table>
+  <thead><tr><th>Pod</th><th>Agent?</th><th>Why</th></tr></thead>
+  <tbody><tr><td><code>lab1-frontend</code>, <code>lab1-backend</code></td><td>Yes</td><td>They&#x27;re the app</td></tr><tr><td><code>postgres</code></td><td>No</td><td>It isn&#x27;t a Python app, so a Python agent has nothing to patch. You still see its queries, as database spans from the backend</td></tr><tr><td><code>lab1-loadgen</code></td><td>No</td><td>It only makes traffic. Traced, it would add spans that aren&#x27;t the app, and each trace would start in a different place depending on whether load or a person sent it</td></tr></tbody>
+</table>
 <p>See it for yourself:</p>
+<figure class="code"><figcaption><span>Which pods got the agent</span></figcaption><pre><code>kubectl -n lab1 get pods -o 'custom-columns=POD:.metadata.name,INIT:.spec.initContainers[*].name'</code></pre></figure>
 <figure class="code"><figcaption><span>Look at what the Operator added</span></figcaption><pre><code>kubectl -n lab1 describe pod -l app=backend</code></pre></figure>
 
-<h2>Try it in SigNoz</h2>
-<p>Fire these three, then search. They give you an order, a database failure and a crash to look at.</p>
-<div data-fire="order" data-lab="lab1"></div>
-<div data-fire="db_error" data-lab="lab1"></div>
-<div data-fire="crash" data-lab="lab1"></div>
-<table>
-  <thead><tr><th>What to look for</th><th>Where</th><th>Search</th></tr></thead>
-  <tbody>
-    <tr><td>SQL statements, with no database code changed</td><td>Traces</td><td><code>service.name = 'lab1-backend' AND db.statement EXISTS</code></td></tr>
-    <tr><td>Failed requests</td><td>Traces</td><td><code>service.name = 'lab1-frontend' AND has_error = true</code></td></tr>
-    <tr><td>Error logs, each linked to its trace</td><td>Logs</td><td><code>service.name = 'lab1-backend' AND severity_text = 'ERROR' AND trace_id != ''</code></td></tr>
-  </tbody>
-</table>
-<p>Each of these ran successfully through the query API <span class="badge api">Query API only</span>.</p>
-<p>Open any of those traces. It runs from <code>lab1-frontend</code> through <code>lab1-backend</code> to the SQL statement, with the pod name on every span.</p>
-
-<h2>What you get, and what you don't</h2>
-<p>Run <code>make lab2</code>, then <code>make compare</code>. It sends both labs the same requests and asks SigNoz what arrived. This is a real run from 2026-11-07:</p>
-<table>
-  <thead><tr><th>What SigNoz received</th><th>Lab 1 (hands-off)</th><th>Lab 2 (custom dimensions)</th></tr></thead>
-  <tbody>
-    <tr><td>Traces crossing both services</td><td>Yes</td><td>Yes</td></tr>
-    <tr><td>SQL text on spans</td><td>Yes</td><td>Yes</td></tr>
-    <tr><td>Spans marked as errors</td><td>Yes</td><td>Yes</td></tr>
-    <tr><td>Pod names on spans</td><td>Yes</td><td>Yes</td></tr>
-    <tr><td>Logs linked to traces</td><td>Yes</td><td>Yes</td></tr>
-    <tr><td>HTTP metrics</td><td>Yes</td><td>Yes</td></tr>
-    <tr><td>Python runtime metrics</td><td>Yes</td><td>Yes</td></tr>
-    <tr><td>Log fields from plain logging (<code>order.item</code>)</td><td>Yes</td><td>Yes</td></tr>
-    <tr><td>Custom span (<code>price_order</code>)</td><td>No</td><td><strong>Yes</strong></td></tr>
-    <tr><td>Business attribute on spans (<code>order.item</code>)</td><td>No</td><td><strong>Yes</strong></td></tr>
-    <tr><td>Technical attribute on spans (<code>cache.hit</code>)</td><td>No</td><td><strong>Yes</strong></td></tr>
-    <tr><td>Scenario name on spans (<code>lab.scenario</code>)</td><td>No</td><td><strong>Yes</strong></td></tr>
-    <tr><td>Business metric (<code>orders.created</code>)</td><td>No</td><td><strong>Yes</strong></td></tr>
-    <tr><td>Trace ID in the API response</td><td>No</td><td><strong>Yes</strong></td></tr>
-  </tbody>
-</table>
-<p>The pattern is simple. Hands-off sees everything that passes through your libraries. It can't see what your code means, unless your logs already say it.</p>
-
-<h2>What hands-off costs</h2>
-<ul>
-  <li><strong>No custom detail on spans or metrics.</strong> You can see a slow <code>POST /orders</code>, but the span doesn't say which item or how much. If the app already logs those fields, you can count, sum and chart them from logs. You can't connect them to latency, and you can't see a field nobody logged.</li>
-  <li><strong>No trace IDs in your app.</strong> It can't show one to a user, or put one in a support ticket, because the app doesn't know it is being traced.</li>
-  <li><strong>More metrics than you asked for.</strong> The agent bundles about 50 instrumentation packages, and turns on every one that applies. That includes Python runtime, process and system metrics, so you get them with no code. It also means more metric series: in this run, one Lab 1 backend pod sent 768 metric series, and 426 of them were runtime, process and system metrics. Lab 2 runs the same agent, so it sends them too. Check the cost at scale.</li>
-  <li><strong>It can fail silently.</strong> If the Operator's webhook can't answer, Kubernetes starts the pod anyway, with no agent and no error. The pod looks healthy and sends nothing. So check for the init container, which is what <code>make up</code> does here.</li>
-  <li><strong>The platform gaps remain.</strong> Stdout logs are still duplicated, and Service Map counts stay unreliable. See <a href="gaps.html">What is missing</a>.</li>
-</ul>
-
-<h2>When to use it</h2>
-<p>Start here. It costs one annotation and gives you most of what you need to debug. The next six pages prove that: each one is a real incident you can solve with this telemetry alone. When you reach something it can't answer, Lab 2 shows how to add just that detail, without re-instrumenting anything.</p>
+<h2>What&#x27;s next</h2>
+<p>Next, you&#x27;ll follow one real order through its traces, logs and metrics, then work through six incidents with this telemetry alone. At the end of the lab, <a href="lab1-review.html">What hands-off gets you</a> weighs up what it can&#x27;t do.</p>
 
 <div class="quiz" data-quiz="l1a"><p class="q">Check yourself: You add the annotation to a namespace, but running pods send nothing. Why?</p><button type="button" data-right="true" data-why="The agent is added when a pod is created, so existing pods must be restarted.">Injection happens at pod creation, so they need a restart.</button><button type="button" data-right="false" data-why="The namespace annotation covers every pod in it, unless a pod opts out.">The annotation only works on individual pods.</button><button type="button" data-right="false" data-why="Lab 1's app has no SDK at all, and works.">The app needs the OpenTelemetry SDK installed first.</button></div>
-<div class="quiz" data-quiz="l1b"><p class="q">Check yourself: A manager asks which product sells most, from telemetry. Can Lab 1 answer?</p><button type="button" data-right="false" data-why="Its spans do not, but the app logs order.item, and logs can be counted.">No, because it has no idea what an item is.</button><button type="button" data-right="true" data-why="order.item is on the order stored log, so you can group by it. That works only because a developer logged it.">Yes, by counting a field the app already logs.</button><button type="button" data-right="false" data-why="The agent knows nothing about orders. The field comes from the app&#x27;s own log line.">Yes, because the agent understands orders.</button></div>
 
 <section class="page-end" id="page-end" aria-label="Page navigation"></section>
 </main>

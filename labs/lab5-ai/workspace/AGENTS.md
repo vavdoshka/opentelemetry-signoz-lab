@@ -23,15 +23,16 @@ says nothing about what has gone wrong before: find that out from the data.
 - `lab1`: a shop with three services, `lab1-frontend` → `lab1-backend` →
   PostgreSQL. Python, instrumented automatically by the OpenTelemetry
   Operator, so they have traces, logs and runtime metrics with no code changes.
-  `lab1-loadgen` sends it traffic.
+  `lab1-loadgen` sends it traffic, and isn't traced.
 - `lab2`: the same shop, `frontend` → `backend` → PostgreSQL, with business
   data added by hand. The `price_order` span carries `order.item`,
   `order.qty`, `order.coupon` and `order.total`, in USD. `GET /catalog` spans
   carry `cache.hit`. The metrics `orders.created` and `orders.value` are by
   `order.item`, and `cache.lookups` by `cache.hit`. `order stored` logs carry
-  `order.id`, `order.item` and `order.total`. `loadgen` sends it traffic.
+  `order.id`, `order.item` and `order.total`. `loadgen` sends it traffic, and isn't traced.
 - `lab3`: `lab3-workload`, with limits of 200m CPU and 256Mi memory and a
-  liveness probe. `lab3-loadgen` sends it traffic.
+  liveness probe. `lab3-loadgen` sends it traffic, and is traced, so its
+  spans show failures from the caller's side.
 - `lab4`: the alert sink. `lab5`: the MCP server.
 - `signoz`: SigNoz itself. It's the observer, not the subject.
 

@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Incident: a cross-service failure | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>A cross-service failure · Lab 1 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -70,9 +71,18 @@
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>In this lab the exception is deliberate, so the fix is simply to remove it.</p>
-<figure class="code"><figcaption><span>Proposed fix for labs/lab1-hands-off/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code> @app.get(&quot;/work/fail&quot;)
+<figure class="code"><figcaption><span>The fix for labs/lab1-hands-off/app/backend.py. Tried on 2026-11-08, then undone <span class="badge ui">Seen in SigNoz UI</span></span></figcaption><pre><code> @app.get(&quot;/work/fail&quot;)
  def fail() -&gt; dict:
 <span class="del">-    raise RuntimeError(&quot;backend exploded on purpose&quot;)</span><span class="add">+    return {&quot;ok&quot;: True}</span></code></pre></figure>
+<h3>Try the fix</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> Make that edit in <code>labs/lab1-hands-off/app/backend.py</code>, and save it.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
+  <li><strong>Fire the same request.</strong> It should now answer HTTP 200 with <code>{&quot;ok&quot;: true}</code>, not 502.<div data-fire="backend_500" data-lab="lab1"></div></li>
+  <li><strong>Check the Exceptions page.</strong> The <code>RuntimeError</code> row for <code>lab1-backend</code> should stop growing, and its <strong>Last Seen</strong> should stay at the time before you deployed.</li>
+  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/backend.py
+make lab1</code></pre></figure></li>
+</ol>
 <p>What carries over: the fix belongs in the backend, even though the alert would fire on the frontend's 502s. A trace stops you from debugging the wrong service.</p>
 
 <h2>A close relative: a failure that starts in the database</h2>

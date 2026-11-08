@@ -70,6 +70,8 @@ spec:
   replicas: 1
   selector: { matchLabels: { app: loadgen } }
   template:
+    # Traced on purpose, unlike Labs 1 and 2. A killed pod can't report itself, so
+    # this is the caller that records the failed requests.
     metadata: { labels: { app: loadgen } }
     spec:
       containers:

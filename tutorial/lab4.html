@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Alerts that reach you | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>Alerts that reach you · Lab 4 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -15,6 +16,14 @@
 <p class="eyebrow">Lab 4: alerts</p>
 <h1>Alerts that reach you</h1>
 <p class="lead">A dashboard only helps if someone is looking at it. This lab turns what you learned into eight alerts, and proves each one against the real failure. Six first choices turned out to be wrong, and how they were wrong is the most useful part.</p>
+
+<h2 id="fits">Where this lab fits</h2>
+<p>This lab adds nothing to the app or to how telemetry is collected. It acts on what SigNoz already has.</p>
+<div class="wide arch" data-arch="lab4"></div>
+<table>
+  <thead><tr><th>Part</th><th>In this lab</th></tr></thead>
+  <tbody><tr><td>Alert rules in SigNoz</td><td>Eight rules: three on Lab 1&#x27;s telemetry, and five on Lab 3&#x27;s</td></tr><tr><td>Alert sink</td><td>A small app that stands in for Slack or PagerDuty. SigNoz posts to it with a webhook, so you can see exactly what arrives</td></tr><tr><td>Everything else</td><td>Unchanged, and in use: the rules read what the earlier labs send. Postgres is still seen only from outside</td></tr><tr><td>Not in this lab</td><td>AI (Lab 5)</td></tr></tbody>
+</table>
 
 <h2>Start it</h2>
 <p>Run <code>make lab4</code>. It needs Lab 3, because some rules read Lab 3's metrics. It does three things:</p>

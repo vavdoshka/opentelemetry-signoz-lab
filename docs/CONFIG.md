@@ -53,6 +53,7 @@ The app has no OpenTelemetry code or settings. All of its configuration is in
 |---|---|
 | `inject-python: "true"` on the `lab1` namespace | Opts in every pod in the namespace |
 | `inject-python: "false"` on Postgres | Opts it out, because it isn't a Python app |
+| `inject-python: "false"` on the load generator | Opts it out, because it isn't the app. Labs 1 and 2 only. Lab 3 traces its own on purpose |
 | `exporter.endpoint` set to the SigNoz agent | Sends to the agent on the same node |
 | `sampler: parentbased_always_on` | Keeps every trace, and states the default explicitly |
 | `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true` | Python logs are off by default in the Operator |
@@ -100,7 +101,7 @@ Lab 1. `k8s/app.yaml` sets what Labs 1 and 2 don't, because these give Kubernete
 | `startupProbe` | Start-up is slow under a CPU limit. Holds off liveness until the app is up |
 | `emptyDir` with `sizeLimit: 1Gi` | Puts the `disk` scenario's file on the node's disk, with a cap |
 | `Role` allowing `list pods` in `lab3` | Only used by the `api_flood` and `api_denied` scenarios |
-| Separate `lab3-loadgen` Deployment | Load keeps coming while the workload restarts |
+| Separate `lab3-loadgen` Deployment, traced on purpose | Load keeps coming while the workload restarts, and it records failed calls from the caller's side, which a killed pod can't report |
 | `kernel-log` DaemonSet, privileged, in `k8s/kernel-log.yaml` | Reads each node's `/dev/kmsg` and prints it, so the agent collects the kernel log. The collector can't read it itself |
 | `journal-log` DaemonSet, in `k8s/journal-log.yaml`, kind only | Runs `journalctl` on each node's journal and prints the kubelet's and containerd's entries as JSON. The agents can read the journal's files (group 0), but their image has no `journalctl`. Runs as the agents' user and group, not root. The Lab 3 image installs Debian's `systemd` package for `journalctl`, about 5 MB |
 | `audit-log` DaemonSet, root, in `k8s/audit-log.yaml` | Prints the audit log, which only root can read. The node agents run as user 10001. Running them as root would let them read every root-only file on the node, because they mount its filesystem. This pod has only the audit directory, read-only, with all capabilities dropped |

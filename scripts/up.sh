@@ -83,7 +83,7 @@ cat <<DONE
 Lab 1 is ready.
 
   Lab 1     $LAB1_URL
-  SigNoz    $SIGNOZ_URL  (login in .lab-credentials)
+  SigNoz    $SIGNOZ_URL  (to see the login: cat .lab-credentials)
   Tutorial  run: make tutorial
   Lab 2     run: make lab2
   Lab 3     run: make lab3

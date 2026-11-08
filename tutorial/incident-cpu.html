@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Incident: CPU saturation | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>CPU saturation · Lab 1 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -91,10 +92,19 @@
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>Keep heavy work away from the process that serves requests. Move it to a background job or a worker pool. For a quick improvement, run more than one process, so that one burn cannot hold up every request:</p>
-<figure class="code"><figcaption><span>Proposed change for labs/lab1-hands-off/k8s/app.yaml, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code>           image: telemetry-lab1:dev
+<figure class="code"><figcaption><span>The change for labs/lab1-hands-off/k8s/app.yaml. Deployed on 2026-11-08, then undone. Its benefit wasn&#x27;t shown</span></figcaption><pre><code>           image: telemetry-lab1:dev
            imagePullPolicy: IfNotPresent
 <span class="del">-          command: [&quot;uvicorn&quot;, &quot;backend:app&quot;, &quot;--host&quot;, &quot;0.0.0.0&quot;, &quot;--port&quot;, &quot;8000&quot;]</span><span class="add">+          command: [&quot;uvicorn&quot;, &quot;backend:app&quot;, &quot;--host&quot;, &quot;0.0.0.0&quot;, &quot;--port&quot;, &quot;8000&quot;, &quot;--workers&quot;, &quot;2&quot;]</span></code></pre></figure>
 <p>This one needs care: each worker is its own process with its own copy of the agent. And it only helps while a free worker exists.</p>
+<h3>Try the change</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> Make that edit in <code>labs/lab1-hands-off/k8s/app.yaml</code>, and save it. It&#x27;s YAML, not code, but you deploy it the same way, because <code>make lab1</code> also applies the lab&#x27;s manifests.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
+  <li><strong>Fire the same request, and place orders while it runs.</strong> Compare how long the orders take.<div data-fire="cpu_burn" data-lab="lab1"></div><div data-fire="order" data-lab="lab1"></div></li>
+  <li><strong>Put the bug back,</strong> so the later pages match what they describe.<figure class="code"><pre><code>git restore labs/lab1-hands-off/k8s/app.yaml
+make lab1</code></pre></figure></li>
+</ol>
+<p>We did this once, on a busy shared VM. It deployed and telemetry kept arriving, but four orders during a burn took 78 to 672 ms with two workers, and 134 to 440 ms with one. That&#x27;s too noisy to show a benefit, so measure it on your own hardware before relying on it. Moving the work out of the process is still the real fix.</p>
 <p>Once it is fixed, you want to hear about it before users do. A CPU alert on <code>k8s.pod.cpu.usage</code> would catch this. A fresh install has no alerts, so you need to write that rule yourself (<a href="gaps.html#setup">gap 5</a>). <a href="lab4.html">Lab 4</a> shows how.</p>
 
 <div class="quiz" data-quiz="u1"><p class="q">Check yourself: A 10-second burn shows only about 0.27 cores on a 60-second step. Why?</p><button type="button" data-right="false" data-why="It did. A raw sample shows 0.509 cores.">The burn did not work.</button><button type="button" data-right="true" data-why="A short burst inside a long step gets averaged with idle time. Use a smaller step, max, or a longer burn.">Averaging across the step dilutes a short spike.</button><button type="button" data-right="false" data-why="labs/lab1-hands-off/k8s/app.yaml sets a request, not a limit.">The pod has a CPU limit.</button></div>

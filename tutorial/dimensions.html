@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dimensions and granularity | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>Dimensions and granularity · Lab 2 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -15,6 +16,20 @@
 <p class="eyebrow">Lab 2: custom dimensions</p>
 <h1>Dimensions and granularity</h1>
 <p class="lead">A dimension is anything you can filter or group by. Each one lets you ask a sharper question. Some come for free, and some only your code knows. The skill is choosing where each one belongs.</p>
+
+<h2 id="fits">Where this lab fits</h2>
+<p>Only the code in two services changes. Everything else is the same as in Lab 1.</p>
+<div class="wide arch" data-arch="lab2"></div>
+<table>
+  <thead><tr><th>Part</th><th>In this lab</th></tr></thead>
+  <tbody><tr><td><code>frontend</code>, <code>backend</code></td><td>The same agent as Lab 1, <strong>plus OpenTelemetry API calls in their code</strong>. These add spans such as <code>price_order</code>, attributes such as <code>order.item</code>, and metrics such as <code>orders.created</code></td></tr><tr><td>Postgres</td><td><strong>Still not instrumented.</strong> You get the same view from outside as in Lab 1. <a href="index.html#postgres">What that covers</a></td></tr><tr><td>Operator, node agents, SigNoz</td><td>Unchanged. This lab only adds a dashboard to SigNoz</td></tr><tr><td>Not in this lab</td><td>What Kubernetes itself does (Lab 3), alerts (Lab 4) and AI (Lab 5)</td></tr></tbody>
+</table>
+
+<h2>Start it</h2>
+<p>Lab 2 is the same shop as Lab 1, plus a few lines of OpenTelemetry API code. It runs next to Lab 1, and sends to the same SigNoz:</p>
+<figure class="code"><pre><code>make lab2</code></pre></figure>
+<p>Then start its traffic. Stop Lab 1&#x27;s first, if it&#x27;s still running:</p>
+<div data-load-panel="lab2"></div>
 
 <h2>Two kinds of dimension</h2>
 <table>

@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Incident: slow for no visible reason | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>Slow for no visible reason · Lab 2 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -77,7 +78,16 @@
 
 <h2 class="step" id="fix"><span class="n">7</span>Resolution</h2>
 <p>The fix depends on why the cache misses. In a real app you would look at its size, its expiry time, and what fills it. Here it is a random number, so the simplest change is to make misses rarer, then watch the hit rate on the metric:</p>
-<figure class="code"><figcaption><span>Proposed change for labs/lab2-custom-dimensions/app/backend.py, not applied <span class="badge untested">Untested</span></span></figcaption><pre><code><span class="del">-    hit = random.random() &gt;= 0.33</span><span class="add">+    hit = random.random() &gt;= 0.05</span></code></pre></figure>
+<figure class="code"><figcaption><span>The change for labs/lab2-custom-dimensions/app/backend.py. Tried on 2026-11-08, then undone <span class="badge api">Query API only</span></span></figcaption><pre><code><span class="del">-    hit = random.random() &gt;= 0.33</span><span class="add">+    hit = random.random() &gt;= 0.05</span></code></pre></figure>
+<h3>Try the change</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> Make that edit in <code>labs/lab2-custom-dimensions/app/backend.py</code>, and save it.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab2</code></pre></figure></li>
+  <li><strong>Fire the same request in Lab 2</strong> a few times. It should get faster, because far fewer lookups miss.<div data-fire="cache_miss" data-lab="lab2"></div></li>
+  <li><strong>Re-run the search, Catalogue latency by cache result,</strong> with a time range that starts after you deployed. In our run, the P99 of <code>GET /catalog</code> went from 844 ms to 3.3 ms, and each run of six lookups went from 1 to 2 seconds down to about 35 ms. That&#x27;s only 12 lookups each way, and 5% still miss, so you&#x27;ll see a slow one now and then.</li>
+  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it.<figure class="code"><pre><code>git restore labs/lab2-custom-dimensions/app/backend.py
+make lab2</code></pre></figure></li>
+</ol>
 
 <div class="quiz" data-quiz="cm1"><p class="q">Check yourself: Why is cache.hit a job for your code rather than the agent?</p><button type="button" data-right="false" data-why="There is no rule. It simply has no way to know.">The agent is not allowed to read caches.</button><button type="button" data-right="true" data-why="The agent sees the route, the status and the duration. The hit or miss happens inside your function.">Only your code knows what the cache decided.</button><button type="button" data-right="false" data-why="You can add attributes to any span.">Cache spans are not supported.</button></div>
 <div class="quiz" data-quiz="cm2"><p class="q">Check yourself: Why could the log trick from the last two incidents not solve this one?</p><button type="button" data-right="false" data-why="They can, if something writes them.">Logs cannot hold true or false.</button><button type="button" data-right="true" data-why="Logs only help if a developer already logged the field. You could add one, but it still would not connect to latency.">This route writes no log, so there is no field to find.</button><button type="button" data-right="false" data-why="It is on. This route just never logs.">Lab 1 has logging turned off.</button></div>

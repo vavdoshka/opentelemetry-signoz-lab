@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Slow, then restarted | Telemetry tutorial</title>
-<link rel="icon" href="data:,">
+<title>Slow, then restarted · Lab 3 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -74,6 +75,9 @@ Container workload failed liveness probe, will be restarted</code></pre></figure
   <li><strong>Size limits for bursts, not averages.</strong> Here, a limit that barely fits one request throttles every request.</li>
   <li><strong>Make liveness cheap and forgiving.</strong> A liveness probe should only fail if a restart would help. Killing a busy pod removes capacity when you need it most.</li>
 </ul>
+<div class="note"><p><strong>To try this here:</strong> raise <code>cpu: 200m</code> on the <code>limits</code> line in <code>labs/lab3-kubernetes/k8s/app.yaml</code>, and save it. Then deploy it. <a href="index.html#deploy">What this command does</a>.</p><figure class="code"><pre><code>make lab3</code></pre></figure><p>Check the pod got it, then put the original back, because the other pages need the low limit:</p><figure class="code"><pre><code>kubectl -n lab3 get pod -l app=workload -o jsonpath='{.items[0].spec.containers[0].resources.limits}'
+git restore labs/lab3-kubernetes/k8s/app.yaml
+make lab3</code></pre></figure></div>
 <p>In <a href="lab4.html">Lab 4</a> you turn this into an alert. This pod's normal throttling is 19 to 32%, so a 25% threshold would never stop firing. It uses 50%.</p>
 
 <div class="quiz" data-quiz="t1"><p class="q">Check yourself: CPU reads 0.23 of the limit, and 25% of periods are throttled. How can both be true?</p><button type="button" data-right="false" data-why="Both are right. They measure different things over different time spans.">One of the metrics must be wrong.</button><button type="button" data-right="true" data-why="A short burst can use up a period&#x27;s quota while the long-run average stays low.">Throttling happens within 100 ms periods, and a 30-second average hides it.</button><button type="button" data-right="false" data-why="The limit is what causes the throttling.">The limit only applies to memory.</button></div>

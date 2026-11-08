@@ -192,6 +192,14 @@ long-lived connections, so whatever was pinned to that pod lost its logs. In thi
 events, so the "killed by a liveness probe" alert didn't fire for a real kill, and the kernel log's record of an
 OOM kill never arrived. No health check or restart revealed it. Deleting the pod fixed it at once.
 
+**It can stop all logs.** It recurred on 2026-11-08. Two load generators, started 3 seconds apart at 21:37, and then
+an image build overloaded the VM. ClickHouse failed its liveness probe from about 21:40, restarted twice, and was
+back at 21:51. This time both replicas got stuck, with the same `PrepareBatch` error. The last log written was at
+21:39:57. At 22:24, 44 minutes later, both pods were still `1/1 Running` with 0 restarts, had each logged over 100
+`Dropping data` lines, and SigNoz had 0 logs from the last 15 minutes but 897 spans. ClickHouse had 0 merges and no
+read-only replicas. Deleting both pods brought linked logs back within 14 seconds. The smoke test's "logs linked to
+traces" step is what exposed it, so that step now prints this diagnosis.
+
 This matches an open issue, [signoz-otel-collector#965](https://github.com/SigNoz/signoz-otel-collector/issues/965)
 "clickhouselogsexporter: pushToClickhouse deadlocks when the consumer exits early", which others confirm on
 v0.144.15, the version here and the latest release at the time of writing. A commenter there reproduced it from
@@ -203,6 +211,10 @@ a timeout during export. Until it's fixed:
 
 ### 7. Smaller issues
 
+- **The namespace annotation traces everything in it, including a traffic generator.** Load generators made 24%
+  of stored spans (12,904 of 54,044), appeared on Services and the Service Map, and made traces start in a different
+  place from a real click. So Labs 1 and 2 opt them out. Lab 3 keeps its own: a killed pod can't report itself, but
+  its caller can.
 - **Span noise:** more than half of stored spans (47,450 of 84,695) are zero-length ASGI `http send` and
   `http receive` spans. `FastAPIInstrumentor.instrument_app` has an `exclude_spans` argument that
   should remove them, but it is a code argument, and the injected agent has no setting for it
@@ -357,6 +369,40 @@ Same load each time. All setups listed `backend` in every last-60-seconds check.
 - **Restarting an agent leaves a gap.** The agent Service's `Local` policy has no fallback, so
   apps on that node failed 4 metric exports during one restart.
 - **In-process state breaks with replicas.** The load generator had to become its own Deployment.
+
+## The proposed fixes, tried
+
+The incident pages used to mark their fixes as untested, and said "deploy it" without saying how. On 2026-11-08 each
+one was applied exactly as written, deployed with `make lab1` or `make lab2`, checked by firing the same scenario, and
+undone with `git restore`. The repo keeps the bugs, because the pages need them.
+
+| Page | Change | Before | After |
+|---|---|---|---|
+| An unhandled error | Reject an empty basket | HTTP 500 | HTTP 422. On the Exceptions page, `ZeroDivisionError` stayed at count 8 after 6 more requests |
+| A latency spike | Remove the sleep | `/work/slow` P99 3,033 ms | 7 ms, over 8 requests each |
+| A cross-service failure | Remove the exception | HTTP 502 | HTTP 200. `RuntimeError` stayed at count 4 |
+| A slow SQL query | `statement_timeout=1000` | HTTP 200 in 2.2 s | HTTP 500 in 1.5 s, with a failed `SELECT` span and `psycopg.errors.QueryCanceled` |
+| A timeout | `timeout=4.0` | HTTP 504 in 1.1 s | HTTP 200 in 3.1 s |
+| CPU saturation | `--workers 2` | Orders during a burn: 134 to 440 ms | 78 to 672 ms. Deployed and sent telemetry, but this one run shows no benefit |
+| A customer quotes a trace ID | Add the API and a trace ID to errors, in Lab 1 | No `trace_id` | `trace_id` in the error response |
+| The instrumentation code | A manual span in Lab 1 | No such span | 3 `list_orders` spans, each with `orders.returned` |
+| Only one product is slow | Remove the sleep for `catering` | `catering` P99 1,507 ms | 23 ms, level with the others |
+| Revenue dropped with no errors | Apply the discount properly | Revenue 0, 5 orders priced at zero | Revenue 113.81, 0 priced at zero |
+| Slow for no visible reason | Fewer cache misses | `GET /catalog` P99 844 ms | 3.3 ms, over 12 lookups each |
+
+Also measured:
+
+- **`make lab1` and `make lab2` took 45 to 101 seconds.** They stop any traffic you started, because they restart the
+  load generator. Postgres doesn't restart, so orders stay: 2,842 before a deploy, 2,864 after, with the smoke test's
+  orders added.
+- **Undoing a fix matters.** The latency fix removes a sleep that the `timeout` scenario shares, so with it in place that
+  scenario answered 200 in 156 ms, and no longer timed out.
+- **`docker build` failed once** with `failed to prepare extraction snapshot`, during several rebuilds in a row. Running
+  the same command again worked.
+- **A second request soon after an unhandled exception can fail.** Firing `crash` three times in a row usually gave one
+  `502 Bad Gateway`, and the Exceptions page listed `httpx.ReadError` and `httpx.RemoteProtocolError` we hadn't triggered.
+  These stopped when the crash was fixed. The likely reason is that the server closes the connection after an unhandled
+  exception, and the next request tries to reuse it. That wasn't confirmed.
 
 ## Kubernetes coverage
 
