@@ -278,7 +278,9 @@ The full write-ups:
 
 "Yes" for Labs 1 and 2 means they boot from nothing and `make compare` gives the same results.
 Rerunning `make up` is tested in the e2e workflow and on both providers on macOS. Recovery after
-stopping the cluster is tested on k3d on macOS, with Labs 1 to 3. Other platforms, including Windows and Linux on
+stopping the cluster is tested on k3d on macOS, with Labs 1 to 3. Lab 5's MCP server, read-only access and
+alert routing are tested in the e2e workflow on both providers, with no Claude login. The AI itself ran on k3d on
+macOS, headless, and OpenCode was only checked to connect. Other platforms, including Windows and Linux on
 ARM, are untested.
 
 ## Troubleshooting
