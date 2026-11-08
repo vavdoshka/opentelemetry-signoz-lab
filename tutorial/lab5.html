@@ -114,7 +114,7 @@ claude</code></pre></figure>
 <span class="ln">10</span>  },
 <span class="ln">11</span>  // The last matching rule wins, and anything unmatched asks you. SigNoz&#x27;s key
 <span class="ln">12</span>  // and the Kubernetes account are what really stop changes. These rules just</code></pre></figure>
-<p>It reads <code>AGENTS.md</code> by itself. Start it with <code>KUBECONFIG=$PWD/.kubeconfig opencode</code>. We checked that it connects, with OpenCode 2.2.5: <code>opencode mcp list</code> shows <code>signoz connected</code>. We didn't run an investigation with it. <span class="badge untested">Untested</span></p>
+<p>It reads <code>AGENTS.md</code> by itself. Start it with <code>KUBECONFIG=$PWD/.kubeconfig opencode</code>. We checked that it connects, with OpenCode 2.2.5: <code>opencode mcp list</code> shows <code>signoz connected</code>. Twice, its first run in the workspace said <code>No MCP servers configured</code> instead, and the next run connected, so try it again before suspecting the config. We didn't run an investigation with it. <span class="badge untested">Untested</span></p>
 <h3>Codex</h3>
 <p>From the MCP server's documentation. Codex wasn't installed here, so this hasn't been run. <span class="badge untested">Untested</span></p>
 <figure class="code"><pre><code>codex mcp add signoz --url http://mcp.localhost:8080/mcp</code></pre></figure>
