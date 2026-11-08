@@ -15,7 +15,7 @@
 <p class="eyebrow">Lab 5: AI analysis</p>
 <h1>Investigate alerts by itself</h1>
 <p class="lead">A person gets paged and starts from a one-line alert. Here, your own agent has already looked, and its report is waiting for them.</p>
-<ul class="steps" aria-label="Steps on this page"><li><a href="#start">1. Start it</a></li><li><a href="#trigger">2. Trigger it</a></li><li><a href="#path">3. What happens</a></li><li><a href="#report">4. What it found</a></li><li><a href="#limits">5. What keeps it under control</a></li></ul>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#start">1. Start it</a></li><li><a href="#trigger">2. Trigger it</a></li><li><a href="#how">3. What happens</a></li><li><a href="#report">4. What it found</a></li><li><a href="#limits">5. What keeps it under control</a></li></ul>
 
 <h2 class="step" id="start"><span class="n">1</span>Start it</h2>
 <p>There's nothing new to install or log in to. The agent is the one you already use, in the workspace from <a href="lab5.html">the last page</a>. In a terminal, from the repo's root:</p>
@@ -29,7 +29,7 @@ make investigate HARNESS=codex</code></pre></figure>
 <div data-fire="slow_query" data-lab="lab1" data-hint="Runs SELECT pg_sleep(2) in the backend. Press it three times. The investigation costs about $0.25 on Sonnet 5.5, on your plan or API key."></div>
 <div data-investigations></div>
 
-<h2 class="step" id="path"><span class="n">3</span>What happens</h2>
+<h2 class="step" id="how"><span class="n">3</span>What happens</h2>
 <figure class="code"><pre><code>a real failure
       │
       ▼
