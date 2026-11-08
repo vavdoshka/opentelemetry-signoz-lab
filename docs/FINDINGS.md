@@ -438,7 +438,7 @@ spans were stored twice, all from that batch, each with the same span ID as its 
 | `kube-system` pods | No: the chart excludes the namespace | Yes. About 2 lines a minute here |
 | Kernel log | No | Yes, through a DaemonSet |
 | kubelet, API server and scheduler on k3s | No: they go to k3s's output, which k3d sends to `docker logs` | Yes. k3s's `--log` flag, set when the cluster is created, also writes `/var/log/k3s.log`, and the agents read it |
-| kubelet on kubeadm clusters | No: it's in journald | No. The `journald` receiver needs `journalctl` |
+| kubelet and containerd on kubeadm clusters | No: they're in journald | Yes on kind, through a pod that runs `journalctl`. The agents' image has none, and the `journald` receiver needs it |
 | Control plane on kubeadm clusters | No: it runs in `kube-system` | Yes. In CI on kind, `kube-controller-manager` logs arrived |
 | API server audit log | No: off by default | Yes. API server flags set when the cluster is created, and a reader pod, because only root can read the file |
 
@@ -459,6 +459,13 @@ node agents run as user 10001 in group 0, which is how they read pod logs (mode 
 node filesystem they mount, such as the kubelet's keys. So `labs/lab3-kubernetes/k8s/audit-log.yaml`
 runs `tail -F` as root, with only the audit directory mounted read-only and all capabilities dropped,
 and the agents read its output.
+
+**kind's journal needs a reader, but not root.** kind keeps it in memory at `/run/log/journal`, about
+8 MB a node, mode 0640 in a 0750 directory, so group 0 can read it, as the agents do. It's binary,
+though, and only `journalctl` reads it. `labs/lab3-kubernetes/k8s/journal-log.yaml` runs `journalctl`
+as user 10001 in group 0 and prints the kubelet's and containerd's entries as JSON. `journalctl` 257,
+from the Lab 3 image, read kind 0.22's systemd 252 journal. Both services wrote nothing in an idle
+minute, and 84 lines across two nodes while the reader started and CoreDNS restarted.
 
 **Most of k3s's ERROR lines are routine.** While a worker restarted and the labs redeployed, k3s logged 52
 ERROR lines in 7 minutes: 27 `RemoveStaleState: removing container`, 23 lookups of containers that were

@@ -52,6 +52,6 @@ nodes:
 
   - role: worker
 
-# On both nodes the kubelet runs under systemd and logs to journald. The node
-# agents can't read that, because their image has no journalctl, so on kind the
-# kubelet's logs aren't collected.
+# On both nodes the kubelet and containerd run under systemd and log to
+# journald. The node agents' image has no journalctl, so Lab 3's
+# labs/lab3-kubernetes/k8s/journal-log.yaml reads the journal for them.

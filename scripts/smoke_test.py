@@ -51,6 +51,8 @@ def smoke_test_lab3(token):
     )
     if os.environ.get("PROVIDER") == "k3d":
         wait_for("k3s's own log", lambda: count(token, "logs", "service.name = 'k3s'", minutes=10), timeout=420)
+    if os.environ.get("PROVIDER") == "kind":
+        wait_for("the kubelet's log, from journald", lambda: count(token, "logs", "service.name = 'kubelet'", minutes=10), timeout=300)
     print("Smoke test passed: the workload, all four scrape jobs and the node logs are reaching SigNoz.")
 
 

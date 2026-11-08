@@ -1,0 +1,61 @@
+# Puts the kubelet's and containerd's logs into SigNoz on kind, and on other
+# kubeadm clusters where they run under systemd.
+#
+# There they log to journald, not to a file. The node agents could read the
+# journal's files, but they're in journald's own binary format, and the agents'
+# image has no journalctl to read them. So this pod runs journalctl and prints
+# each new entry as JSON. The agents read that output with the filelog/journal
+# receiver in ../k8s-infra-values.yaml.
+#
+# Only `make lab3` on kind applies this. k3d nodes have no journald: k3s's log
+# file covers the kubelet there.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: journal-log
+  namespace: lab3
+spec:
+  selector: { matchLabels: { app: journal-log } }
+  template:
+    metadata:
+      labels: { app: journal-log }
+      annotations:
+        # This isn't an app to trace, so opt out of the namespace's injection.
+        instrumentation.opentelemetry.io/inject-python: "false"
+    spec:
+      # Run on control-plane nodes too, which most clusters keep for system pods.
+      tolerations:
+        - { key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule }
+      containers:
+        - name: journal-log
+          image: telemetry-lab3:dev
+          imagePullPolicy: IfNotPresent
+          # -D reads the mounted journal instead of this container's own.
+          # --lines=0 starts at the end, like the agents do. -o json keeps
+          # each entry on one line, with the service it came from.
+          command:
+            - journalctl
+            - --directory=/run/log/journal
+            - --unit=kubelet
+            - --unit=containerd
+            - --follow
+            - --lines=0
+            - --output=json
+            - --output-fields=MESSAGE,SYSLOG_IDENTIFIER
+          securityContext:
+            # The journal is readable by group 0, so this runs as the same user
+            # and group as the node agents. It doesn't need root.
+            runAsUser: 10001
+            runAsGroup: 0
+            capabilities: { drop: [ALL] }
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          resources:
+            requests: { cpu: 5m, memory: 16Mi }
+            limits: { memory: 64Mi }
+          volumeMounts: [{ name: journal, mountPath: /run/log/journal, readOnly: true }]
+      volumes:
+        # kind keeps the journal in memory, here. Hosts that keep it on disk use
+        # /var/log/journal instead.
+        - name: journal
+          hostPath: { path: /run/log/journal, type: Directory }

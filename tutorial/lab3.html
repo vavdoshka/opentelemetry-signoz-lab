@@ -86,23 +86,23 @@
 
 <h2>The scrape jobs</h2>
 <p>All four are in <code>labs/lab3-kubernetes/k8s-infra-values.yaml</code>. This is the one that adds throttling:</p>
-<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code> lines 42–58</span></figcaption><pre><code><span class="ln">42</span>      # cAdvisor, which is built into the kubelet: throttling and OOM events.
-<span class="ln">43</span>      - job_name: cadvisor
-<span class="ln">44</span>        scrape_interval: 30s
-<span class="ln">45</span>        scheme: https
-<span class="ln">46</span>        metrics_path: /metrics/cadvisor
-<span class="ln">47</span>        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
-<span class="ln">48</span>        tls_config: { insecure_skip_verify: true }
-<span class="ln">49</span>        kubernetes_sd_configs: [{ role: node }]
-<span class="ln">50</span>        relabel_configs:
-<span class="ln">51</span>          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
-<span class="ln">52</span>        metric_relabel_configs:
-<span class="ln">53</span>          - source_labels: [__name__]
-<span class="ln">54</span>            action: keep
-<span class="ln">55</span>            regex: container_cpu_cfs_(throttled_)?periods_total|container_cpu_cfs_throttled_seconds_total|container_oom_events_total
-<span class="ln">56</span>          # An empty container label means the pod&#x27;s cgroup or its pause container.
-<span class="ln">57</span>          - { source_labels: [container], action: drop, regex: &quot;&quot; }
-<span class="ln">58</span>          - { action: labeldrop, regex: id|image|name }</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code> lines 43–59</span></figcaption><pre><code><span class="ln">43</span>      # cAdvisor, which is built into the kubelet: throttling and OOM events.
+<span class="ln">44</span>      - job_name: cadvisor
+<span class="ln">45</span>        scrape_interval: 30s
+<span class="ln">46</span>        scheme: https
+<span class="ln">47</span>        metrics_path: /metrics/cadvisor
+<span class="ln">48</span>        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
+<span class="ln">49</span>        tls_config: { insecure_skip_verify: true }
+<span class="ln">50</span>        kubernetes_sd_configs: [{ role: node }]
+<span class="ln">51</span>        relabel_configs:
+<span class="ln">52</span>          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
+<span class="ln">53</span>        metric_relabel_configs:
+<span class="ln">54</span>          - source_labels: [__name__]
+<span class="ln">55</span>            action: keep
+<span class="ln">56</span>            regex: container_cpu_cfs_(throttled_)?periods_total|container_cpu_cfs_throttled_seconds_total|container_oom_events_total
+<span class="ln">57</span>          # An empty container label means the pod&#x27;s cgroup or its pause container.
+<span class="ln">58</span>          - { source_labels: [container], action: drop, regex: &quot;&quot; }
+<span class="ln">59</span>          - { action: labeldrop, regex: id|image|name }</code></pre></figure>
 <p>Three things to notice:</p>
 <ul>
   <li><strong>The keep-list.</strong> <code>action: keep</code> throws away everything else before it reaches SigNoz. This endpoint has about 3,000 series per node, and this job keeps a handful.</li>
@@ -138,7 +138,7 @@
 <p>Your apps' logs come in by default. The cluster's own logs mostly don't, and each has a different reason:</p>
 <table>
   <thead><tr><th>Log</th><th>Where it is</th><th>Collected?</th></tr></thead>
-  <tbody><tr><td><code>kube-system</code> pods: CoreDNS, Traefik</td><td><code>/var/log/pods</code>, like any pod</td><td><strong>Yes, Lab 3 turns it on.</strong> The chart leaves this namespace out by default</td></tr><tr><td>The kernel log: OOM kills, hardware, the network</td><td><code>/dev/kmsg</code> on each node</td><td><strong>Yes, Lab 3 adds a reader</strong></td></tr><tr><td>k3s: its kubelet, API server, scheduler and controller manager</td><td>k3s's output, which k3d sends to <code>docker logs</code>. The cluster config also writes it to <code>/var/log/k3s.log</code></td><td><strong>Yes, Lab 3 reads the file</strong></td></tr><tr><td>The API server's audit log: who did what</td><td>Off by default. The cluster config turns it on, in a file only root can read</td><td><strong>Yes, Lab 3 adds a reader</strong></td></tr><tr><td>The control plane on kubeadm clusters, such as kind: API server, scheduler, controller manager, etcd</td><td><code>kube-system</code> pods</td><td>Yes, with <code>kube-system</code>. In CI on kind, the controller manager's logs arrived</td></tr><tr><td>kubelet on kubeadm clusters, such as kind</td><td>journald</td><td>No. The <code>journald</code> receiver needs <code>journalctl</code>, and the collector image doesn't have it</td></tr></tbody>
+  <tbody><tr><td><code>kube-system</code> pods: CoreDNS, Traefik</td><td><code>/var/log/pods</code>, like any pod</td><td><strong>Yes, Lab 3 turns it on.</strong> The chart leaves this namespace out by default</td></tr><tr><td>The kernel log: OOM kills, hardware, the network</td><td><code>/dev/kmsg</code> on each node</td><td><strong>Yes, Lab 3 adds a reader</strong></td></tr><tr><td>k3s: its kubelet, API server, scheduler and controller manager</td><td>k3s's output, which k3d sends to <code>docker logs</code>. The cluster config also writes it to <code>/var/log/k3s.log</code></td><td><strong>Yes, Lab 3 reads the file</strong></td></tr><tr><td>The API server's audit log: who did what</td><td>Off by default. The cluster config turns it on, in a file only root can read</td><td><strong>Yes, Lab 3 adds a reader</strong></td></tr><tr><td>The control plane on kubeadm clusters, such as kind: API server, scheduler, controller manager, etcd</td><td><code>kube-system</code> pods</td><td>Yes, with <code>kube-system</code>. In CI on kind, the controller manager's logs arrived</td></tr><tr><td>The kubelet and containerd on kubeadm clusters, such as kind</td><td>journald</td><td><strong>Yes on kind, Lab 3 adds a reader</strong></td></tr></tbody>
 </table>
 <p>Two of these need settings that only take effect when the cluster is created: k3s's log file, and the audit log. They're in <code>cluster/k3d-config.yaml</code> and <code>cluster/kind-config.yaml</code>, so <code>make up</code> turns them on. A cluster created before them needs <code>make down</code> and <code>make up</code>.</p>
 
@@ -229,6 +229,29 @@
 </table>
 <figure class="code"><pre><code>service.name = 'kube-apiserver-audit'   count, grouped by k8s.audit.user, k8s.audit.verb and k8s.audit.resource</code></pre></figure>
 <p><a href="incident-apiserver.html">The API server incident</a> uses it to find who flooded the API server, and the refused requests its metrics never counted.</p>
+
+<h3>The kubelet on kind</h3>
+<p>On kind, as on most kubeadm clusters, the kubelet and containerd run under systemd and log to journald. kind keeps the journal in memory, in <code>/run/log/journal</code>. Its files are readable by group 0, which the node agents run in, but they&#x27;re in journald&#x27;s binary format. The collector&#x27;s <code>journald</code> receiver reads them by running <code>journalctl</code>, and the agents&#x27; image doesn&#x27;t have it. So another small DaemonSet runs <code>journalctl</code> and prints each entry as JSON:</p>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s/journal-log.yaml</code> lines 33–44</span></figcaption><pre><code><span class="ln">33</span>          # -D reads the mounted journal instead of this container&#x27;s own.
+<span class="ln">34</span>          # --lines=0 starts at the end, like the agents do. -o json keeps
+<span class="ln">35</span>          # each entry on one line, with the service it came from.
+<span class="ln">36</span>          command:
+<span class="ln">37</span>            - journalctl
+<span class="ln">38</span>            - --directory=/run/log/journal
+<span class="ln">39</span>            - --unit=kubelet
+<span class="ln">40</span>            - --unit=containerd
+<span class="ln">41</span>            - --follow
+<span class="ln">42</span>            - --lines=0
+<span class="ln">43</span>            - --output=json
+<span class="ln">44</span>            - --output-fields=MESSAGE,SYSLOG_IDENTIFIER</code></pre></figure>
+<p>This one doesn&#x27;t need root. It runs as the same user and group as the node agents:</p>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s/journal-log.yaml</code> lines 46–49</span></figcaption><pre><code><span class="ln">46</span>            # The journal is readable by group 0, so this runs as the same user
+<span class="ln">47</span>            # and group as the node agents. It doesn&#x27;t need root.
+<span class="ln">48</span>            runAsUser: 10001
+<span class="ln">49</span>            runAsGroup: 0</code></pre></figure>
+<p><code>make lab3</code> only applies it on kind: k3d nodes have no journald, and k3s&#x27;s log covers their kubelet. The <code>filelog/journal</code> receiver turns each entry back into a log line, with journald&#x27;s timestamp, the level from the line, and <code>service.name</code> set to <code>kubelet</code> or <code>containerd</code>:</p>
+<figure class="code"><pre><code>service.name = 'kubelet'</code></pre></figure>
+<p>CI checks that these lines reach SigNoz on kind 0.33. On kind 0.22, this reader read the journal and the receiver parsed its output, in a test without SigNoz. Both services are quiet at idle, with no lines in a minute. Starting this reader and restarting CoreDNS made them write 84 lines across the two nodes.</p>
 
 <h3>What you miss without them</h3>
 <p>While checking this, we found the worker node logging about 5,800 lines an hour, which nobody would have seen. It's k3d 5.5.0's own start-up script on worker nodes, retrying this every 3 seconds, forever:</p>

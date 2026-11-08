@@ -102,6 +102,7 @@ Lab 1. `k8s/app.yaml` sets what Labs 1 and 2 don't, because these give Kubernete
 | `Role` allowing `list pods` in `lab3` | Only used by the `api_flood` and `api_denied` scenarios |
 | Separate `lab3-loadgen` Deployment | Load keeps coming while the workload restarts |
 | `kernel-log` DaemonSet, privileged, in `k8s/kernel-log.yaml` | Reads each node's `/dev/kmsg` and prints it, so the agent collects the kernel log. The collector can't read it itself |
+| `journal-log` DaemonSet, in `k8s/journal-log.yaml`, kind only | Runs `journalctl` on each node's journal and prints the kubelet's and containerd's entries as JSON. The agents can read the journal's files (group 0), but their image has no `journalctl`. Runs as the agents' user and group, not root. The Lab 3 image installs Debian's `systemd` package for `journalctl`, about 5 MB |
 | `audit-log` DaemonSet, root, in `k8s/audit-log.yaml` | Prints the audit log, which only root can read. The node agents run as user 10001. Running them as root would let them read every root-only file on the node, because they mount its filesystem. This pod has only the audit directory, read-only, with all capabilities dropped |
 
 `labs/lab3-kubernetes/k8s-infra-values.yaml` adds four scrape jobs to the `k8s-infra` cluster
@@ -117,15 +118,19 @@ collector, and `k8s/metrics-rbac.yaml` gives that collector permission to read t
 - **Each job has a keep-list,** because SigNoz stores everything it's sent. See `FINDINGS.md`.
 - **`presets.logsCollection.blacklist.namespaces: []`** collects `kube-system` pod logs, which the chart
   leaves out by default.
-- **`otelAgent.config` adds two file receivers** on the node agents. `filelog/k3s` reads `/var/log/k3s.log`
-  through the node's `/var/log`, which the agents already mount. It joins multi-line messages, sets the
-  level from each line, and sets `service.name` to `k3s`. `filelog/audit` reads the `audit-log` pod's
-  output, and `presets.logsCollection.blacklist.containers: [audit-log]` stops the chart's own receiver
-  reading it too. It copies the caller, user agent, verb, resource, namespace, path and response code
-  into `k8s.audit.*` attributes, keeps the whole event as the body, and sets `service.name` to
-  `kube-apiserver-audit`. Both run in their own `logs/node` pipeline, because Helm replaces lists:
-  adding them to the chart's `logs` pipeline would mean copying its receiver list. Both start at the
-  end of the file, like the chart's pod logs.
+- **`otelAgent.config` adds three log receivers** on the node agents:
+  - `filelog/k3s` reads `/var/log/k3s.log` through the node's `/var/log`, which the agents already
+    mount. It joins multi-line messages, sets the level from each line, and sets `service.name` to `k3s`.
+  - `filelog/audit` reads the `audit-log` pod's output. It copies the caller, user agent, verb,
+    resource, namespace, path and response code into `k8s.audit.*` attributes, keeps the whole event
+    as the body, and sets `service.name` to `kube-apiserver-audit`.
+  - `filelog/journal` reads the `journal-log` pod's output, on kind. It takes the timestamp from
+    journald and the level from the line, and sets `service.name` to `kubelet` or `containerd`.
+
+  `presets.logsCollection.blacklist.containers: [audit-log, journal-log]` stops the chart's own
+  receiver reading those two pods' output as well. The three run in their own `logs/node` pipeline,
+  because Helm replaces lists: adding them to the chart's `logs` pipeline would mean copying its
+  receiver list. All three start at the end of the file, like the chart's pod logs.
 - **`presets.prometheus.namespaces: [lab3]` matters.** `presets.prometheus.enabled` also turns on an
   annotation job that scrapes SigNoz's own pods. Limiting it to `lab3` turns it off.
 - **`make up` keeps these jobs.** `install_k8s_infra` in `scripts/lib.sh` adds this values file when

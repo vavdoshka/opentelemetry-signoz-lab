@@ -24,6 +24,14 @@ k apply -f "$dir/k8s/app.yaml"
 
 if [ "$1" = 3 ]; then
   k apply -f "$dir/k8s/kernel-log.yaml" -f "$dir/k8s/audit-log.yaml"
+  readers="kernel-log audit-log"
+  # kind's kubelet logs to journald. k3d nodes have no journald, and k3s's log
+  # file covers the kubelet there. Restart this reader first, so it's following
+  # the journal while the others restart, and the smoke test has lines to find.
+  if [ "$PROVIDER" = kind ]; then
+    k apply -f "$dir/k8s/journal-log.yaml"
+    readers="journal-log $readers"
+  fi
   step "Extra scrape jobs and logs"
   k apply -f "$dir/k8s/metrics-rbac.yaml"
   install_k8s_infra
@@ -41,7 +49,7 @@ done
 if [ "$1" != 3 ]; then
   k -n "$namespace" rollout status deployment/postgres --timeout=300s
 else
-  for daemonset in kernel-log audit-log; do
+  for daemonset in $readers; do
     k -n "$namespace" rollout restart "daemonset/$daemonset"
     k -n "$namespace" rollout status "daemonset/$daemonset" --timeout=180s
   done

@@ -14,8 +14,9 @@ presets:
       # you're debugging: CoreDNS and Traefik here. On kubeadm clusters such as
       # kind, the API server, scheduler, controller manager and etcd too.
       namespaces: []
-      # The audit log pod's output is read by filelog/audit below instead.
-      containers: [audit-log]
+      # These pods' output is read by filelog/audit and filelog/journal below
+      # instead.
+      containers: [audit-log, journal-log]
 
   prometheus:
     enabled: true
@@ -89,9 +90,9 @@ presets:
             action: keep
             regex: apiserver_request_total|apiserver_request_sli_duration_seconds_(bucket|sum|count)|apiserver_current_inflight_requests|apiserver_longrunning_requests|apiserver_storage_objects|workqueue_depth|process_cpu_seconds_total|process_resident_memory_bytes|go_goroutines
 
-# Two node logs that aren't ordinary pod logs. Both are only written because
-# cluster/k3d-config.yaml and cluster/kind-config.yaml turn them on when the
-# cluster is created.
+# Node logs that aren't ordinary pod logs. k3s's log file and the audit log
+# are only written because cluster/k3d-config.yaml and cluster/kind-config.yaml
+# turn them on when the cluster is created.
 otelAgent:
   config:
     receivers:
@@ -175,6 +176,48 @@ otelAgent:
           - { type: remove, field: attributes.event }
           - { type: add, field: 'resource["service.name"]', value: kube-apiserver-audit }
 
+      # The kubelet's and containerd's logs from journald, on kind. The agents'
+      # image has no journalctl, so k8s/journal-log.yaml runs a pod that prints
+      # each journal entry as JSON, and this reads that pod's output. On k3d
+      # there's no such pod, and k3s's log covers the kubelet.
+      filelog/journal:
+        include: [/var/log/pods/lab3_journal-log-*/journal-log/*.log]
+        include_file_name: false
+        start_at: end
+        operators:
+          # The same container runtime format as filelog/audit.
+          - type: regex_parser
+            regex: '^\S+ (?P<stream>stdout|stderr) \S+ (?P<line>.*)$'
+          - { type: filter, expr: 'attributes.stream != "stdout"' }
+          - { type: move, from: attributes.line, to: body }
+          - { type: remove, field: attributes.stream }
+          # journald records when each line was written, in microseconds.
+          - type: json_parser
+            parse_to: attributes.entry
+            timestamp: { parse_from: attributes.entry.__REALTIME_TIMESTAMP, layout_type: epoch, layout: us }
+          # kubelet or containerd, so you can search for service.name = 'kubelet'.
+          - { type: move, from: attributes.entry.SYSLOG_IDENTIFIER, to: 'resource["service.name"]' }
+          - { type: move, from: attributes.entry.MESSAGE, to: body }
+          - { type: remove, field: attributes.entry }
+          # journald marks everything these services write as informational, so
+          # take the level from the line, as filelog/k3s does: the kubelet logs
+          # like Kubernetes components, and containerd like k3s.
+          - type: regex_parser
+            if: body matches "^[IWEF]\\d{4} "
+            regex: '^(?P<level>[IWEF])\d{4} '
+            severity:
+              parse_from: attributes.level
+              mapping: { info: I, warn: W, error: E, fatal: F }
+              overwrite_text: true
+          - type: regex_parser
+            if: body matches "^time="
+            regex: '^time="[^"]+" level=(?P<level>\w+)'
+            severity:
+              parse_from: attributes.level
+              mapping: { warn: warning }
+              overwrite_text: true
+          - { type: remove, field: attributes.level, if: "attributes.level != nil" }
+
     service:
       pipelines:
         # A pipeline of their own, so the chart's `logs` pipeline is left as it
@@ -184,6 +227,6 @@ otelAgent:
         # left out: these lines are about the node and the API server, not
         # about the pod that relays the audit log.
         logs/node:
-          receivers: [filelog/k3s, filelog/audit]
+          receivers: [filelog/k3s, filelog/audit, filelog/journal]
           processors: [resourcedetection, batch]
           exporters: [otlphttp]

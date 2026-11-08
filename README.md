@@ -51,8 +51,9 @@ failures, 94 saved searches, and code quoted straight from this repo.
 - Find an OOM kill, when the metric named after it reads 0
 - Read pod, node, kubelet and API server metrics, and tell a pod problem from a node problem
 - Scrape Prometheus endpoints into SigNoz with a keep-list, and see what that costs
-- Collect `kube-system`, k3s, kernel and API server audit logs. Find an OOM kill's process in the kernel
-  log, and who flooded the API server in the audit log
+- Collect `kube-system`, kubelet, kernel and API server audit logs: from k3s's log file on k3d, and
+  from journald on kind. Find an OOM kill's process in the kernel log, and who flooded the API server
+  in the audit log
 - How k3s differs from a real API server
 - See what collects what, and why there's no node-exporter or kube-state-metrics
 
@@ -199,7 +200,7 @@ Lab 4 adds no app of its own. Its rules watch Labs 1 and 3, so these same scenar
 ## Use it on your own cluster
 
 Everything in Labs 3 and 4 is scripted, so you can reuse it. The metrics and logs are a Helm values file
-and three manifests. k3s's log file and the API server's audit log need settings made when the cluster is
+and four manifests. k3s's log file and the API server's audit log need settings made when the cluster is
 created, which are in `cluster/`. The dashboards and alerts come from two scripts that work on any SigNoz, with a service
 account's key:
 
