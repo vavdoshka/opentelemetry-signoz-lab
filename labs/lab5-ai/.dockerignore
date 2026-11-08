@@ -1,5 +1,0 @@
-# Never put these in the image: a token for your cluster, and your machine's
-# own settings.
-workspace/.kubeconfig
-workspace/.claude/settings.local.json
-workspace/.mcp.json

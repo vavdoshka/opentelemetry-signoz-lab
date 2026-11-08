@@ -32,7 +32,7 @@ says nothing about what has gone wrong before: find that out from the data.
   `order.id`, `order.item` and `order.total`. `loadgen` sends it traffic.
 - `lab3`: `lab3-workload`, with limits of 200m CPU and 256Mi memory and a
   liveness probe. `lab3-loadgen` sends it traffic.
-- `lab4`: the alert sink. `lab5`: the MCP server and the investigator.
+- `lab4`: the alert sink. `lab5`: the MCP server.
 - `signoz`: SigNoz itself. It's the observer, not the subject.
 
 ## Where the signals are

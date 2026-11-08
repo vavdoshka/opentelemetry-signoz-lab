@@ -11,6 +11,4 @@ __pycache__/
 labs/lab5-ai/workspace/.kubeconfig
 labs/lab5-ai/workspace/.claude/settings.local.json
 labs/lab5-ai/workspace/.claude/skills/
-
-# Claude login for Lab 5's investigator. Never commit this.
-.lab-ai-credentials
+labs/lab5-ai/reports/

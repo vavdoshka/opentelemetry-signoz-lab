@@ -4,7 +4,7 @@
 1. A SigNoz service account, lab5-ai, with the signoz-viewer role. Its key goes
    into the Kubernetes Secret lab5/signoz-viewer, for the MCP server. SigNoz
    refuses any change made with it.
-2. A kubeconfig for the lab5/ai-reader ServiceAccount, for agents on your
+2. A kubeconfig for the lab5/ai-reader ServiceAccount, for the agent on your
    machine: labs/lab5-ai/workspace/.kubeconfig. RBAC in
    labs/lab5-ai/k8s/reader-rbac.yaml makes it read-only.
 

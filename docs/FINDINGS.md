@@ -568,10 +568,10 @@ field that defaults to 5 minutes. The query uses `evaluation.spec.evalWindow`, a
 
 ## AI analysis
 
-Lab 5 connects Claude Code (2.1.319, Sonnet 5.5) to SigNoz through SigNoz's own MCP server, read-only. SigNoz's
-built-in AI assistant isn't an option when self-hosted: the UI has the code, but it needs a separate backend that
-SigNoz hasn't published, and `ai_assistant_url` is unset. OpenCode 2.2.5 connects to the same server. Codex wasn't
-tested.
+Lab 5 connects your own agent to SigNoz, read-only, through SigNoz's own MCP server. These runs used Claude Code 2.1.319
+on Sonnet 5.5, on the Mac. SigNoz's built-in AI assistant isn't an option when self-hosted: the UI has the code, but it
+needs a separate backend that SigNoz hasn't published, and `ai_assistant_url` is unset. OpenCode 2.2.5 connects to the
+same server, but ran no investigation. Codex wasn't tested.
 
 ### Is it really read-only?
 
@@ -594,30 +594,42 @@ different amounts. That mistake was ours.
 
 ### Alert-triggered, on five known failures
 
-Each run: cause the real failure, wait for the real alert, read the report. One run each, so this is a demonstration,
-not a benchmark. `tutorial/data/ai-evaluation.json` has every report. Collectors dropped nothing during the last four.
-The slow SQL case ran first, just after the stuck collector in gap 6 began failing. Everything it cited still checked out.
+Each run: cause the real failure, wait for the real alert, run the agent, read the report. One run each, so this is a
+demonstration, not a benchmark. Collectors dropped nothing during these runs, and `tutorial/data/ai-evaluation.json`
+has every report.
 
 | Incident | Text check | Reading the report | Alert after | Report after | Cost |
 |---|---|---|---|---|---|
-| Slow SQL | Passed | Complete. Every number and trace ID verified | 301 s | 116 s | $0.24 |
-| API calls refused | Passed | Complete. Audit count of 3,269 exact | 213 s | 23 s | $0.14 |
-| Failing health check | Passed | Complete, including the request that started it | 240 s | 34 s | $0.20 |
-| CPU throttling | Passed | Partial. Mechanism right, didn't find what burned the CPU, and said so | 252 s | 23 s | $0.18 |
-| OOM kill | Passed | Partial. Best evidence, but called a 2 MiB/s leak a sudden spike | 331 s | 33 s | $0.24 |
+| Slow SQL | Passed | Complete. Every number and trace verified | 180 s | 20 s | $0.20 |
+| API calls refused | Passed | Complete. 1,809 in the audit log and the app's own log | 226 s | 33 s | $0.14 |
+| Failing health check | Passed | **Wrong cause.** Found the kill and the 503s, then blamed CPU throttling, at medium confidence | 243 s | 23 s | $0.17 |
+| CPU throttling | Passed | Partial. Mechanism right, didn't find what burned the CPU, and said so | 250 s | 26 s | $0.18 |
+| OOM kill | Passed | Partial. Best evidence, but called a 2 MiB/s leak a sudden allocation | 306 s | 34 s | $0.15 |
 
-**Text checks passed all five, and reading gave 3 complete and 2 partial.** None was wrong about the mechanism.
-We didn't time a person, so we make no claim about speed against one.
+**Text checks passed all five. Reading gave 2 complete, 2 partial and 1 wrong cause.** We didn't time a person, so we
+make no claim about speed against one.
+
+**Runs vary, on the same model and question.** Our first full run, with the same files in a pod, read 3 complete and 2
+partial: it solved the health check by reading `kubectl logs --previous`. A run of the slow SQL case named the wrong
+endpoint, with the same spans in hand, while the next one got it right. A confident report can still be wrong, so
+check its evidence before acting on it.
 
 **It stated an absence that was false.** One OOM report said "zero OOM or kernel 'Killed' log lines in lab3 over 2h",
 but they were there. Those pods have no `service.name`, and its search missed them. Adding the exact filter to
-`AGENTS.md` fixed that search, though that run then missed the app's own log lines. Treat "I found nothing" as its
-weakest claim.
+`AGENTS.md` fixed that search in the runs since. Treat "I found nothing" as its weakest claim.
 
 **It read our testing as a pattern.** It called repeated test runs "recurring", which is reasonable and wrong. It also
-blamed a rollout that our first evaluation script had caused, so we stopped restarting the pod between cases.
+blamed a rollout that our first evaluation script had caused, so we stopped restarting the pod between cases. In the
+health check case above, the throttling it blamed came from the previous test case.
 
-**It caught a weakness in our alert rule:** the OOM rule stays true after a single kill.
+**It caught a weakness in our alert rule,** in an earlier run: the OOM rule stays true after a single kill.
+
+### Local agent, or a pod?
+
+We first ran the investigator as a pod in the cluster. Its reports were no better, and it needed its own year-long
+Claude token, a 438 MB image, a web server and a second alert channel. Now `make investigate` polls Lab 4's sink from your
+machine and runs the agent you already have, with its existing login. The cost is that it only runs while your machine
+and the script do. For a team, you'd run the same command somewhere that stays up.
 
 ### What the setup taught us
 
@@ -630,11 +642,11 @@ blamed a rollout that our first evaluation script had caused, so we stopped rest
 - **MCP's HTTP transport needs `Accept: application/json, text/event-stream`.** curl's default `*/*` passes, but
   Python's urllib sends none, and gets a 400.
 - **SigNoz can watch the AI.** The MCP server's traces show each tool call, and Claude Code's telemetry gives cost per
-  model call. For four investigations that added up to $0.73, exactly what their reports said.
+  model call. For the five investigations that added up to $0.83, exactly what their reports said.
 
 ### Overload, and what it did to the evidence
 
-With Docker at 4 CPUs, three load generators, other containers and a 438 MB image import left Docker's VM with 2% idle
+With Docker at 4 CPUs, three load generators, other containers and a 438 MB image import, from when the investigator was a pod, left Docker's VM with 2% idle
 and a load of about 100. ClickHouse inserts went from about 30 ms to 1.7 s on average. Probes timed out, and Kubernetes
 killed healthy pods, including ClickHouse. It also triggered gap 6, the stuck collector, so a real liveness kill raised no
 alert, and one OOM kill's kernel lines were lost. The agent can't see what never arrived. A test that expected an alert

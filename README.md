@@ -15,7 +15,7 @@ breaks. One command, on k3d or kind.
 | **2. Custom dimensions** | Add a few OpenTelemetry API calls, only where they help | How to slice telemetry by things only your code knows, through four incidents | `make lab2` |
 | **3. Kubernetes** | Run a workload with real limits, scrape the kubelet, cAdvisor and API server, and collect cluster, kernel and API audit logs | How to debug throttling, OOM kills and failed probes, through five incidents, and which metrics quietly miss them | `make lab3` |
 | **4. Alerts** | Add eight alert rules, and a page showing what they send | How to write alerts that fire for real failures, and how long they take | `make lab4` |
-| **5. AI analysis** | Connect an AI agent to SigNoz with read-only access, ask it questions, and let alerts start investigations | How to set it up safely, and how good it is, measured on incidents with known causes | `make lab5` |
+| **5. AI analysis** | Connect your own AI agent to SigNoz with read-only access, ask it questions, and let alerts start investigations | How to set it up safely, and how good it is, measured on incidents with known causes | `make lab5` |
 
 Each lab builds on the one before and adds only what it needs. They run side by side on a local
 two-node cluster and send to the same SigNoz.
@@ -70,7 +70,7 @@ failures, 96 saved searches, and code quoted straight from this repo.
 - Connect Claude Code to SigNoz through SigNoz's MCP server, and see how OpenCode and Codex connect the same way
 - Keep it read-only with limits it can't talk its way past: a SigNoz viewer key and Kubernetes RBAC
 - Ask it about incidents and business data, and check its numbers
-- Start an investigation automatically from an alert, with limits on cost
+- Start your agent automatically from an alert, with limits on cost
 - Measure it: accuracy, time and cost on known failures, and watch what it did in SigNoz itself
 
 **Running it for real**
@@ -140,7 +140,7 @@ make lab2      # custom dimensions
 make compare   # sends Labs 1 and 2 the same requests and shows what each captured
 make lab3      # Kubernetes
 make lab4      # alerts. Needs Lab 3
-make lab5      # AI analysis. Needs Lab 4, and Claude Code for the AI itself
+make lab5      # AI analysis: connects your own agent, such as Claude Code
 ```
 
 | What | Where |
@@ -149,7 +149,6 @@ make lab5      # AI analysis. Needs Lab 4, and Claude Code for the AI itself
 | SigNoz | http://signoz.localhost:8080 (the generated login is in `.lab-credentials`) |
 | Labs 1 to 3 | http://lab1.localhost:8080, and `lab2`, `lab3` in the same form |
 | Alerts received | http://lab4.localhost:8080 |
-| AI investigations | http://lab5.localhost:8080 |
 | MCP server, for agents | http://mcp.localhost:8080/mcp |
 
 Start the load generator on a lab's page, so SigNoz has data to show, and stop it when you finish.
@@ -164,7 +163,8 @@ Start the load generator on a lab's page, so SigNoz has data to show, and stop i
 | `make lab2` | Deploys Lab 2 and its SigNoz dashboard, or redeploys it after you change its code |
 | `make lab3` | Deploys Lab 3, its extra scrape jobs and its dashboards |
 | `make lab4` | Deploys Lab 4's alert sink and rules, and proves a notification gets through. Needs Lab 3 |
-| `make lab5` | Deploys SigNoz's MCP server, read-only access for agents, and the alert investigator, and proves the access is read-only. Needs Lab 4 |
+| `make lab5` | Deploys SigNoz's MCP server and read-only access for agents, and proves the access is read-only |
+| `make investigate` | Runs your own AI agent on Lab 4's alerts as they fire. `HARNESS=claude`, `opencode` or `codex`. Needs Lab 4 |
 | `make compare` | Shows what SigNoz captures from Labs 1 and 2 |
 | `make status` | Shows nodes, pods and URLs |
 | `make tutorial` | Runs the interactive tutorial |
@@ -250,9 +250,10 @@ were surprises:
   apps and people.
 - **Alerts took about 4 minutes to arrive,** and that's by design: SigNoz reads data that's 2 minutes
   old, so late data can land.
-- **An AI agent found the mechanism in all five known failures, for about 20 cents each.** Reading the
-  reports, 3 were complete and 2 partial, although simple text checks passed all five. Once it said a kernel
-  log line didn't exist when it did. One line in its runbook fixed that.
+- **An AI agent investigated five known failures for about 20 cents each, and simple text checks passed all
+  five.** Reading the reports, 2 were complete, 2 partial, and 1 confidently blamed the wrong cause. An earlier
+  run of that same case got it right, so check the evidence. Once it said a kernel log line didn't exist when it
+  did, and one line in its runbook fixed that.
 - **It was right when we were wrong.** We expected an OOM kill, but the overloaded machine's liveness probe
   killed the pod first. The agent reported that, not the obvious story.
 - **A SigNoz collector stopped writing logs and still reported healthy.** For 84 minutes it dropped 19,131
@@ -278,9 +279,9 @@ The full write-ups:
 
 "Yes" for Labs 1 and 2 means they boot from nothing and `make compare` gives the same results.
 Rerunning `make up` is tested in the e2e workflow and on both providers on macOS. Recovery after
-stopping the cluster is tested on k3d on macOS, with Labs 1 to 3. Lab 5's MCP server, read-only access and
-alert routing are tested in the e2e workflow on both providers, with no Claude login. The AI itself ran on k3d on
-macOS, headless, and OpenCode was only checked to connect. Other platforms, including Windows and Linux on
+stopping the cluster is tested on k3d on macOS, with Labs 1 to 3. Lab 5's MCP server and read-only access are
+tested in the e2e workflow on both providers, with no AI. The AI itself ran on k3d on macOS, headless, with Claude
+Code, and OpenCode was only checked to connect. Other platforms, including Windows and Linux on
 ARM, are untested.
 
 ## Troubleshooting

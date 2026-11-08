@@ -2,8 +2,8 @@
 """Scores Lab 5's AI on incidents whose real causes are already known.
 
 For each case this triggers the real failure, waits for the real alert to
-start an investigation, and checks the report for the facts the earlier labs
-established by hand. It measures how long each step took and what it cost.
+reach Lab 4's sink, runs the AI agent on your machine on that alert, and checks
+the report for the facts the earlier labs established by hand. It measures how long each step took and what it cost.
 
 The checks are simple text matches, so they can be fooled: a report that says
 "this was NOT an OOM kill" contains "OOM". So every report is saved in full
@@ -23,12 +23,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from signoz_client import LAB3_URL, LABS, SIGNOZ_URL, request, session
+from investigate_alerts import investigate
+from signoz_client import LAB3_URL, LABS, SIGNOZ_URL, received_alerts, request, session
 
-LAB5_URL = "http://lab5.localhost:8080"
 RESULTS = Path(__file__).resolve().parent.parent / "tutorial/data/ai-evaluation.json"
 ALERT_TIMEOUT_S = 480
-REPORT_TIMEOUT_S = 600
 
 # "must" facts are the root cause. "should" facts are good evidence.
 CASES = {
@@ -72,16 +71,6 @@ CASES = {
 
 def utc(seconds=None):
     return datetime.fromtimestamp(seconds or time.time(), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def investigations():
-    # A busy cluster can drop a request now and then, so try for a minute.
-    for _ in range(12):
-        status, items = request(f"{LAB5_URL}/api/investigations")
-        if status == 200:
-            return items
-        time.sleep(5)
-    raise SystemExit(f"Could not read the investigator (HTTP {status}). Is Lab 5 deployed?")
 
 
 def last_termination(context):
@@ -159,15 +148,14 @@ def score(report, facts):
 
 def run_case(context, name, case):
     print(f"\n=== {name}: {case['rule']}", flush=True)
-    state = wait_until_quiet(case["rule"], seconds=60)
-    if state == "firing":
+    # The OOM rule stays true until the pod that was killed is gone.
+    if name == "oom" and rule_state(case["rule"]) == "firing":
         print("The rule is still firing from an earlier run, so replacing the pod.", flush=True)
         reset_workload(context)
-        state = wait_until_quiet(case["rule"])
+    state = wait_until_quiet(case["rule"])
     if state == "firing":
         return {"case": name, "rule": case["rule"], "error": "The rule was still firing from an earlier run."}
 
-    known = {item["key"] for item in investigations()}
     fired = time.time()
     for url, body in case["fire"]:
         status = fire(url, body)
@@ -176,20 +164,17 @@ def run_case(context, name, case):
         time.sleep(3)
     print(f"Triggered at {utc(fired)}. Waiting for the alert...", flush=True)
 
-    item = None
+    alert = None
     deadline = fired + ALERT_TIMEOUT_S
-    while time.time() < deadline and not item:
-        item = next((i for i in investigations() if i["key"] not in known and i["alertname"] == case["rule"]), None)
+    while time.time() < deadline and not alert:
+        alert = next((a for a in received_alerts() if a["status"] == "firing" and a["labels"].get("alertname") == case["rule"] and a["received_ms"] >= fired * 1000), None)
         time.sleep(5)
-    if not item:
+    if not alert:
         return {"case": name, "rule": case["rule"], "error": f"No alert within {ALERT_TIMEOUT_S} s."}
     alerted = time.time()
-    print(f"Alert reached the investigator after {round(alerted - fired)} s. Investigating...", flush=True)
+    print(f"Alert reached the sink after {round(alerted - fired)} s. Investigating...", flush=True)
 
-    deadline = alerted + REPORT_TIMEOUT_S
-    while time.time() < deadline and item["status"] in ("queued", "running"):
-        time.sleep(5)
-        item = next(i for i in investigations() if i["key"] == item["key"])
+    item = investigate(alert)
     report = item.get("report") or ""
     must, should = score(report, case["must"]), score(report, case["should"])
     kubernetes_says = last_termination(context) if name in ("oom", "liveness") else None
@@ -220,11 +205,12 @@ def main():
     names = sys.argv[2:] or list(CASES)
     previous = json.loads(RESULTS.read_text()) if RESULTS.exists() else {"results": []}
     results = {r["case"]: r for r in previous["results"]}
+    harness_version = subprocess.run(["claude", "--version"], capture_output=True, text=True).stdout.strip()
     for name in names:
         result = run_case(context, name, CASES[name])
         results[name] = result
         ordered = [results[n] for n in CASES if n in results]
-        RESULTS.write_text(json.dumps({"model": "claude-sonnet-5-5", "harness": "Claude Code 2.1.319", "results": ordered}, indent=1) + "\n")
+        RESULTS.write_text(json.dumps({"model": "claude-sonnet-5-5", "harness": harness_version, "results": ordered}, indent=1) + "\n")
         print(json.dumps({k: result.get(k) for k in ("root_cause_found", "must", "should", "seconds_to_alert", "seconds_to_report", "cost_usd", "turns", "error")}), flush=True)
 
     done = [r for r in results.values() if "error" not in r]

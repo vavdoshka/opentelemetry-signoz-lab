@@ -1,0 +1,18 @@
+# Lets an agent on your machine send its own telemetry to SigNoz: Claude Code's
+# cost, tokens and tool calls, turned on in workspace/.claude/settings.json.
+#
+# Pods reach the node agents directly. Your machine can't, so this exposes their
+# OTLP/HTTP port at http://otlp.localhost:8080. It has no login, so anyone who can
+# reach it can send data. Fine on a laptop, not on a shared cluster.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: { name: otlp, namespace: signoz }
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: otlp.localhost
+      http:
+        paths:
+          - path: /v1
+            pathType: Prefix
+            backend: { service: { name: k8s-infra-otel-agent, port: { number: 4318 } } }

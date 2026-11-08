@@ -13,7 +13,6 @@ LAB1_URL="http://lab1.localhost:8080"
 LAB2_URL="http://lab2.localhost:8080"
 LAB3_URL="http://lab3.localhost:8080"
 LAB4_URL="http://lab4.localhost:8080"
-LAB5_URL="http://lab5.localhost:8080"
 
 kind_cluster_exists() {
   command -v kind >/dev/null 2>&1 && kind get clusters 2>/dev/null | grep -qx "$CLUSTER_NAME"

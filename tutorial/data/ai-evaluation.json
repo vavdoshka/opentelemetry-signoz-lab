@@ -1,18 +1,20 @@
 {
  "model": "claude-sonnet-5-5",
- "harness": "Claude Code 2.1.319",
+ "harness": "2.1.319 (Claude Code)",
  "results": [
   {
    "case": "slow_query",
    "rule": "Lab 1: slow database queries",
    "truth": "The backend ran SELECT pg_sleep(2), so the query took 2 seconds.",
-   "triggered": "2026-11-08T14:12:29Z",
-   "seconds_to_alert": 301,
-   "seconds_to_report": 116,
+   "triggered": "2026-11-08T17:34:39Z",
+   "seconds_to_alert": 180,
+   "seconds_to_report": 20,
    "status": "done",
-   "cost_usd": 0.24054450000000002,
+   "cost_usd": 0.2007109,
    "turns": 9,
    "denied": [],
+   "kubernetes_says": null,
+   "collector_drops": 0,
    "must": {
     "names the slow SQL": true
    },
@@ -21,24 +23,24 @@
     "gives the duration": true
    },
    "root_cause_found": true,
-   "report": "**Cause:** Someone deliberately ran the lab1 \"slow_query\" scenario. It calls `GET /work/slow-query?seconds=2`, which makes the backend run `SELECT pg_sleep(...)`, so the alert is firing on a sleep rather than a real database fault.\n\n**Evidence**\n- **Rule:** `signoz_get_alert` shows `max(duration_nano)` over `service.name='lab1-backend' AND db.system='postgresql'`. It fires above 1000 ms, with a 5m rolling window evaluated every minute.\n- **Fire:** `signoz_get_alert_history` (7d) returned one firing row, at 14:16:48 UTC, with value 2,032,733,543 ns (2.03 s). It has no resolved row, so the alert is still firing (the rule's `state` is `firing`).\n- **Slow spans:** `signoz_search_traces` for spans over 500 ms between 13:46 and 14:46 UTC found three `SELECT pg_sleep(%s)` spans at 14:12:29\u201314:12:40 UTC:\n  - 2.033 s, trace `97bede5354321861512ca4f07361b11f`\n  - 2.033 s, trace `80aa4a1b15b7abd0fde0869cb6c0bca3`\n  - 2.010 s, trace `6eda3b00fc0325bc62a45d100be17a46`\n- **Trace detail:** `signoz_get_trace_details` on the first trace shows `POST /api/scenario/{name}` from lab1-frontend with URL `.../api/scenario/slow_query`. That calls `GET /work/slow-query?seconds=2` on `lab1-backend`, which runs the `pg_sleep` span. All three spans came from pod `lab1-backend-5fdf895ff4-zqw8x`.\n- **Secondary:** Two `INSERT INTO orders` spans took 906 ms and 558 ms at 14:14 UTC. Both are under the threshold, so they didn't trigger the alert.\n- **Latency by 5-minute bucket:** max was 2.03 s and p99 was 1.005 s in the 14:10 bucket (392 spans). In the 14:15 bucket max was 240 ms and p99 was 166 ms (365 spans). Only those two buckets came back.\n\n**Confidence:** High that the cause is the injected `pg_sleep` scenario. The rule's own description says the default load generator has no calls this slow, and three spans from one endpoint line up with the fire time. I did not check Postgres or node resource metrics, and I did not find who triggered the scenario. The 14:15 bucket looks normal, so the alert should resolve soon, once the 5-minute window moves past 14:12.\n\n**What would confirm it:** Confirm the alert resolves, and that no further `pg_sleep` spans appear after 14:12:40 UTC.\n\n**Fix:** None is needed if the scenario was intended. If it wasn't, find out who or what called `POST /api/scenario/slow_query`. If you only care about real database slowness, exclude `pg_sleep` from the rule's filter."
+   "report": "**Cause:** Someone triggered the `slow_query` scenario on `lab1`. It deliberately runs `SELECT pg_sleep(2)` through `lab1-backend`. This is not a real database slowdown.\n\n**Evidence**\n- **Rule** (`signoz_get_alert`): the alert watches `max(duration_nano)` for `service.name = 'lab1-backend' AND db.system = 'postgresql'`. It fires above 1000 ms over a 5m rolling window, evaluated every 1m. The rule description says the default load generator has no calls this slow.\n- **History** (`signoz_get_alert_history`, 7d): there were two fires, 17:28:00 to 17:33:00 UTC and again from 17:37:00 UTC. The second was still open when I checked. The peak value was 2.11 s, which is 111% over the threshold.\n- **Slow spans** (`signoz_search_traces`, `minDuration` 1s, last hour): exactly 6 spans, all `SELECT pg_sleep(%s)` and all from pod `lab1-backend-d56854f4f-zxnjx`.\n  - 17:25:13, :18 and :23: 2.009 s, 2.006 s and 2.030 s.\n  - 17:34:39, :44 and :49: 2.005 s, 2.112 s and 2.005 s.\n  - Each burst is 3 calls, 5 s apart. The 2.11 s span matches the alert value.\n- **Trace** (`signoz_get_trace_details`, `c2c985aa123d66323fd5d50892f503eb`): `POST http://lab1.localhost:8080/api/scenario/slow_query` goes to the frontend. That calls `GET /work/slow-query?seconds=2` on the backend, which runs the 2.11 s `pg_sleep` span. Everything returned 200 with no errors.\n- **Database health** (`signoz_aggregate_traces`, 5m buckets): p99 across all Postgres spans was 13\u201319 ms before the bursts. In the two bursts it was 57\u201392 ms, while the max was about 2 s. The 17:25 burst falls in the 17:25 bucket, so the 17:30 bucket (not listed) had no slow spans and the 5m window cleared. The 17:37 fire is the 17:34 burst, which stays in the window until about 17:39\u201317:40.\n\n**Confidence:** High that this is deliberate load. The spans are literal `pg_sleep` calls on an endpoint named `slow-query`, in two bursts of three calls. I did not check Kubernetes events or the apiserver audit log for who triggered it.\n\n**Next steps**\n- The alert should resolve by itself once the 17:34 burst leaves the 5m window, unless more bursts arrive.\n- To confirm nobody else is calling it, search `lab1-frontend` spans with `http.route = '/api/scenario/{name}'`.\n- If this was a test, no fix is needed. I changed nothing."
   },
   {
    "case": "oom",
    "rule": "Lab 3: container OOM killed",
    "truth": "The app leaked memory until the kernel killed it at its 256Mi limit.",
-   "triggered": "2026-11-08T16:11:24Z",
-   "seconds_to_alert": 331,
-   "seconds_to_report": 33,
+   "triggered": "2026-11-08T17:51:29Z",
+   "seconds_to_alert": 306,
+   "seconds_to_report": 34,
    "status": "done",
-   "cost_usd": 0.23732229999999999,
-   "turns": 8,
+   "cost_usd": 0.1485317,
+   "turns": 7,
    "denied": [],
    "kubernetes_says": {
     "reason": "OOMKilled",
     "exitCode": 137,
-    "finishedAt": "2026-11-08T16:13:20Z",
-    "restarts": 1
+    "finishedAt": "2026-11-08T17:53:19Z",
+    "restarts": 2
    },
    "collector_drops": 0,
    "must": {
@@ -50,17 +52,17 @@
     "sees memory growing": true
    },
    "root_cause_found": true,
-   "report": "**Cause:** `lab3-workload-7dcf9f8c8d-czdzx` went through a sudden memory spike and hit its 256Mi limit. The kernel OOM-killed its `uvicorn` process at 16:13:19 UTC, and the alert fired at 16:16:15. The spike looks like a recurring app-level memory burst, not a slow leak.\n\n**Evidence**\n- **Kernel log:** I searched `kernel-log` pods for \"oom\". They show `Memory cgroup out of memory: Killed process 3767198 (uvicorn) ... anon-rss:260184kB` and `oom-kill:constraint=CONSTRAINT_MEMCG`. 260184kB is about 254Mi, essentially the limit. The limit comes from AGENTS.md; I didn't read it from the pod spec.\n- **Memory metric:** I queried `k8s.pod.memory.working_set` for lab3 by pod. This pod sat flat at about 37.7MB. At 16:11 it rose to 58.8MB, then to 190.7MB in the 16:12 bucket, then dropped to 19.0MB at 16:13 after the restart. Those are 1-minute averages, so the true peak was higher.\n- **Recurring pattern:** Alert history (7d) shows 3 distinct pods firing, with the earlier ones on `znqnn` (one fire) and `h46r4` (two fires). `h46r4` showed the same shape, with spikes of 195.6MB and 184.2MB against a baseline of about 55\u201366MB. `948b748b4-x76sr` also spiked to 160.8MB, but I didn't match it to an alert fire.\n- **Not load or CPU:** The pod's logs from 16:10:00 to 16:10:10 are steady `GET /api/work` 200s, about 1 per second, plus health checks. I didn't check CPU or the later seconds before the kill.\n\n**Confidence:** Medium-high that this is a memory spike hitting the 256Mi limit. The spike's trigger is unknown. I didn't find which request or code path allocates the memory, and I didn't pull traces or the logs from the minutes before the kill.\n\n**To confirm:**\n- Search `lab3-workload` traces and logs for 16:11\u201316:13 UTC, looking for slow or large `/api/work` calls.\n- Check whether the spikes line up with a fixed interval, such as a periodic job or request in the workload.\n\n**Fix (nothing applied):**\n- Find and fix the allocation behind the spike. Short term, raise the memory limit above the roughly 260MB peak.\n- Consider lowering the `oom_score_adj` priority or adding a memory request. The pods are `burstable`."
+   "report": "**Cause:** `lab3-workload-5fc949584b-wkdpr` ran out of memory. Its `uvicorn` process was OOM-killed at 17:53:19 UTC after a fast memory ramp, and the container restarted. I couldn't read the cause of the ramp or the container's memory limit.\n\n**Evidence**\n- **Kernel log.** I searched the `kernel-log` pods for \"Memory cgroup\". At 17:53:18\u201319 the log says `Memory cgroup out of memory: Killed process 3929106 (uvicorn) \u2026 anon-rss:259956kB`. That is about 254 MiB, right at the 256Mi limit from AGENTS.md. The cgroup path is `kubepods/burstable/pod9a51a561\u2026`, and `oom_score_adj` is 990.\n- **Memory metric.** I queried `k8s.pod.memory.working_set` for this pod (1-minute max). It sat at about 60 MB until 17:38, then stepped to 63 MB and then 70 MB. The 1-minute samples then read 106 MB, 229.8 MB and 59.5 MB. That is a spike of about 160 MB in two minutes, followed by the restart, and it ended just under the 256Mi limit. That fits a sudden allocation rather than a slow leak.\n- **Kubernetes events (lab3).** After the kill, startup, liveness and readiness probes failed with \"connection refused\" and \"connection reset by peer\", then the container was recreated at 17:53:19\u201320. There was an earlier restart at 17:42:34, when the liveness probe failed with HTTP 503. That is consistent with \"Restarts so far: 2\". I read only the 15 most recent events, so the 17:42 restart's cause is unconfirmed. Earlier probe timeouts at 17:44 also suggest the pod was unhealthy before the kill.\n\n**Confidence:** high that this was an OOM kill, since the kernel log and the memory metric agree. Low on why memory jumped, because I didn't pull traces or logs from `lab3-workload` or check `lab3-loadgen`.\n\n**What would confirm it**\n- Check `lab3-workload` request traces and logs between 17:50 and 17:53.\n- Check whether `lab3-loadgen` sent a burst of traffic.\n- Look for earlier OOM lines in the kernel log, and for a restart count and the 17:42 kill reason in `kubectl describe pod`.\n\n**Fix (nothing applied)**\n- Find and bound the allocation behind the spike, for example a payload size or a cache.\n- Or raise the memory limit above 256Mi.\n- Tune the liveness probe so a busy pod isn't also killed for slow health checks."
   },
   {
    "case": "throttle",
    "rule": "Lab 3: CPU throttled",
    "truth": "The app burned more CPU than its 200m limit, so the kernel throttled it.",
-   "triggered": "2026-11-08T15:47:52Z",
-   "seconds_to_alert": 252,
-   "seconds_to_report": 23,
+   "triggered": "2026-11-08T17:46:51Z",
+   "seconds_to_alert": 250,
+   "seconds_to_report": 26,
    "status": "done",
-   "cost_usd": 0.1763375,
+   "cost_usd": 0.17829100000000003,
    "turns": 9,
    "denied": [],
    "kubernetes_says": null,
@@ -74,24 +76,24 @@
     "gives a throttled share": true
    },
    "root_cause_found": true,
-   "report": "**Cause:** `lab3-workload` runs periodic CPU bursts that pin it at its 200m CPU limit. The kernel throttles it during each burst, and the 2-minute evaluation window catches the burst. This is probably a workload problem, not a mistuned alert, but I haven't checked the burst source.\n\n**Evidence**\n- **Alert rule** (`signoz_get_alert`): the rule is `(throttled_periods / periods) * 100`, averaged over a 2m window, with a threshold of 50. Its description says normal is 20\u201330%. The alert fired at 15:51:24 UTC with a value of 54.3%.\n- **CPU use** (`signoz_query_metrics`, `k8s.pod.cpu_limit_utilization` for this pod, last hour): the pod idles at about 0.15\u20130.45 of its limit. It then jumps to about 1.0 (the full limit) for 5\u20136 minutes at a time. The bursts ran from 15:41 to 15:46 and from 15:48 to 15:51, and the series ends at 1.001 at 15:51, so the last burst was still going when the alert fired.\n- **Alert history** (`signoz_get_alert_history`, 7d, 5 rows):\n  - The previous pod, `7458cc87c5-zpwvh`, fired at 15:06:24 and cleared at 15:12:24, peaking at 98.6%.\n  - This pod fired at 15:25:24 (64.1%), cleared at 15:45:24, and fired again at 15:51:24.\n  - That is recurring, sustained firing across pods, so it follows the workload and not one pod.\n- **Probe failures** (`signoz_search_logs`, lab3 events; `kubectl describe pod`): the container has restarted 3 times. Events show the liveness probe returning 503, and readiness probes timing out or returning 503. The container limit is 200m CPU, the probes have a 3s timeout, and the pod is Burstable.\n\n**Confidence:** medium. The throttling and the CPU pinning at the limit line up in time. I haven't identified what triggers each burst. The restarts may be a consequence of the throttling, or a separate problem.\n\n**What would confirm it**\n- Check `container_cpu_cfs_throttled_periods_total` and the pod's traces (`service.name = 'lab3-workload'`) during 15:48\u201315:51 for the request or job behind the bursts.\n- Check that the 503s from the probes coincide with the bursts.\n\n**Fix (nothing applied)**\n- Raise the CPU limit above 200m, or reduce or spread the burst work.\n- Loosen the probe `timeout` and `failureThreshold`.\n- Keep the 50% threshold. The pod's baseline is 20\u201330% and the real bursts reach 64\u201399%, so the alert is working as intended."
+   "report": "**Cause:** `lab3-workload` is running into its 200m CPU limit, so the kernel throttles it. The CPU use is not a leak or a stuck loop; the pod is working as hard as its limit allows.\n\n**Evidence**\n- **Alert history** (`signoz_get_alert_history`, 7d): one firing transition for this pod, at 17:50:26 UTC, with value 50.62%. There were no earlier fires, so this is a `one-off`.\n- **Throttling** (`container_cpu_cfs_throttled_periods_total`, rate by minute): about 0.1\u20130.5 periods/s until ~17:37. It rose to 1.0\u20131.8 from 17:38 and jumped to 8.1, 8.8 and 14.1 from 17:46.\n- **CPU use** (`k8s.pod.cpu.usage`): about 0.01 cores until 17:37 and 0.03\u20130.1 from 17:38. It sits flat at 0.199\u20130.200 from 17:46, which is exactly the 200m limit. A flat line at the limit means the pod wants more CPU than it can have.\n- **Probes** (`kubectl describe pod`, plus lab3 Kubernetes events in SigNoz): liveness and readiness returned 503 at 17:42:24\u201317:42:34. The kubelet then killed and restarted the container (restart count 1, new start 17:42:36 UTC, which is 18:42:36 +0100 in the describe output). More probe timeouts followed at 17:44:33. The probe has `timeout=3s`, so a throttled process answers `/healthz` too slowly.\n- **Memory:** the limit is 256Mi and the container's last state is `Completed` with exit code 0, not `OOMKilled`. I didn't query memory usage or the kernel logs, so I haven't ruled out memory pressure beyond that.\n\n**Confidence:** medium-high that CPU limit saturation is the cause, because throttling and CPU use agree and flatten at the limit. Medium on the probe failures and restart being a consequence of it; the timing fits but I haven't proven the order.\n\n**Not established:** what drives the extra load. I didn't look at `lab3-loadgen` traffic or at traces. Check request rate for `service.name = 'lab3-workload'` from 17:35 UTC onward to see whether load rose or something in the workload got heavier.\n\n**Fix (nothing applied):** raise the CPU limit above 200m, or lower the load. Also relax the liveness probe (longer `timeout` and `failureThreshold`) so throttling doesn't restart the pod and make things worse."
   },
   {
    "case": "liveness",
    "rule": "Lab 3: killed by a liveness probe",
    "truth": "/healthz started returning 503, so the kubelet killed the container.",
-   "triggered": "2026-11-08T15:43:23Z",
-   "seconds_to_alert": 240,
-   "seconds_to_report": 34,
+   "triggered": "2026-11-08T17:42:22Z",
+   "seconds_to_alert": 243,
+   "seconds_to_report": 23,
    "status": "done",
-   "cost_usd": 0.204675,
-   "turns": 12,
+   "cost_usd": 0.1711442,
+   "turns": 10,
    "denied": [],
    "kubernetes_says": {
     "reason": "Completed",
     "exitCode": 0,
-    "finishedAt": "2026-11-08T15:43:39Z",
-    "restarts": 3
+    "finishedAt": "2026-11-08T17:42:36Z",
+    "restarts": 1
    },
    "collector_drops": 0,
    "must": {
@@ -99,21 +101,21 @@
     "finds the failing check": true
    },
    "should": {
-    "finds what started it": true,
+    "finds what started it": false,
     "sees the restart": true
    },
    "root_cause_found": true,
-   "report": "**Cause:** `lab3-workload`'s `/healthz` started returning 503 right after a `POST /api/scenario/liveness` call hit the app. Three failed probes in a row (`failureThreshold=3`) made the kubelet kill and restart the container. I'm fairly sure of this (medium-high), but I haven't seen what that endpoint does inside the app.\n\n**Evidence**\n- **Rule:** `signoz_get_alert` shows it counts `k8s.event.reason = 'Killing'` events containing \"failed liveness probe\" in `lab3`, and it fires on any count above 0. The alert is real, not a threshold tickle.\n- **Kubernetes events:** `signoz_search_logs` on `lab3` events shows `Liveness probe failed: HTTP probe failed with statuscode: 503` at 15:43:24 and 15:43:29 UTC. A `Killing \u2026 failed liveness probe, will be restarted` event followed at 15:43:34 UTC for pod `h46r4`. The alert fired at 15:46:43 UTC.\n- **Probe config:** `kubectl describe pod` shows the liveness probe is `/healthz`, 3s timeout, every 5s, 3 failures allowed. The pod has 3 restarts, and Killing events appear 33 minutes and 4 minutes before the describe. The last container state was \"Completed, exit 0\", so it was stopped cleanly rather than OOM-killed.\n- **Previous container log:** `kubectl logs --previous` shows `POST /api/scenario/liveness` returned 200. Right after it, `GET /healthz` returned 503, then three more 503s, then \"Shutting down\". `/api/work` kept returning 200 throughout. The app was still serving traffic, and only its health endpoint failed.\n\n**Ruled out**\n- **Memory kill:** exit code 0, no OOM reason.\n- **Slow startup:** the startup probe only failed with connection refused in the first minutes of the pod's life. These liveness failures are 503 responses.\n\n**Not checked**\n- **CPU throttling:** my `container_cpu_cfs_throttled_periods_total` query returned no series, so I can't rule it out. I also never ran a CPU or memory comparison against a baseline window, so there's no number for resource pressure.\n- **Earlier fire:** the history shows one earlier fire on 15:02 UTC for the old pod `x76sr`. That pod was deleted at 15:02:46 by a rollout, so the two fires aren't a flap pattern. I didn't look into why that one fired.\n\n**Confirm**\n- Find out what `/api/scenario/liveness` does. The lab loadgen or a test may be calling it on purpose.\n- Query `service.name = 'lab3-workload'` logs for `/api/scenario/liveness`.\n\n**Fix**\n- If the scenario call is deliberate, this is expected behaviour.\n- If not, stop whatever calls that endpoint.\n- Either way, consider making `/healthz` independent of the app's work state. Also make the alert group by deployment rather than pod name, so a restart doesn't look like a new alert."
+   "report": "**Cause:** `lab3-workload` stopped answering `/healthz` in time, so the kubelet killed and restarted the container. Under 200m CPU, CPU throttling is the likeliest reason it was slow, but I didn't confirm that.\n\n**Evidence**\n- `signoz_search_logs` on Kubernetes events in `lab3` (last 2h) shows the pod's probe failures:\n  - 17:42:24\u201317:42:34: four `Liveness probe failed: HTTP probe failed with statuscode: 503` events, then `Container workload failed liveness probe, will be restarted` at 17:42:34.\n  - 17:42:39: `Startup probe failed: connection refused`, which is the restart coming up.\n  - 17:44:33: a new `Liveness probe failed \u2026 context deadline exceeded (Client.Timeout exceeded while awaiting headers)`. The container is timing out again, so the restart did not fix it. The alert fired at 17:45:49.\n- `signoz_query_metrics` on `container_cpu_cfs_throttled_periods_total`, grouped by `pod`:\n  - Throttled periods ran at about 0.03\u20130.5/s until 17:37, then 1.0 at 17:38 and 1.42 at 17:39. They hit 1.77 at 17:43, and the last reading (about 17:44) was 0.72.\n  - That is roughly 3\u20135\u00d7 the earlier rate. The jump starts about 4 minutes before the first probe failure.\n- `k8s.pod.cpu_limit_utilization`: about 0.03\u20130.10 until 17:37, then 0.49 at 17:38 and 0.48 at 17:39. It settled at 0.15\u20130.26 afterwards. The pod is not pinned at its limit.\n- The kernel log (`k8s.pod.name CONTAINS 'kernel-log'`, searching \"kill\") returned 0 rows in the last 2h, so I found no OOM kill.\n\n**Confidence:** medium. The timing lines up: a CPU burst and throttling began at 17:38, and probe failures followed. I have not shown that the throttling is what made `/healthz` slow. Utilization is under the limit, but a short burst against a 200m limit can still be throttled within a scheduling period.\n\n**What would confirm it**\n- Check what the app did at 17:38. `lab3-workload` traces and logs from 17:35\u201317:45 would show it, and I didn't query them.\n- Compare the throttled-period ratio with the probe's `timeoutSeconds`.\n\n**Fix (nothing applied)**\n- Raise the CPU limit, or remove it.\n- Loosen the liveness probe's `timeoutSeconds` and `failureThreshold`.\n- Add a startupProbe so slow starts aren't killed.\n- Make `/healthz` cheap and independent of request load."
   },
   {
    "case": "api_denied",
    "rule": "Lab 3: API calls denied",
    "truth": "The workload's ServiceAccount listed secrets, which its Role doesn't allow.",
-   "triggered": "2026-11-08T15:39:26Z",
-   "seconds_to_alert": 213,
-   "seconds_to_report": 23,
+   "triggered": "2026-11-08T17:38:01Z",
+   "seconds_to_alert": 226,
+   "seconds_to_report": 33,
    "status": "done",
-   "cost_usd": 0.1412571,
+   "cost_usd": 0.13550210000000001,
    "turns": 8,
    "denied": [],
    "kubernetes_says": null,
@@ -127,7 +129,7 @@
     "points at permissions": true
    },
    "root_cause_found": true,
-   "report": "**Cause:** The `lab3-workload` pod (`lab3-workload-5955c5b764-h46r4`) keeps calling `list secrets` in namespace `lab3`. Its service account, `system:serviceaccount:lab3:workload`, has no RBAC permission for that, so the API server returns 403 each time.\n\n**Evidence**\n- **Alert rule** (`signoz_get_alert`): it counts `lab3-workload` Client spans with `response_status_code = 403`. The threshold is above 10 in total over a 2m rolling window. 494 is well over that.\n- **Audit log, last 1h** (`signoz_aggregate_logs` on `kube-apiserver-audit`, code \u2265 400):\n  - `lab3:workload` `list secrets` returned 403 3,269 times.\n  - The next largest are 409 conflicts from kube-system controllers (13 and 9) and 1 admin 403, which is noise.\n- **Sample audit events** (`signoz_search_logs`): the message reads `secrets is forbidden: User \"system:serviceaccount:lab3:workload\" cannot list resource \"secrets\" ... in the namespace \"lab3\"`. The user agent is `python-httpx/0.28.1`. The decision is `forbid`. The latest events are at 15:41:26 UTC, just before the alert started firing at 15:42:21.\n- **Rate, 6h series in 15-minute buckets:** the audit series has only two buckets, 1,469 (the 15:00 bucket) and 1,800 (the 15:30 bucket, partial). The denials therefore began in the last ~1.5h, and I didn't pin down the exact start. The sample events show 403s only; the 3,269-row hourly total is all 403s, but I didn't separately confirm each came from the same pod.\n\n**Confidence:** High that this is the denial source. Several signals agree: the same user, the same pod, and the same resource in the audit log. The alert rule's span filter is consistent with it. Medium on why it began recently, because I didn't find the trigger.\n\n**What would confirm it:**\n- Check the first 403 timestamp against `lab3-workload` rollouts and Kubernetes events (`k8s.event.reason`) in `lab3`.\n- Check whether the pod's `list secrets` calls are intentional.\n- Run `kubectl describe pod lab3-workload-5955c5b764-h46r4 -n lab3`.\n\n**Fix (I applied nothing):**\n- If the workload needs secrets, add a narrowly scoped Role and RoleBinding for `list` on the specific secrets.\n- If it doesn't, remove the call in the app, or find the recent change that added it. It is probably retrying in a tight loop, given the rate."
+   "report": "**Cause:** The `lab3-workload` service account is trying to list Secrets in namespace `lab3`, and the API server refuses every attempt with 403 because RBAC doesn't allow it.\n\n**Evidence**\n- **Rule definition** (`signoz_get_alert`): it counts `lab3-workload` client spans with `response_status_code = 403`. It fires when the total over a 2m window is above 10, so 822 is far past the threshold.\n- **Audit log** (`signoz_aggregate_logs`, `kube-apiserver-audit`, code \u2265 400, last 1h): the top row is `system:serviceaccount:lab3:workload`, verb `list`, resource `secrets`, code 403, with 1809 events.\n  - Next largest is 24 controller 409s (update on deployments).\n  - There are also 3 `system:admin` list-secrets 403s.\n- **Workload log** (`signoz_search_logs`, 17:40:02 UTC): `finished calling /api/v1/namespaces/lab3/secrets: {403: 1809}`. This matches the audit count exactly.\n- **Timing** (5-minute time series of the same 403s): 1775 in the 17:35 bucket and 34 in the current partial bucket. Nothing appears in the earlier buckets, so I didn't find a start time before about 17:35. I only read 2h of history and did not call `signoz_get_alert_history`.\n\n**Confidence:** High that the cause is this 403 stream, because the alert query, the audit log and the app's own log all agree. Medium on why it started. I didn't read the Role or RoleBinding, and I couldn't read RBAC changes from the audit log.\n\n**What would confirm it:** `kubectl describe role,rolebinding -n lab3` should show no `secrets` `list` permission for the `workload` account. The audit log for `rolebindings` and `roles` in `lab3` shortly before 17:35 may show a removed grant.\n\n**Fix (not applied):**\n- If the workload should read Secrets, add a Role with `list` on the specific Secrets it needs, and bind it to `lab3:workload`.\n- If it shouldn't, remove or stop the code that lists Secrets. The 403s are RBAC working as intended, so don't widen permissions."
   }
  ]
 }

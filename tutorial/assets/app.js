@@ -771,17 +771,17 @@
     setInterval(refresh, 5000);
   }
 
-  /* What Lab 5's investigator has reported, newest first. */
+  /* What `make investigate` has saved, newest first. */
   function renderInvestigations(host) {
     host.classList.add('panel');
     const status = el('p', { class: 'meta', style: 'color:var(--muted);font-size:.88rem;margin:.25rem 0 .5rem', role: 'status' });
     const box = el('div');
-    const notRunning = 'Lab 5 is not running. Start it with: make lab5';
+    const notRunning = 'Could not read the reports. Is the tutorial server running?';
     const show = (items) => {
       box.textContent = '';
       status.textContent = items.length
         ? 'Refreshes every 10 seconds. Times are UTC.'
-        : 'No investigations yet. An alert takes about 4 minutes to fire. Refreshes every 10 seconds.';
+        : 'No reports yet. Run make investigate in a terminal. An alert takes about 5 minutes to fire. Refreshes every 10 seconds.';
       items.slice(0, 5).forEach((item) => {
         const facts = [item.status];
         if (item.startsAt) facts.unshift('fired ' + item.startsAt.slice(11, 19));

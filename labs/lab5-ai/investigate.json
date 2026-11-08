@@ -1,19 +1,38 @@
 {
-  "channel": {
-    "name": "lab5-investigator",
-    "displayName": "Lab 5 investigator",
-    "config": { "kind": "webhook", "spec": { "url": "http://investigator.lab5.svc.cluster.local:8000/webhook" } }
-  },
   "investigate": [
-    { "rule": "Lab 1: slow database queries", "why": "The alert only says a query took over a second. Which query, and why, takes a trace search." },
-    { "rule": "Lab 3: container OOM killed", "why": "Several signals disagree about OOM kills. A good answer has to pick the right ones." },
-    { "rule": "Lab 3: CPU throttled", "why": "Average CPU hides throttling, so it tests whether the agent reads the right metric." },
-    { "rule": "Lab 3: killed by a liveness probe", "why": "The cause is in the app, not in Kubernetes, which only reports the kill." },
-    { "rule": "Lab 3: API calls denied", "why": "The API server's metrics miss these. The audit log and client spans have them." }
+    {
+      "rule": "Lab 1: slow database queries",
+      "why": "The alert only says a query took over a second. Which query, and why, takes a trace search."
+    },
+    {
+      "rule": "Lab 3: container OOM killed",
+      "why": "Several signals disagree about OOM kills. A good answer has to pick the right ones."
+    },
+    {
+      "rule": "Lab 3: CPU throttled",
+      "why": "Average CPU hides throttling, so it tests whether the agent reads the right metric."
+    },
+    {
+      "rule": "Lab 3: killed by a liveness probe",
+      "why": "The cause is in the app, not in Kubernetes, which only reports the kill."
+    },
+    {
+      "rule": "Lab 3: API calls denied",
+      "why": "The API server's metrics miss these. The audit log and client spans have them."
+    }
   ],
   "not_investigated": [
-    { "rule": "Lab 1: error rate above 20%", "why": "The load generator injects errors on purpose, so this fires often, and each firing would start a paid investigation." },
-    { "rule": "Lab 1: error logs", "why": "Fires with the injected errors too, for the same reason." },
-    { "rule": "Lab 3: telemetry stopped", "why": "Fires as a side effect of the kills above, which already get investigated." }
+    {
+      "rule": "Lab 1: error rate above 20%",
+      "why": "The load generator injects errors on purpose, so this fires often, and each firing would start a paid investigation."
+    },
+    {
+      "rule": "Lab 1: error logs",
+      "why": "Fires with the injected errors too, for the same reason."
+    },
+    {
+      "rule": "Lab 3: telemetry stopped",
+      "why": "Fires as a side effect of the kills above, which already get investigated."
+    }
   ]
 }

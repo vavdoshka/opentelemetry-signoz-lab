@@ -152,7 +152,7 @@ shows it at `lab4.localhost:8080`. To use a real service, change the channel's `
 
 ## Lab 5: AI analysis
 
-`make lab5` deploys these. It needs Lab 4, because it investigates Lab 4's alerts.
+The agent is the one on your machine, with the login it already has. `make lab5` only deploys what it connects to:
 
 | What | Where | Why |
 |---|---|---|
@@ -162,16 +162,25 @@ shows it at `lab4.localhost:8080`. To use a real service, change the channel's `
 | `ANALYTICS_ENABLED=false` | `mcp.yaml` | No product analytics |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME=signoz-mcp` | `mcp.yaml` | The server's own traces go to SigNoz, so you can see each tool call |
 | Ingress at `mcp.localhost` | `mcp.yaml` | Lets agents on your machine connect. It has no login, so anyone who can reach it can read your SigNoz. Fine on a laptop, not on a shared cluster |
+| Ingress at `otlp.localhost` | `labs/lab5-ai/k8s/otlp-ingress.yaml` | Lets an agent on your machine send its own telemetry. It has no login either |
 | ServiceAccount `ai-reader`, ClusterRole `lab5-ai-reader` | `labs/lab5-ai/k8s/reader-rbac.yaml` | Read-only: pods, logs, events, nodes, workloads. No Secrets, ConfigMaps or `exec` |
 | `labs/lab5-ai/workspace/` | `AGENTS.md`, `.mcp.json`, `.claude/settings.json`, `opencode.jsonc` | One directory with the instructions, MCP address and permissions, so nothing else on your machine changes |
+| `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_*` | `workspace/.claude/settings.json` | Claude Code's cost, tokens and tool calls go to your SigNoz, only for sessions in this directory. Prompts aren't included |
 | `.kubeconfig`, `.claude/settings.local.json` in the workspace | `scripts/create_ai_access.py`, git-ignored | A 30-day token for `ai-reader`, and `KUBECONFIG` pointing at it, so an agent's `kubectl` isn't your admin login |
 | SigNoz's skills, pinned to one commit | `scripts/fetch_signoz_skills.py`, git-ignored | `signoz-investigating-alerts`, `signoz-generating-queries` and `signoz-explaining-alerts`, from SigNoz/agent-skills (MIT) |
-| Investigator, `telemetry-lab5:dev` | `labs/lab5-ai/Dockerfile`, `app/investigator.py`, `k8s/investigator.yaml` | Runs one headless Claude Code per firing alert. Claude Code 2.1.319 and kubectl 1.32.4, pinned |
-| `MODEL=sonnet`, `MAX_BUDGET_USD=1.00`, `MAX_TURNS=40`, `MAX_PER_HOUR=10` | `k8s/investigator.yaml` | Limits on what one investigation, or a flapping alert, can cost |
-| `--settings` on the Claude Code command | `app/investigator.py` | Claude Code ignores a folder's allow list until someone trusts the folder, and nobody can in a pod |
-| `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_*` | `k8s/investigator.yaml` | Claude Code's cost, tokens and tool calls go to SigNoz. Prompts aren't included |
-| `.lab-ai-credentials` | You create it, git-ignored | The investigator's Claude login. `make lab5` puts it in Secret `claude-auth` |
-| Channel "Lab 5 investigator" on five rules | `labs/lab5-ai/investigate.json`, `scripts/create_ai_routes.py` | The file gives the reason for each rule, including those left out. `make lab4` rewrites the rules, so it reruns this when `lab5` exists |
+
+`make investigate` runs `scripts/investigate_alerts.py` on your machine:
+
+| What | Why |
+|---|---|
+| Polls Lab 4's sink | SigNoz already sends alerts there, and nothing has to reach into your machine |
+| `labs/lab5-ai/investigate.json` | Which rules start an investigation. Not every alert should spend money, and the file gives the reason for each rule, including those left out |
+| `HARNESS=claude`, `opencode` or `codex` | Which agent to run. Only Claude Code has run an investigation here |
+| `--settings .claude/settings.json` | Claude Code ignores a folder's allow list until someone trusts the folder interactively, which can't happen in a headless run |
+| `--setting-sources project,local` | Leaves out your user settings, whose hooks could rewrite commands so they no longer match the allow list |
+| `--strict-mcp-config --mcp-config .mcp.json` | Only this MCP server, not any others you've set up |
+| `MAX_BUDGET_USD = "1.00"`, `MAX_TURNS = "40"`, `MAX_PER_HOUR = 10` | Limits on what one investigation, or a flapping alert, can cost |
+| `labs/lab5-ai/reports/`, git-ignored | Each report, with its cost and turns. The tutorial's live feed reads it |
 
 Lab 5 also changes two SigNoz settings, in `signoz/signoz-values.yaml`:
 

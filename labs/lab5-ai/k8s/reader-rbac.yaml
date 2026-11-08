@@ -5,8 +5,8 @@
 # change anything, exec into a pod, or read Secrets or ConfigMaps, which hold
 # credentials.
 #
-# The alert-triggered investigator runs as this ServiceAccount. For agents on
-# your machine, scripts/create_ai_access.py writes a kubeconfig for it.
+# scripts/create_ai_access.py writes a kubeconfig for it, which the agent on your
+# machine uses instead of your own login.
 apiVersion: v1
 kind: ServiceAccount
 metadata: { name: ai-reader, namespace: lab5 }
