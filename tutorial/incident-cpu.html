@@ -15,7 +15,7 @@
 <main id="main">
 <p class="eyebrow">Lab 1: incident 6 of 6</p>
 <h1>CPU saturation</h1>
-<p class="lead">One expensive request slows down unrelated requests. Traces alone will not explain this. You need infrastructure metrics, and that is where the k8s-infra chart comes in.</p>
+<p class="lead">One expensive request slows down unrelated requests. Traces alone will not explain this. You need the pod&#x27;s CPU, which comes from the SigNoz agents on each node, not from the app.</p>
 <ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#look">3. Where to look</a></li><li><a href="#search">4. Search</a></li><li><a href="#evidence">5. Evidence</a></li><li><a href="#cause">6. Root cause</a></li><li><a href="#fix">7. Resolution</a></li></ul>
 
 <h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
@@ -50,6 +50,8 @@
   <li>Then find what was running at that moment, with a search for long spans in that service.</li>
   <li>Infra Monitoring in SigNoz has Hosts and Kubernetes tabs. See below for what was confirmed.</li>
 </ol>
+<div class="note"><p><strong>Where this metric comes from.</strong> Not from the app: the Python agent sends traces, logs and the app&#x27;s own metrics, but not how much CPU its pod uses. <code>k8s.pod.cpu.usage</code> comes from the SigNoz agent that <code>make up</code> runs on each node, as part of the <code>k8s-infra</code> chart. Its <code>kubeletstats</code> receiver asks the kubelet for every pod&#x27;s usage every 30 seconds. That&#x27;s why it lags, and why short spikes hide, as the evidence below shows.</p>
+<p>So you get it for free, with no change to the app. <a href="lab3.html#collectors">Lab 3</a> explains these agents and what they collect, and shows what pod CPU alone can&#x27;t tell you: a pod held back by its CPU limit can look almost idle on this same chart.</p></div>
 <div class="note"><p><strong>From a trace to its pod:</strong> every span in this lab carries <code>k8s.pod.name</code>, added by the SigNoz agent on the node. So you can go straight from a slow trace to the pod that served it, and then to that pod's CPU. In the saved run it is <code>lab1-backend-7554c777f4-khppk</code>.</p></div>
 
 <h2 class="step" id="search"><span class="n">4</span>Search</h2>

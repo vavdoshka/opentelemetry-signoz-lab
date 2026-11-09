@@ -85,7 +85,7 @@
 </table>
 <p>The defaults come from the kubelet's summary API, which doesn't include these. They're on the kubelet's and the API server's Prometheus endpoints, so this lab scrapes them.</p>
 
-<h2>What collects it</h2>
+<h2 id="collectors">What collects it</h2>
 <p>If you've used Prometheus on Kubernetes, you might expect node-exporter, kube-state-metrics and a Prometheus server. <strong>None of those run here.</strong> <code>k8s-infra</code> installs OpenTelemetry collectors, and their <em>receivers</em> do the same jobs:</p>
 <table>
   <thead><tr><th>Runs as</th><th>Receiver</th><th>What it collects</th><th>Does the job of</th></tr></thead>
