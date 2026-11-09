@@ -29,8 +29,10 @@
 <ol>
   <li>Open a slow trace, and look for a long database span.</li>
   <li>Search by database attributes in the Traces Explorer.</li>
-  <li>Use the DB Call Metrics tab on <a href="http://signoz.localhost:8080/services/lab1-backend" target="_blank" rel="noopener">/services/lab1-backend</a> for a chart of database calls.</li>
+  <li>Use the <strong>DB Call Metrics</strong> tab on <a href="http://signoz.localhost:8080/services/lab1-backend" target="_blank" rel="noopener">/services/lab1-backend</a> for a chart of database calls.</li>
 </ol>
+<div class="note"><p><strong>That tab is built in, for every service.</strong> Nobody created it, and the app sends no database metrics. SigNoz&#x27;s own collector derives them from spans, with its <code>signozspanmetrics</code> processor: every span with <code>db.system</code> on it becomes a count and a total duration, in <code>signoz_db_latency_count</code> and <code>signoz_db_latency_sum</code>. Here that&#x27;s <code>lab1-backend</code>, Lab 2&#x27;s <code>backend</code> and Lab 5&#x27;s <code>lab5-app</code>. <span class="badge api">Query API only</span></p>
+<p>The tab charts two things, calls per second and average duration, by <code>db.system</code>. Those metrics also carry <code>db.name</code>, but not the statement, so they can tell you that a service&#x27;s database calls got slower, not which query. For that, go back to the spans. They also average, so a few slow calls among many fast ones barely move the line.</p></div>
 <figure class="shot"><img src="screenshots/lab1-db-call-metrics.png" alt="SigNoz DB Call Metrics tab for lab1-backend with database call rate and average duration charts" width="1440" height="900" loading="lazy"><figcaption>The DB Call Metrics tab on <code>lab1-backend</code>. <span class="badge ui">Seen in SigNoz UI</span> The spike in average duration is three <code>pg_sleep</code> calls, fired during the load run.</figcaption></figure>
 
 <h2 class="step" id="search"><span class="n">4</span>Search</h2>
