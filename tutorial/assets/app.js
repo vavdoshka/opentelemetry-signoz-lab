@@ -31,6 +31,11 @@
     { id: 'apiserver', href: 'incident-apiserver.html', title: 'The API server', group: 'Lab 3: Kubernetes' },
     { id: 'lab3-collection', href: 'lab3-collection.html', title: "How it's collected, and what it costs", group: 'Lab 3: Kubernetes' },
     { id: 'lab4', href: 'lab4.html', title: 'Alerts that reach you', group: 'Lab 4: alerts' },
+    { id: 'lab5', href: 'lab5.html', title: 'Look inside Postgres', group: 'Lab 5: Postgres (optional)' },
+    { id: 'lockwait', href: 'incident-lock-wait.html', title: 'An order that waits', group: 'Lab 5: Postgres (optional)' },
+    { id: 'deadlock', href: 'incident-deadlock.html', title: 'An order that gets cancelled', group: 'Lab 5: Postgres (optional)' },
+    { id: 'missingindex', href: 'incident-missing-index.html', title: 'A query that reads everything', group: 'Lab 5: Postgres (optional)' },
+    { id: 'connections', href: 'incident-connections.html', title: 'Out of connections', group: 'Lab 5: Postgres (optional)' },
     { id: 'lab6', href: 'lab6.html', title: 'Connect an AI agent', group: 'Lab 6: AI analysis' },
     { id: 'ai-ask', href: 'ai-ask.html', title: 'Ask it questions', group: 'Lab 6: AI analysis' },
     { id: 'ai-alerts', href: 'ai-alerts.html', title: 'Investigate alerts by itself', group: 'Lab 6: AI analysis' },
@@ -43,9 +48,11 @@
 
   const SIGNOZ = 'http://signoz.localhost:8080';
   const STORE = 'telemetry-tutorial-v1';
-  const LAB_NAMES = { lab1: 'Lab 1', lab2: 'Lab 2', lab3: 'Lab 3', lab6: 'Lab 6' };
-  const LAB_START = { lab1: 'make up', lab2: 'make lab2', lab3: 'make lab3' };
-  const LAB_FRONTEND = { lab1: 'lab1-frontend', lab2: 'frontend', lab3: 'lab3-workload' };
+  const LAB_NAMES = { lab1: 'Lab 1', lab2: 'Lab 2', lab3: 'Lab 3', lab5: 'Lab 5', lab6: 'Lab 6' };
+  const LAB_START = { lab1: 'make up', lab2: 'make lab2', lab3: 'make lab3', lab5: 'make lab5' };
+  /* The banner only mentions these. Lab 5 is optional, and Lab 6 has nothing to fire. */
+  const REQUIRED_LABS = ['lab1', 'lab2', 'lab3'];
+  const LAB_FRONTEND = { lab1: 'lab1-frontend', lab2: 'frontend', lab3: 'lab3-workload', lab5: 'lab5-app' };
   const SPAN_ARRIVAL_WAIT_MS = 2000;
   const SPAN_RETRY_WAIT_MS = 3000;
   const SPAN_RETRIES = 8;
@@ -278,7 +285,7 @@
     const running = Object.keys(LAB_NAMES).filter((labId) => labUp(labId) && lab.labs[labId].load && lab.labs[labId].load.running);
     add(host,
       Object.keys(LAB_START).map((labId) => el('strong', {
-        text: LAB_NAMES[labId] + ': ' + (labUp(labId) ? 'up' : 'not running. Start it with: ' + LAB_START[labId]),
+        text: LAB_NAMES[labId] + ': ' + (labUp(labId) ? 'up' : (REQUIRED_LABS.includes(labId) ? '' : 'optional, ') + 'not running. Start it with: ' + LAB_START[labId]),
       })),
       el('strong', { text: 'SigNoz: ' + (lab.signoz.up ? 'up' : 'not reachable') }),
       running.length ? 'Load generator is running in ' + running.map((labId) => LAB_NAMES[labId]).join(' and ') + '. Stop it when you finish.' : null,
@@ -289,7 +296,7 @@
     if (lab.bridge === false) {
       return 'The tutorial server is not running, so live buttons and saved examples are unavailable. Start it with: make tutorial';
     }
-    const parts = Object.keys(LAB_NAMES).map((labId) => (labUp(labId)
+    const parts = REQUIRED_LABS.map((labId) => (labUp(labId)
       ? LAB_NAMES[labId] + ' is up.'
       : LAB_NAMES[labId] + ' is not running, so its live buttons are off. Start it with: ' + LAB_START[labId] + '.'));
     parts.push(lab.signoz.up ? 'SigNoz is up.' : 'SigNoz is not reachable, so searches and trace lookups are off. Start it with: make up.');
@@ -300,7 +307,7 @@
   function renderBanner() {
     const main = document.getElementById('main');
     let banner = document.getElementById('lab-banner');
-    const down = lab && (lab.bridge === false || Object.keys(LAB_NAMES).some((labId) => !labUp(labId)) || !lab.signoz.up);
+    const down = lab && (lab.bridge === false || REQUIRED_LABS.some((labId) => !labUp(labId)) || !lab.signoz.up);
     if (!down) {
       if (banner) banner.remove();
       return;
@@ -682,6 +689,7 @@
     { x: 490, y: 128, w: 140, h: 148, label: 'Namespace lab3', parts: ['workload'] },
     { x: 650, y: 128, w: 190, h: 320, label: 'SigNoz: namespace signoz', parts: ['signoz', 'clickhouse', 'collectors'] },
     { x: 30, y: 460, w: 600, h: 150, label: 'What it all runs on', parts: ['kubelet', 'nodes', 'apiserver'] },
+    { x: 650, y: 462, w: 320, h: 100, label: 'Optional: namespace lab5', parts: ['lab5app', 'lab5pg'] },
   ];
   const ARCH_PARTS = [
     { id: 'browser', x: 40, y: 28, w: 170, h: 42, title: ['Your browser'] },
@@ -706,6 +714,8 @@
     { id: 'kubelet', lab: 3, x: 45, y: 492, w: 180, h: 104, title: ['kubelet'], detail: ['Pod and node metrics,', 'container limits and', 'probe results'] },
     { id: 'nodes', lab: 3, x: 240, y: 492, w: 180, h: 104, title: ['Nodes and kernel'], detail: ['Host metrics, the kernel', 'log with its OOM kills,', 'k3s log or journal'] },
     { id: 'apiserver', lab: 3, x: 435, y: 492, w: 180, h: 104, title: ['API server'], detail: ['Request metrics, and', 'an audit log of who', 'asked for what'] },
+    { id: 'lab5app', lab: 5, x: 665, y: 488, w: 130, h: 62, title: ['lab5-app'], detail: ['FastAPI, Python agent'] },
+    { id: 'lab5pg', lab: 5, x: 825, y: 488, w: 130, h: 62, title: ['Postgres'], detail: ['Reports on itself'] },
   ];
   const ARCH_WIRES = [
     { d: 'M107,70 V152', from: 'browser', to: 'frontend', label: ['your clicks', 113, 95] },
@@ -727,36 +737,44 @@
     { d: 'M860,188 H825', from: 'mcp', to: 'signoz', covers: ['lab6'], label: ['reads', 843, 180, null, 'middle'] },
     { d: 'M915,70 V152', from: 'ai', to: 'mcp', label: ['asks through MCP', 908, 95, null, 'end'] },
     { d: 'M970,49 H982 V326 H970', from: 'ai', to: 'sink', covers: ['lab6'], label: ['polls', 968, 284, null, 'end'] },
-    { d: 'M982,326 V544 H615', from: 'ai', to: 'apiserver', covers: ['lab6'], label: ['kubectl, read-only', 800, 536, null, 'middle'] },
+    { d: 'M982,326 V586 H615', from: 'ai', to: 'apiserver', covers: ['lab6'], label: ['kubectl, read-only', 800, 579, null, 'middle'] },
     { d: 'M190,492 V432', from: 'kubelet', to: 'nodeagents', label: ['scraped and read', 197, 450] },
     { d: 'M330,492 V432', from: 'nodes', to: 'nodeagents' },
     { d: 'M525,492 V432', from: 'apiserver', to: 'nodeagents' },
+    { d: 'M795,519 H825', from: 'lab5app', to: 'lab5pg' },
+    { d: 'M665,519 H640 V422 H630', from: 'lab5app', to: 'nodeagents' },
+    { d: 'M890,488 V455 H645 V412 H630', from: 'lab5pg', to: 'nodeagents', kind: 'outside', label: ['stats and log', 897, 479] },
   ];
   const ARCH_APP = ['frontend', 'frontend.agent', 'backend', 'backend.agent'];
   const ARCH_PIPELINE = ['nodeagents', 'collectors', 'clickhouse', 'signoz'];
   const ARCH_CODE = ['frontend.code', 'backend.code'];
+  const ARCH_LAB5 = ['lab5app', 'lab5pg'];
   const ARCH_VIEWS = {
     lab1: {
       covered: [...ARCH_APP, 'operator', ...ARCH_PIPELINE],
       seen: ['postgres'],
-      off: [...ARCH_CODE, 'workload', 'workload.agent', 'signoz.rules', 'apiserver', 'sink', 'mcp', 'ai'],
+      off: [...ARCH_CODE, ...ARCH_LAB5, 'workload', 'workload.agent', 'signoz.rules', 'apiserver', 'sink', 'mcp', 'ai'],
     },
     lab2: {
       covered: ['frontend', 'backend', ...ARCH_CODE],
       seen: ['postgres'],
-      off: ['workload', 'workload.agent', 'signoz.rules', 'apiserver', 'sink', 'mcp', 'ai'],
+      off: [...ARCH_LAB5, 'workload', 'workload.agent', 'signoz.rules', 'apiserver', 'sink', 'mcp', 'ai'],
     },
     lab3: {
       covered: ['workload', 'workload.agent', 'nodeagents', 'kubelet', 'nodes', 'apiserver'],
-      off: [...ARCH_APP, ...ARCH_CODE, 'postgres', 'signoz.rules', 'sink', 'mcp', 'ai'],
+      off: [...ARCH_APP, ...ARCH_CODE, ...ARCH_LAB5, 'postgres', 'signoz.rules', 'sink', 'mcp', 'ai'],
     },
     lab4: {
       covered: ['signoz', 'signoz.rules', 'sink'],
-      off: [...ARCH_CODE, 'mcp', 'ai'],
+      off: [...ARCH_CODE, ...ARCH_LAB5, 'mcp', 'ai'],
+    },
+    lab5: {
+      covered: [...ARCH_LAB5, 'nodeagents'],
+      off: [...ARCH_APP, ...ARCH_CODE, 'postgres', 'workload', 'workload.agent', 'apiserver', 'signoz.rules', 'sink', 'mcp', 'ai'],
     },
     lab6: {
       covered: ['ai', 'mcp'],
-      off: [],
+      off: ARCH_LAB5,
     },
   };
 

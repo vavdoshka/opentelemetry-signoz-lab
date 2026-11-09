@@ -17,6 +17,7 @@ SIGNOZ_URL = os.environ.get("SIGNOZ_URL", "http://signoz.localhost:8080").rstrip
 API_KEY = os.environ.get("SIGNOZ_API_KEY")
 LAB3_URL = "http://lab3.localhost:8080"
 LAB4_URL = "http://lab4.localhost:8080"
+LAB5_URL = "http://lab5.localhost:8080"
 LABS = {
     "1": {"url": "http://lab1.localhost:8080", "frontend": "lab1-frontend", "backend": "lab1-backend"},
     "2": {"url": "http://lab2.localhost:8080", "frontend": "frontend", "backend": "backend"},

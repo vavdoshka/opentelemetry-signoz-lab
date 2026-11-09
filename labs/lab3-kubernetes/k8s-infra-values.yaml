@@ -15,8 +15,9 @@ presets:
       # kind, the API server, scheduler, controller manager and etcd too.
       namespaces: []
       # These pods' output is read by filelog/audit and filelog/journal below
-      # instead.
-      containers: [audit-log, journal-log]
+      # instead. postgres-log is Lab 5's: Helm replaces a list rather than merging
+      # it, so this has to match Lab 5's file.
+      containers: [audit-log, journal-log, postgres-log]
 
   prometheus:
     enabled: true

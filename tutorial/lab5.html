@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Look inside Postgres · Lab 5 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="lab5">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 5: Postgres (optional)</p>
+<h1>Look inside Postgres</h1>
+<p class="lead">A trace shows that a query was slow. It can&#x27;t show why. Postgres knows, and you can get that out of it with nothing running inside it.</p>
+<h2 id="fits">Where this lab fits</h2>
+<p>This lab is optional, and Lab 6 doesn&#x27;t need it. It has its own small app and its own Postgres, so Labs 1 and 2 stay as they are. Nothing runs inside this Postgres either: its settings make it report on itself.</p>
+<div class="wide arch" data-arch="lab5"></div>
+<table>
+  <thead><tr><th>Part</th><th>In this lab</th></tr></thead>
+  <tbody><tr><td><code>lab5-app</code></td><td>A small shop with the same Python agent as Lab 1, and no OpenTelemetry code. It connects as an ordinary user, <code>shop</code></td></tr><tr><td>Postgres</td><td><strong>Reports on itself.</strong> Its settings turn on slow query logs, query plans and lock wait logs, and a monitoring user can read its statistics</td></tr><tr><td>Node agents</td><td>Read its log, one record per entry, with <code>service.name = postgres</code></td></tr><tr><td>Cluster collector</td><td>Asks it for statistics every 10 seconds</td></tr><tr><td>SigNoz</td><td>Adds a dashboard, <strong>Lab 5: Postgres</strong></td></tr><tr><td>Not in this lab</td><td>Alerts, and which queries are slowest over time. See <a href="#not-covered">Not covered</a></td></tr></tbody>
+</table>
+
+<h2>Start it</h2>
+<p>Stop any load generator first, because this is a lot of work for a small machine. From the repo&#x27;s root:</p>
+<figure class="code"><pre><code>make lab5</code></pre></figure>
+<p>It took 142 seconds here the first time, and about a minute after that. It does these in order:</p>
+<ol>
+  <li>Builds the app&#x27;s image, and loads it into the cluster.</li>
+  <li>Starts Postgres, which fills a table with 500,000 rows, and waits until it&#x27;s ready.</li>
+  <li>Adds <code>labs/lab5-postgres/k8s-infra-values.yaml</code> to the collectors, which restarts them.</li>
+  <li>Starts the app, then proves that its spans, Postgres&#x27;s statistics and Postgres&#x27;s log all reach SigNoz.</li>
+  <li>Creates the dashboard.</li>
+</ol>
+<p>This lab has no load generator, because each scenario makes its own traffic. You can also fire them from its own page, <a href="http://lab5.localhost:8080" target="_blank" rel="noopener">lab5.localhost:8080</a>.</p>
+<div class="warn"><p><strong>Keep the steps apart.</strong> Our first version loaded 2 million rows while the collectors restarted, and that overloaded our 4-CPU machine. ClickHouse stopped answering, SigNoz&#x27;s collectors got stuck, and no logs were written for 12 minutes, as <a href="gaps.html#collector">gap 6</a> describes. That&#x27;s why it&#x27;s 500,000 rows now, and why the steps run one at a time.</p></div>
+
+<h2>Why a trace isn&#x27;t enough</h2>
+<p>The agent in the app sees each query from the outside: its SQL, how long it took, and whether it failed. It can&#x27;t see why. Only Postgres knows that it was waiting for a lock, or which plan it chose. It tells you in two ways, and neither needs anything running inside it:</p>
+<table>
+  <thead><tr><th>Signal</th><th>How it gets to SigNoz</th><th>What it answers</th></tr></thead>
+  <tbody><tr><td><strong>Its log</strong></td><td>Postgres writes it, and the node agents read it</td><td>What happened to this statement: slow, its plan, waiting for a lock, a deadlock, a refused connection</td></tr><tr><td><strong>Its statistics</strong></td><td>The cluster collector logs in and asks</td><td>How much and how often: connections, deadlocks, sequential scans, blocked sessions</td></tr></tbody>
+</table>
+
+<h2>The log</h2>
+<p>All of this is in the Postgres container&#x27;s arguments:</p>
+<figure class="code"><figcaption><span><code>labs/lab5-postgres/k8s/app.yaml</code> lines 63–106</span></figcaption><pre><code><span class="ln">63</span>            # One JSON object per log entry, written to a file that postgres-log
+<span class="ln">64</span>            # below prints. As plain text, a deadlock&#x27;s detail and a query plan
+<span class="ln">65</span>            # would each become many separate log lines.
+<span class="ln">66</span>            - &quot;-c&quot;
+<span class="ln">67</span>            - logging_collector=on
+<span class="ln">68</span>            - &quot;-c&quot;
+<span class="ln">69</span>            - log_destination=jsonlog
+<span class="ln">70</span>            - &quot;-c&quot;
+<span class="ln">71</span>            - log_directory=/var/log/postgresql
+<span class="ln">72</span>            - &quot;-c&quot;
+<span class="ln">73</span>            - log_filename=postgres
+<span class="ln">74</span>            - &quot;-c&quot;
+<span class="ln">75</span>            - log_file_mode=0644
+<span class="ln">76</span>            # Slow queries: log any statement that takes longer than this, in ms.
+<span class="ln">77</span>            - &quot;-c&quot;
+<span class="ln">78</span>            - log_min_duration_statement=100
+<span class="ln">79</span>            # And its plan, which says why it was slow. It costs little without
+<span class="ln">80</span>            # auto_explain.log_analyze, which times every step of every query.
+<span class="ln">81</span>            - &quot;-c&quot;
+<span class="ln">82</span>            - shared_preload_libraries=auto_explain
+<span class="ln">83</span>            - &quot;-c&quot;
+<span class="ln">84</span>            - auto_explain.log_min_duration=100
+<span class="ln">85</span>            # Lock waits: log any wait longer than deadlock_timeout, 1 second by default.
+<span class="ln">86</span>            - &quot;-c&quot;
+<span class="ln">87</span>            - log_lock_waits=on
+<span class="ln">88</span>            # A query&#x27;s values can be personal data, so leave them out of the logs.
+<span class="ln">89</span>            # The third setting matters too: auto_explain logs them by default.
+<span class="ln">90</span>            # A plan can still show one, in its Filter line, so treat plans as sensitive.
+<span class="ln">91</span>            - &quot;-c&quot;
+<span class="ln">92</span>            - log_parameter_max_length=0
+<span class="ln">93</span>            - &quot;-c&quot;
+<span class="ln">94</span>            - log_parameter_max_length_on_error=0
+<span class="ln">95</span>            - &quot;-c&quot;
+<span class="ln">96</span>            - auto_explain.log_parameter_max_length=0
+<span class="ln">97</span>            # One process per scan. This VM is small, and a scan using three would
+<span class="ln">98</span>            # slow down everything else on it, including ClickHouse.
+<span class="ln">99</span>            - &quot;-c&quot;
+<span class="ln">100</span>            - max_parallel_workers_per_gather=0
+<span class="ln">101</span>            # Connections: low, so the scenario reaches the limit quickly. The 2
+<span class="ln">102</span>            # reserved ones are for otel_monitor, on top of 3 for superusers.
+<span class="ln">103</span>            - &quot;-c&quot;
+<span class="ln">104</span>            - max_connections=30
+<span class="ln">105</span>            - &quot;-c&quot;
+<span class="ln">106</span>            - reserved_connections=2</code></pre></figure>
+<p>JSON matters more than it looks. In plain text, a deadlock&#x27;s detail and a query plan each become many separate log lines. As JSON, each entry stays in one piece, and <code>filelog/postgres</code> turns it into one log record:</p>
+<figure class="code"><figcaption><span><code>labs/lab5-postgres/k8s-infra-values.yaml</code> lines 61–93</span></figcaption><pre><code><span class="ln">61</span>      # Postgres&#x27;s log, one JSON object per entry, from the postgres-log container.
+<span class="ln">62</span>      filelog/postgres:
+<span class="ln">63</span>        include: [/var/log/pods/lab5_postgres-*/postgres-log/*.log]
+<span class="ln">64</span>        include_file_name: false
+<span class="ln">65</span>        start_at: end
+<span class="ln">66</span>        operators:
+<span class="ln">67</span>          # The container runtime writes each line as &quot;&lt;time&gt; &lt;stream&gt; &lt;tag&gt; &lt;line&gt;&quot;.
+<span class="ln">68</span>          - type: regex_parser
+<span class="ln">69</span>            regex: &#x27;^\S+ (?P&lt;stream&gt;stdout|stderr) \S+ (?P&lt;line&gt;.*)$&#x27;
+<span class="ln">70</span>          - { type: filter, expr: &#x27;attributes.stream != &quot;stdout&quot;&#x27; }
+<span class="ln">71</span>          - { type: move, from: attributes.line, to: body }
+<span class="ln">72</span>          - { type: remove, field: attributes.stream }
+<span class="ln">73</span>          - type: json_parser
+<span class="ln">74</span>            parse_to: attributes.pg
+<span class="ln">75</span>            timestamp: { parse_from: attributes.pg.timestamp, layout: &#x27;%Y-%m-%d %H:%M:%S.%L %Z&#x27; }
+<span class="ln">76</span>            severity:
+<span class="ln">77</span>              parse_from: attributes.pg.error_severity
+<span class="ln">78</span>              mapping:
+<span class="ln">79</span>                debug: [DEBUG, DEBUG1, DEBUG2, DEBUG3, DEBUG4, DEBUG5]
+<span class="ln">80</span>                info: [LOG, INFO, NOTICE]
+<span class="ln">81</span>                warn: WARNING
+<span class="ln">82</span>                error: ERROR
+<span class="ln">83</span>                fatal: [FATAL, PANIC]
+<span class="ln">84</span>          # The body is what Postgres said. These are what you search and group on.
+<span class="ln">85</span>          - { type: move, from: attributes.pg.state_code, to: &#x27;attributes[&quot;postgres.state_code&quot;]&#x27;, if: &#x27;attributes.pg.state_code != nil&#x27; }
+<span class="ln">86</span>          - { type: move, from: attributes.pg.backend_type, to: &#x27;attributes[&quot;postgres.backend_type&quot;]&#x27;, if: &#x27;attributes.pg.backend_type != nil&#x27; }
+<span class="ln">87</span>          - { type: move, from: attributes.pg.user, to: &#x27;attributes[&quot;postgres.user&quot;]&#x27;, if: &#x27;attributes.pg.user != nil&#x27; }
+<span class="ln">88</span>          - { type: move, from: attributes.pg.detail, to: &#x27;attributes[&quot;postgres.detail&quot;]&#x27;, if: &#x27;attributes.pg.detail != nil&#x27; }
+<span class="ln">89</span>          - { type: move, from: attributes.pg.statement, to: &#x27;attributes[&quot;postgres.statement&quot;]&#x27;, if: &#x27;attributes.pg.statement != nil&#x27; }
+<span class="ln">90</span>          - { type: move, from: attributes.pg.message, to: body }
+<span class="ln">91</span>          - { type: remove, field: attributes.pg }
+<span class="ln">92</span>          - { type: add, field: &#x27;resource[&quot;service.name&quot;]&#x27;, value: postgres }
+<span class="ln">93</span>          - { type: add, field: &#x27;resource[&quot;k8s.namespace.name&quot;]&#x27;, value: lab5 }</code></pre></figure>
+<table>
+  <thead><tr><th>In SigNoz</th><th>What it holds</th></tr></thead>
+  <tbody><tr><td><code>body</code></td><td>What Postgres said</td></tr><tr><td><code>postgres.detail</code></td><td>The explanation, such as which process holds a lock</td></tr><tr><td><code>postgres.statement</code></td><td>The statement it was running</td></tr><tr><td><code>postgres.state_code</code></td><td>The error code, such as <code>40P01</code> for a deadlock</td></tr><tr><td><code>postgres.user</code>, <code>postgres.backend_type</code></td><td>Who, and which kind of process</td></tr><tr><td><code>severity_text</code></td><td>From Postgres&#x27;s own level, so <code>FATAL</code> and <code>ERROR</code> stay distinct</td></tr></tbody>
+</table>
+<div class="note"><p><strong>Plans can show values.</strong> The settings above keep a query&#x27;s parameters out of the log, but a plan can still include one in its filter. In this lab that&#x27;s a made-up email address. On a real system, decide who can read these logs.</p></div>
+
+<h2>The statistics</h2>
+<p>The collector logs in as its own user, which can read statistics, and can&#x27;t read or change your data:</p>
+<figure class="code"><figcaption><span><code>labs/lab5-postgres/k8s/app.yaml</code> lines 8–20</span></figcaption><pre><code><span class="ln">8</span>    -- What SigNoz&#x27;s collector logs in as. pg_monitor can read statistics, and
+<span class="ln">9</span>    -- can&#x27;t read or change your data.
+<span class="ln">10</span>    CREATE ROLE otel_monitor LOGIN PASSWORD &#x27;lab-monitor&#x27;;
+<span class="ln">11</span>    GRANT pg_monitor TO otel_monitor;
+<span class="ln">12</span>    -- So it can still connect when the app has used every other connection.
+<span class="ln">13</span>    GRANT pg_use_reserved_connections TO otel_monitor;
+<span class="ln">14</span>    -- Don&#x27;t log its own queries as slow when the machine is busy.
+<span class="ln">15</span>    ALTER ROLE otel_monitor SET log_min_duration_statement = -1;
+<span class="ln">16</span>    ALTER ROLE otel_monitor SET auto_explain.log_min_duration = -1;
+<span class="ln">17</span>
+<span class="ln">18</span>    -- What the app logs in as. The image&#x27;s own user is a superuser, which can use
+<span class="ln">19</span>    -- the connections reserved above, so the app needs an ordinary one.
+<span class="ln">20</span>    CREATE ROLE shop LOGIN PASSWORD &#x27;shop&#x27;;</code></pre></figure>
+<p>Then two receivers in the one cluster collector, so nothing is collected twice, read them every 10 seconds:</p>
+<figure class="code"><figcaption><span><code>labs/lab5-postgres/k8s-infra-values.yaml</code> lines 20–45</span></figcaption><pre><code><span class="ln">20</span>      # The standard way: reads Postgres&#x27;s statistics views as otel_monitor. It runs
+<span class="ln">21</span>      # in the one cluster collector, so nothing is collected twice.
+<span class="ln">22</span>      postgresql:
+<span class="ln">23</span>        endpoint: postgres.lab5.svc.cluster.local:5432
+<span class="ln">24</span>        transport: tcp
+<span class="ln">25</span>        username: otel_monitor
+<span class="ln">26</span>        password: ${env:POSTGRES_MONITOR_PASSWORD}
+<span class="ln">27</span>        databases: [lab]
+<span class="ln">28</span>        collection_interval: 10s
+<span class="ln">29</span>        tls: { insecure: true }
+<span class="ln">30</span>        metrics:
+<span class="ln">31</span>          # These are off by default. So is postgresql.database.locks, which stays off:
+<span class="ln">32</span>          # in this version it asks from the postgres database, and can only name tables
+<span class="ln">33</span>          # there. Here that&#x27;s never the app&#x27;s tables, only the collector&#x27;s own locks.
+<span class="ln">34</span>          postgresql.deadlocks: { enabled: true }
+<span class="ln">35</span>          postgresql.sequential_scans: { enabled: true }
+<span class="ln">36</span>      # So nothing above says a session is stuck waiting for a lock. Ask for that directly.
+<span class="ln">37</span>      sqlquery/postgres:
+<span class="ln">38</span>        driver: postgres
+<span class="ln">39</span>        datasource: &quot;host=postgres.lab5.svc.cluster.local port=5432 user=otel_monitor password=${env:POSTGRES_MONITOR_PASSWORD} dbname=lab sslmode=disable&quot;
+<span class="ln">40</span>        collection_interval: 10s
+<span class="ln">41</span>        max_open_conn: 1
+<span class="ln">42</span>        queries:
+<span class="ln">43</span>          - sql: &quot;SELECT count(*) AS blocked FROM pg_stat_activity WHERE wait_event_type = &#x27;Lock&#x27;&quot;
+<span class="ln">44</span>            metrics:
+<span class="ln">45</span>              - { metric_name: postgres.sessions.blocked, value_column: blocked, value_type: int, data_type: gauge }</code></pre></figure>
+<table>
+  <thead><tr><th>Metric</th><th>What it tells you</th><th>From</th></tr></thead>
+  <tbody><tr><td><code>postgres.sessions.blocked</code></td><td>Sessions stuck waiting for a lock right now</td><td><code>sqlquery</code></td></tr><tr><td><code>postgresql.backends</code>, <code>postgresql.connection.max</code></td><td>Connections in use, and the limit</td><td><code>postgresql</code></td></tr><tr><td><code>postgresql.deadlocks</code></td><td>Deadlocks so far. Off by default</td><td><code>postgresql</code></td></tr><tr><td><code>postgresql.sequential_scans</code>, <code>postgresql.index.scans</code></td><td>Whole-table reads, and index use. The first is off by default</td><td><code>postgresql</code></td></tr><tr><td><code>postgresql.operations</code>, <code>postgresql.rows</code>, <code>postgresql.table.size</code></td><td>Activity and size, for each table</td><td><code>postgresql</code></td></tr></tbody>
+</table>
+
+<h3>The metric you&#x27;d reach for is no use here</h3>
+<p>The receiver has a lock metric, <code>postgresql.database.locks</code>, and SigNoz&#x27;s guide turns it on. We tried it during a real lock wait, with two sessions fighting over a row in <code>stock</code>. <code>stock</code> never appeared. It listed only these: <span class="badge api">Query API only</span></p>
+<figure class="code"><pre><code>relation                              mode
+pg_class                              AccessShareLock
+pg_class_oid_index                    AccessShareLock
+pg_class_relname_nsp_index            AccessShareLock
+pg_class_tblspc_relfilenode_index     AccessShareLock
+pg_db_role_setting                    AccessShareLock
+pg_locks                              AccessShareLock</code></pre></figure>
+<p>Those are the collector&#x27;s own locks. In this version, v0.139.0, the receiver asks from a connection to the <code>postgres</code> database, and its query joins <code>pg_class</code> there, so it can only name tables in that database. Newer versions document a setting for this, but this one rejects it: the collector wouldn&#x27;t start. So this lab leaves that metric off, and <code>postgres.sessions.blocked</code> does the job.</p>
+
+<h3>The dashboard</h3>
+<p><code>make lab5</code> creates <strong>Lab 5: Postgres</strong>, which charts the metrics above. It&#x27;s our own, for two reasons. SigNoz publishes a Postgres dashboard in <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a>, and when we imported it, it opened empty, because its saved filters name one person&#x27;s laptop (<code>Srikanths-MacBook-Pro.local</code>), someone else&#x27;s tables and the <code>postgres</code> database. It also has no panel for blocked sessions, and its locks panel depends on the metric above. <span class="badge ui">Seen in SigNoz UI</span></p>
+<figure class="shot"><img src="screenshots/lab5-postgres-dashboard.png" alt="SigNoz dashboard for Lab 5, with charts of blocked sessions, connections against the limit of 30, deadlocks and whole-table reads, each showing the incidents fired during testing" width="1440" height="900" loading="lazy"><figcaption>The dashboard during testing, with each incident visible. Times show UTC+1. The totals drop back to zero when Postgres restarts.</figcaption></figure>
+
+<h2>What it costs</h2>
+<table>
+  <thead><tr><th>What</th><th>Measured here</th></tr></thead>
+  <tbody><tr><td>Metric series</td><td>59, from 22 metric names</td></tr><tr><td>Postgres&#x27;s log when idle</td><td>2 records every 5 minutes, from checkpoints</td></tr><tr><td>CPU, Postgres with its log reader, idle</td><td>About 25m, most of it answering the collector</td></tr><tr><td>Memory, the same pod</td><td>About 42 MiB, plus shared memory</td></tr></tbody>
+</table>
+<p>Per-table metrics multiply with the number of tables, so on a large database, limit <code>databases</code> and check what you get.</p>
+
+<h2 id="not-covered">Not covered</h2>
+<ul>
+  <li><strong>Which queries are slowest over time.</strong> <code>pg_stat_statements</code> keeps that, and the receiver can read it with its optional <code>db.server.top_query</code> events. The library is in this image, but it isn&#x27;t loaded here. <span class="badge untested">Untested</span></li>
+  <li><strong>Going from a slow log line to its trace.</strong> SQLCommenter adds the trace ID to each query as a comment, with <code>PsycopgInstrumentor().instrument(enable_commenter=True)</code>. That&#x27;s a code change, and it may clash with the agent&#x27;s own instrumentation. <span class="badge untested">Untested</span></li>
+  <li><strong>Alerts on any of this.</strong> <a href="lab4.html">Lab 4</a> shows how.</li>
+</ul>
+
+<div class="quiz" data-quiz="pg1"><p class="q">Check yourself: Why does this lab turn on auto_explain as well as log_min_duration_statement?</p><button type="button" data-right="false" data-why="It does. It tells you that a statement was slow, and how long it took.">Because log_min_duration_statement doesn&#x27;t log slow statements.</button><button type="button" data-right="true" data-why="The first setting says that it was slow. The plan says how Postgres ran it, such as reading the whole table.">Because the plan says why a statement was slow.</button><button type="button" data-right="false" data-why="Speed isn&#x27;t why. Without log_analyze, it adds little, but it still does extra work.">Because auto_explain is faster.</button></div>
+<div class="quiz" data-quiz="pg2"><p class="q">Check yourself: Why is the collector&#x27;s user allowed to use the reserved connections?</p><button type="button" data-right="false" data-why="pg_monitor can&#x27;t read your tables. The reserved connections only give it a way in.">So it can read your data.</button><button type="button" data-right="true" data-why="It already holds some open, so the difference was small here. The connections incident has the numbers.">So it can still connect when the app has used every other connection.</button><button type="button" data-right="false" data-why="It isn&#x27;t a superuser. Superusers have their own 3 reserved connections.">Because a superuser needs them.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

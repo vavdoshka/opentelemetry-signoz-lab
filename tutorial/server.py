@@ -69,11 +69,18 @@ LABS = {
         "frontend": "lab3-workload",
         "start": "make lab3",
     },
+    "lab5": {
+        "name": "Lab 5",
+        "url": os.environ.get("TUTORIAL_LAB5_URL", "http://lab5.localhost:8080").rstrip("/"),
+        "frontend": "lab5-app",
+        "start": "make lab5",
+    },
 }
 SCENARIOS = {
     "order", "list", "slow", "bad_input", "crash", "backend_500", "timeout",
     "slow_query", "db_error", "cpu_burn", "log_burst", "slow_item", "free_orders", "cache_miss",
     "throttle", "oom", "liveness", "disk", "api_flood", "api_denied",
+    "lock_wait", "deadlock", "missing_index", "too_many_clients",
 }
 LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 MAX_BURN_SECONDS = 120

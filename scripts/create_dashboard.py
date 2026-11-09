@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Creates a lab's SigNoz dashboards, unless they already exist.
 
-Usage: create_dashboard.py 2|3
+Usage: create_dashboard.py 2|3|5
 """
 
 import json
@@ -17,6 +17,7 @@ COMMUNITY = "https://raw.githubusercontent.com/SigNoz/dashboards/7d43df2673039ba
 LOCAL = {
     "2": [ROOT / "labs/lab2-custom-dimensions/dashboard.json"],
     "3": [ROOT / "labs/lab3-kubernetes/dashboard.json"],
+    "5": [ROOT / "labs/lab5-postgres/dashboard.json"],
 }
 REMOTE = {
     "2": [],
@@ -26,6 +27,9 @@ REMOTE = {
         "k8s-system-monitoring/kubernetes-kubelet.json",
         "k8s-system-monitoring/kubernetes-apiserver.json",
     ],
+    # Not postgresql/postgresql.json: it opens empty, because its saved filters name one
+    # person's laptop, and it has no panel for blocked sessions.
+    "5": [],
 }
 
 
@@ -40,7 +44,7 @@ def fetch(path):
 def main():
     lab = sys.argv[1] if len(sys.argv) > 1 else ""
     if lab not in LOCAL:
-        raise SystemExit("Usage: create_dashboard.py 2|3")
+        raise SystemExit("Usage: create_dashboard.py 2|3|5")
     dashboards = [json.loads(path.read_text()) for path in LOCAL[lab] if path.exists()]
     dashboards += [fetch(path) for path in REMOTE[lab]]
 

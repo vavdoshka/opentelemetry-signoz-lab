@@ -13,6 +13,7 @@ LAB1_URL="http://lab1.localhost:8080"
 LAB2_URL="http://lab2.localhost:8080"
 LAB3_URL="http://lab3.localhost:8080"
 LAB4_URL="http://lab4.localhost:8080"
+LAB5_URL="http://lab5.localhost:8080"
 
 kind_cluster_exists() {
   command -v kind >/dev/null 2>&1 && kind get clusters 2>/dev/null | grep -qx "$CLUSTER_NAME"
@@ -44,15 +45,29 @@ load_image() {
   esac
 }
 
-# Lab 3 adds scrape jobs. Keep them when `make up` reruns, or an upgrade would
-# remove them with no error.
+# Labs 3 and 5 add to the collectors' config. Keep that when `make up` reruns, or an
+# upgrade would remove it with no error.
 install_k8s_infra() {
   local values=(-f signoz/k8s-infra-values.yaml)
   if k get namespace lab3 >/dev/null 2>&1; then
     values+=(-f labs/lab3-kubernetes/k8s-infra-values.yaml)
   fi
-  h upgrade --install k8s-infra signoz/k8s-infra --version "$K8S_INFRA_CHART_VERSION" \
-    --namespace signoz "${values[@]}"
+  if k get namespace lab5 >/dev/null 2>&1; then
+    values+=(-f labs/lab5-postgres/k8s-infra-values.yaml)
+  fi
+  # The chart comes from GitHub, which sometimes answers 504 for a few minutes. The
+  # version is pinned, so Helm's cached copy is the same file, and needs no download.
+  local chart=signoz/k8s-infra attempt
+  local cached
+  cached="$(helm env HELM_CACHE_HOME)/repository/k8s-infra-$K8S_INFRA_CHART_VERSION.tgz"
+  if [ -f "$cached" ]; then chart=$cached; fi
+  for attempt in 1 2 3 4 5; do
+    h upgrade --install k8s-infra "$chart" --version "$K8S_INFRA_CHART_VERSION" \
+      --namespace signoz "${values[@]}" && return 0
+    echo "Couldn't install k8s-infra (attempt $attempt of 5). Trying again in 30 seconds." >&2
+    sleep 30
+  done
+  return 1
 }
 
 step() { printf '\n==> %s\n' "$*"; }

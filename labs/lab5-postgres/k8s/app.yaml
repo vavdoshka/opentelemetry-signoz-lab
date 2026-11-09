@@ -1,0 +1,191 @@
+# Lab 5's Postgres and app. Postgres has its own copy here, so Labs 1 and 2 stay
+# as they are. No agent runs inside it: these settings make it report on itself.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: postgres-init, namespace: lab5 }
+data:
+  init.sql: |
+    -- What SigNoz's collector logs in as. pg_monitor can read statistics, and
+    -- can't read or change your data.
+    CREATE ROLE otel_monitor LOGIN PASSWORD 'lab-monitor';
+    GRANT pg_monitor TO otel_monitor;
+    -- So it can still connect when the app has used every other connection.
+    GRANT pg_use_reserved_connections TO otel_monitor;
+    -- Don't log its own queries as slow when the machine is busy.
+    ALTER ROLE otel_monitor SET log_min_duration_statement = -1;
+    ALTER ROLE otel_monitor SET auto_explain.log_min_duration = -1;
+
+    -- What the app logs in as. The image's own user is a superuser, which can use
+    -- the connections reserved above, so the app needs an ordinary one.
+    CREATE ROLE shop LOGIN PASSWORD 'shop';
+
+    CREATE TABLE stock (item text PRIMARY KEY, qty int NOT NULL);
+    INSERT INTO stock VALUES ('coffee', 1000000), ('bagel', 1000000);
+
+    -- Large enough to be slow to search, with deliberately no index on email.
+    CREATE TABLE sales (
+      id bigserial PRIMARY KEY,
+      email text NOT NULL,
+      item text NOT NULL,
+      total numeric(10, 2) NOT NULL,
+      sold_at timestamptz NOT NULL
+    );
+    INSERT INTO sales (email, item, total, sold_at)
+      SELECT 'Customer' || (1 + (random() * 49999)::int) || '@example.com', 'coffee', 4.50,
+             now() - random() * interval '365 days'
+      FROM generate_series(1, 500000);
+    ANALYZE sales;
+
+    GRANT SELECT, UPDATE ON stock TO shop;
+    GRANT SELECT, INSERT ON sales TO shop;
+    GRANT USAGE ON SEQUENCE sales_id_seq TO shop;
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: postgres, namespace: lab5 }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: postgres } }
+  template:
+    metadata:
+      labels: { app: postgres }
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "false"
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - { name: POSTGRES_USER, value: lab }
+            - { name: POSTGRES_PASSWORD, value: lab }
+            - { name: POSTGRES_DB, value: lab }
+          args:
+            # One JSON object per log entry, written to a file that postgres-log
+            # below prints. As plain text, a deadlock's detail and a query plan
+            # would each become many separate log lines.
+            - "-c"
+            - logging_collector=on
+            - "-c"
+            - log_destination=jsonlog
+            - "-c"
+            - log_directory=/var/log/postgresql
+            - "-c"
+            - log_filename=postgres
+            - "-c"
+            - log_file_mode=0644
+            # Slow queries: log any statement that takes longer than this, in ms.
+            - "-c"
+            - log_min_duration_statement=100
+            # And its plan, which says why it was slow. It costs little without
+            # auto_explain.log_analyze, which times every step of every query.
+            - "-c"
+            - shared_preload_libraries=auto_explain
+            - "-c"
+            - auto_explain.log_min_duration=100
+            # Lock waits: log any wait longer than deadlock_timeout, 1 second by default.
+            - "-c"
+            - log_lock_waits=on
+            # A query's values can be personal data, so leave them out of the logs.
+            # The third setting matters too: auto_explain logs them by default.
+            # A plan can still show one, in its Filter line, so treat plans as sensitive.
+            - "-c"
+            - log_parameter_max_length=0
+            - "-c"
+            - log_parameter_max_length_on_error=0
+            - "-c"
+            - auto_explain.log_parameter_max_length=0
+            # One process per scan. This VM is small, and a scan using three would
+            # slow down everything else on it, including ClickHouse.
+            - "-c"
+            - max_parallel_workers_per_gather=0
+            # Connections: low, so the scenario reaches the limit quickly. The 2
+            # reserved ones are for otel_monitor, on top of 3 for superusers.
+            - "-c"
+            - max_connections=30
+            - "-c"
+            - reserved_connections=2
+          ports: [{ containerPort: 5432 }]
+          resources: { requests: { cpu: 100m, memory: 256Mi } }
+          readinessProbe:
+            exec: { command: [pg_isready, -U, lab, -d, lab] }
+            periodSeconds: 5
+          volumeMounts:
+            - { name: init, mountPath: /docker-entrypoint-initdb.d, readOnly: true }
+            - { name: logs, mountPath: /var/log/postgresql }
+        # Prints Postgres's log file, so the node agents can read it from this
+        # container's output with the filelog/postgres receiver in
+        # ../k8s-infra-values.yaml.
+        - name: postgres-log
+          image: postgres:16-alpine
+          # -F keeps waiting for the file, which doesn't exist until Postgres starts.
+          command: ["tail", "-n", "+1", "-F", "/var/log/postgresql/postgres.json"]
+          securityContext:
+            runAsUser: 70
+            capabilities: { drop: [ALL] }
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          resources:
+            requests: { cpu: 5m, memory: 16Mi }
+            limits: { memory: 32Mi }
+          volumeMounts:
+            - { name: logs, mountPath: /var/log/postgresql, readOnly: true }
+      initContainers:
+        # An emptyDir starts owned by root, and Postgres runs as user 70.
+        - name: log-dir-owner
+          image: postgres:16-alpine
+          command: ["chown", "70:70", "/var/log/postgresql"]
+          volumeMounts:
+            - { name: logs, mountPath: /var/log/postgresql }
+      volumes:
+        - name: init
+          configMap: { name: postgres-init }
+        - name: logs
+          emptyDir: { sizeLimit: 200Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: postgres, namespace: lab5 }
+spec:
+  selector: { app: postgres }
+  ports: [{ port: 5432, targetPort: 5432 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: lab5-app, namespace: lab5 }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: shop } }
+  template:
+    metadata: { labels: { app: shop } }
+    spec:
+      containers:
+        - name: shop
+          image: telemetry-lab5:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: DATABASE_URL, value: "postgresql://shop:shop@postgres:5432/lab" }
+          ports: [{ containerPort: 8000 }]
+          resources: { requests: { cpu: 50m, memory: 128Mi } }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata: { name: shop, namespace: lab5 }
+spec:
+  selector: { app: shop }
+  ports: [{ port: 8000, targetPort: 8000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: { name: shop, namespace: lab5 }
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: lab5.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: shop, port: { number: 8000 } } }

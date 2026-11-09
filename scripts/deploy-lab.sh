@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds a lab's app, deploys it and proves its telemetry reaches SigNoz.
-# Rerun it after changing a lab's code. Usage: scripts/deploy-lab.sh 1|2|3
+# Rerun it after changing a lab's code. Usage: scripts/deploy-lab.sh 1|2|3|5
 source "$(dirname "$0")/lib.sh"
 cd "$ROOT"
 
@@ -11,7 +11,9 @@ case "${1:-}" in
      apps="backend frontend loadgen" ;;
   3) dir=labs/lab3-kubernetes; namespace=lab3; image=telemetry-lab3:dev
      apps="lab3-workload lab3-loadgen" ;;
-  *) echo "Usage: $0 1|2|3" >&2; exit 1 ;;
+  5) dir=labs/lab5-postgres; namespace=lab5; image=telemetry-lab5:dev
+     apps="lab5-app" ;;
+  *) echo "Usage: $0 1|2|3|5" >&2; exit 1 ;;
 esac
 
 step "Lab $1"
@@ -34,6 +36,19 @@ if [ "$1" = 3 ]; then
   fi
   step "Extra scrape jobs and logs"
   k apply -f "$dir/k8s/metrics-rbac.yaml"
+  install_k8s_infra
+  k -n signoz rollout status deployment/k8s-infra-otel-deployment --timeout=180s
+  k -n signoz rollout status daemonset/k8s-infra-otel-agent --timeout=180s
+fi
+
+if [ "$1" = 5 ]; then
+  # Wait for Postgres to load its table first. Restarting the collectors at the same
+  # time overloaded a 4-CPU machine, and left SigNoz's collectors stuck.
+  k -n "$namespace" rollout status deployment/postgres --timeout=300s
+  step "Postgres logs and statistics"
+  k apply -f "$dir/k8s/monitor-secret.yaml"
+  # Helm restarts the collectors only if their config changed. Restarting them anyway
+  # would register every metric series again, which is needless work for ClickHouse.
   install_k8s_infra
   k -n signoz rollout status deployment/k8s-infra-otel-deployment --timeout=180s
   k -n signoz rollout status daemonset/k8s-infra-otel-agent --timeout=180s

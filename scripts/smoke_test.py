@@ -7,7 +7,37 @@ Usage: smoke_test.py 1|2|3
 import os
 import sys
 
-from signoz_client import LAB3_URL, LABS, count, fire, login, metric_exists, query, read_credentials, request, wait_for
+from signoz_client import LAB3_URL, LAB5_URL, LABS, count, fire, login, metric_exists, query, read_credentials, request, wait_for
+
+
+def smoke_test_lab5(token):
+    """Proves each way Postgres reports on itself reaches SigNoz."""
+
+    def slow_query():
+        return request(f"{LAB5_URL}/api/scenario/missing_index", {}, timeout=30)[0] == 200
+
+    wait_for("the app and Postgres", slow_query, timeout=300)
+    wait_for(
+        "database spans from the app",
+        lambda: slow_query() and count(token, "traces", "service.name = 'lab5-app' AND db.system = 'postgresql'", minutes=2),
+        timeout=180,
+        interval=15,
+    )
+    # The cluster collector's two receivers. Each fails on its own if its login,
+    # address or pipeline is wrong, with no error in the collector's status.
+    wait_for("metrics from the postgresql receiver", lambda: metric_exists(token, "postgresql.backends", minutes=3), timeout=180)
+    wait_for("metrics from the sqlquery receiver", lambda: metric_exists(token, "postgres.sessions.blocked", minutes=3), timeout=180)
+    try:
+        wait_for(
+            "Postgres's own log, with a query plan",
+            lambda: slow_query() and count(token, "logs", "service.name = 'postgres' AND body CONTAINS 'Seq Scan'", minutes=3),
+            timeout=180,
+            interval=15,
+        )
+    except SystemExit:
+        print(COLLECTORS_STUCK, file=sys.stderr)
+        raise
+    print("Smoke test passed: Lab 5's spans, statistics and Postgres log are reaching SigNoz.")
 
 
 COLLECTORS_STUCK = """Spans are arriving but logs aren't, so a SigNoz collector may be stuck while reporting Running.
@@ -65,8 +95,8 @@ def smoke_test_lab3(token):
 
 def main():
     lab = sys.argv[1] if len(sys.argv) > 1 else ""
-    if lab not in (*LABS, "3"):
-        raise SystemExit("Usage: smoke_test.py 1|2|3")
+    if lab not in (*LABS, "3", "5"):
+        raise SystemExit("Usage: smoke_test.py 1|2|3|5")
 
     credentials = read_credentials()
     if not credentials:
@@ -77,6 +107,8 @@ def main():
 
     if lab == "3":
         return smoke_test_lab3(token)
+    if lab == "5":
+        return smoke_test_lab5(token)
     backend = LABS[lab]["backend"]
 
     def order_succeeds():

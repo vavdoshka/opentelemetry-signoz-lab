@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>An order that waits · Lab 5 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="lockwait">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 5: incident 1 of 4</p>
+<h1>An order that waits</h1>
+<p class="lead">An order takes 14 seconds, nothing fails, and the slow query updates one row. The trace shows where the time went. Only Postgres can say what it was waiting for.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#trace">3. What the trace shows</a></li><li><a href="#postgres">4. What Postgres shows</a></li><li><a href="#cause">5. Root cause</a></li><li><a href="#fix">6. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p><code>lock_wait</code> places two orders, one second apart. The first keeps its row locked while it waits for a slow payment provider.</p>
+<div data-fire="lock_wait" data-lab="lab5" data-hint="Takes about 15 seconds."></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>The request succeeds, but it took 15.4 seconds. The response says the second order took 14.2 of them. Nothing failed, and no span has an error.</p>
+
+<h2 class="step" id="trace"><span class="n">3</span>What the trace shows</h2>
+<div data-query="t-lab5-writes">Loading saved query...</div>
+<p>Two identical statements, which update one row each:</p>
+<figure class="code"><pre><code>UPDATE stock SET qty = qty - 1 WHERE item = %s        28 ms
+UPDATE stock SET qty = qty - 1 WHERE item = %s    14,112 ms</code></pre></figure>
+<p>The trace is right about where the time went, but it can&#x27;t say why. It looks just like a slow query. From this alone you could blame the SQL, a missing index or the disk, and you&#x27;d be wrong each time.</p>
+
+<h2 class="step" id="postgres"><span class="n">4</span>What Postgres shows</h2>
+<p>Postgres logs any wait longer than <code>deadlock_timeout</code>, which is 1 second by default:</p>
+<div data-query="l-lab5-lock-waits">Loading saved query...</div>
+<figure class="code"><figcaption><span>One log record, with its attributes</span></figcaption><pre><code>process 2296 still waiting for ShareLock on transaction 778 after 1002.715 ms
+postgres.detail:    Process holding the lock: 2295. Wait queue: 2296.
+postgres.statement: UPDATE stock SET qty = qty - 1 WHERE item = $1
+postgres.user:      shop</code></pre></figure>
+<p>That&#x27;s the whole answer: this statement isn&#x27;t slow, it&#x27;s waiting for another session. The count of blocked sessions shows the same thing on a chart:</p>
+<div data-query="m-lab5-blocked">Loading saved query...</div>
+<p>While it&#x27;s happening, you can also ask Postgres directly who is blocking whom:</p>
+<figure class="code"><pre><code>kubectl -n lab5 exec deploy/postgres -c postgres -- psql -U lab -d lab -c &quot;SELECT pid, pg_blocking_pids(pid) AS blocked_by, wait_event_type, left(query, 50) AS query FROM pg_stat_activity WHERE wait_event_type = &#x27;Lock&#x27;&quot;</code></pre></figure>
+<figure class="code"><figcaption><span>Output during this run</span></figcaption><pre><code> pid  | blocked_by | wait_event_type |                     query
+------+------------+-----------------+------------------------------------------------
+ 2296 | {2295}     | Lock            | UPDATE stock SET qty = qty - 1 WHERE item = $1
+(1 row)</code></pre></figure>
+<p>Be careful with the metric you&#x27;d reach for first. <code>postgresql.database.locks</code> never showed this wait, as <a href="lab5.html">the start of this lab</a> explains.</p>
+
+<h2 class="step" id="cause"><span class="n">5</span>Root cause</h2>
+<figure class="code"><figcaption><span><code>labs/lab5-postgres/app/shop.py</code> lines 45–51</span></figcaption><pre><code><span class="ln">45</span>def hold_row_during_payment() -&gt; None:
+<span class="ln">46</span>    &quot;&quot;&quot;Takes a row, then keeps the transaction open during a slow call.&quot;&quot;&quot;
+<span class="ln">47</span>    with psycopg.connect(DSN) as conn:
+<span class="ln">48</span>        conn.execute(TAKE_FROM_STOCK, (&quot;coffee&quot;,))
+<span class="ln">49</span>        log.info(&quot;waiting for the payment provider&quot;)
+<span class="ln">50</span>        # Deliberate bug: the row stays locked until this transaction ends.
+<span class="ln">51</span>        time.sleep(HOLD_SECONDS)</code></pre></figure>
+<p>An <code>UPDATE</code> locks its row until the transaction ends, and here the transaction stays open during a slow call. Everyone who wants that row queues up behind it. In a real app that might be a payment provider, an email or any other HTTP call.</p>
+
+<h2 class="step" id="fix"><span class="n">6</span>Resolution</h2>
+<p>Make the slow call first, and keep the transaction short:</p>
+<figure class="code"><figcaption><span>The fix for labs/lab5-postgres/app/shop.py. Tried on 2026-11-09, then undone <span class="badge api">Query API only</span></span></figcaption><pre><code><span class="del">-    with psycopg.connect(DSN) as conn:</span>
+<span class="del">-        conn.execute(TAKE_FROM_STOCK, (&quot;coffee&quot;,))</span>
+<span class="del">-        log.info(&quot;waiting for the payment provider&quot;)</span>
+<span class="del">-        # Deliberate bug: the row stays locked until this transaction ends.</span>
+<span class="del">-        time.sleep(HOLD_SECONDS)</span>
+<span class="add">+    log.info(&quot;waiting for the payment provider&quot;)</span>
+<span class="add">+    time.sleep(HOLD_SECONDS)</span>
+<span class="add">+    with psycopg.connect(DSN) as conn:</span>
+<span class="add">+        conn.execute(TAKE_FROM_STOCK, (&quot;coffee&quot;,))</span></code></pre></figure>
+<h3>Try the fix</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> Make that edit in <code>labs/lab5-postgres/app/shop.py</code>, and save it.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab5</code></pre></figure></li>
+  <li><strong>Fire the same request.</strong> In our run, the second order took 0.1 seconds, not 14.2.<div data-fire="lock_wait" data-lab="lab5"></div></li>
+  <li><strong>Check Postgres&#x27;s log.</strong> <strong>Sessions waiting for a lock</strong> should find nothing new.</li>
+  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it.<figure class="code"><pre><code>git restore labs/lab5-postgres/app/shop.py
+make lab5</code></pre></figure></li>
+</ol>
+
+<div class="quiz" data-quiz="lw1"><p class="q">Check yourself: A one-row UPDATE takes 14 seconds in a trace. What&#x27;s the first thing to check?</p><button type="button" data-right="false" data-why="An index wouldn&#x27;t help a query that&#x27;s waiting for another session. The time wasn&#x27;t spent working.">Whether the table needs an index.</button><button type="button" data-right="true" data-why="A slow write to one row usually means it was waiting. Postgres&#x27;s log says so, and names the holder.">Whether the session was waiting for a lock.</button><button type="button" data-right="false" data-why="Possible, but a disk problem would slow everything down, not one of two identical statements.">Whether the disk is slow.</button></div>
+<div class="quiz" data-quiz="lw2"><p class="q">Check yourself: Why doesn&#x27;t postgresql.database.locks show this wait in this lab?</p><button type="button" data-right="false" data-why="They are, and pg_stat_activity shows the session waiting for one.">Because row locks aren&#x27;t real locks.</button><button type="button" data-right="true" data-why="Its query joins pg_class in the database it&#x27;s connected to, which here is never the app&#x27;s.">Because it asks from the postgres database, so it can&#x27;t name the app&#x27;s tables.</button><button type="button" data-right="false" data-why="It&#x27;s read every 10 seconds, and the wait lasts 15. It was read during the wait, and stock wasn&#x27;t there.">Because it updates too slowly.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

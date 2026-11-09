@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>An order that gets cancelled · Lab 5 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="deadlock">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 5: incident 2 of 4</p>
+<h1>An order that gets cancelled</h1>
+<p class="lead">Two orders arrive together, and Postgres cancels one. This time the trace does say what happened. Postgres adds which statements were involved, and how often it happens.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#trace">3. What the trace shows</a></li><li><a href="#postgres">4. What Postgres shows</a></li><li><a href="#cause">5. Root cause</a></li><li><a href="#fix">6. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p><code>deadlock</code> places two orders at once. Each one needs the same two rows, and they take them in opposite orders.</p>
+<div data-fire="deadlock" data-lab="lab5" data-hint="Takes about a second."></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>HTTP 500 after about 1.5 seconds: <code>{"error": "DeadlockDetected", "failed_orders": 1}</code>. One order failed, and the other succeeded.</p>
+
+<h2 class="step" id="trace"><span class="n">3</span>What the trace shows</h2>
+<p>This time the trace knows quite a lot. The failed <code>UPDATE</code> took 1,055 ms, and its exception event says what happened:</p>
+<figure class="code"><figcaption><span>exception.message on the failed span</span></figcaption><pre><code>deadlock detected
+DETAIL:  Process 398 waits for ShareLock on transaction 755; blocked by process 397.
+Process 397 waits for ShareLock on transaction 756; blocked by process 398.
+HINT:  See server log for query details.
+CONTEXT:  while updating tuple (0,2) in relation &quot;stock&quot;</code></pre></figure>
+<p>About a second is no accident: that&#x27;s <code>deadlock_timeout</code>, which is how long Postgres waits before it checks for a deadlock. The exception tells you it was a deadlock, and which processes were involved. Look at its last line, though: for the queries, it sends you to the server log.</p>
+
+<h2 class="step" id="postgres"><span class="n">4</span>What Postgres shows</h2>
+<div data-query="l-lab5-deadlocks">Loading saved query...</div>
+<figure class="code"><figcaption><span>postgres.detail on that log record</span></figcaption><pre><code>Process 398 waits for ShareLock on transaction 755; blocked by process 397.
+Process 397 waits for ShareLock on transaction 756; blocked by process 398.
+Process 398: UPDATE stock SET qty = qty - 1 WHERE item = $1
+Process 397: UPDATE stock SET qty = qty - 1 WHERE item = $1</code></pre></figure>
+<p>That adds the statement each process was running. Here they&#x27;re the same, because both orders do the same thing, and the values are left out of the log. To see which rows each one took, and in what order, you read the code, which is the next step.</p>
+<p>The counter tells you whether this is a one-off or a pattern. It goes up by one for each deadlock, but it can take about a minute to move:</p>
+<div data-query="m-lab5-deadlocks">Loading saved query...</div>
+
+<h2 class="step" id="cause"><span class="n">5</span>Root cause</h2>
+<figure class="code"><figcaption><span><code>labs/lab5-postgres/app/shop.py</code> lines 64–68</span></figcaption><pre><code><span class="ln">64</span>def take_in_order(first: str, second: str, both_have_one: threading.Barrier) -&gt; None:
+<span class="ln">65</span>    with psycopg.connect(DSN) as conn:
+<span class="ln">66</span>        conn.execute(TAKE_FROM_STOCK, (first,))
+<span class="ln">67</span>        both_have_one.wait(timeout=5)
+<span class="ln">68</span>        conn.execute(TAKE_FROM_STOCK, (second,))</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab5-postgres/app/shop.py</code> lines 73–77</span></figcaption><pre><code><span class="ln">73</span>    # Deliberate bug: two orders take the same rows in opposite orders.
+<span class="ln">74</span>    results = await asyncio.gather(
+<span class="ln">75</span>        asyncio.to_thread(take_in_order, &quot;coffee&quot;, &quot;bagel&quot;, both_have_one),
+<span class="ln">76</span>        asyncio.to_thread(take_in_order, &quot;bagel&quot;, &quot;coffee&quot;, both_have_one),
+<span class="ln">77</span>        return_exceptions=True,</code></pre></figure>
+<p>The first order holds <code>coffee</code> and wants <code>bagel</code>. The second holds <code>bagel</code> and wants <code>coffee</code>. Neither can ever finish, so Postgres cancels one. The barrier only makes the timing certain here. In real traffic it happens now and then, under load, which is what makes it hard to reproduce.</p>
+
+<h2 class="step" id="fix"><span class="n">6</span>Resolution</h2>
+<p>Always take rows in the same order. Then the second order just waits for the first:</p>
+<figure class="code"><figcaption><span>The fix for labs/lab5-postgres/app/shop.py. Tried on 2026-11-09, then undone <span class="badge api">Query API only</span></span></figcaption><pre><code><span class="del">-        conn.execute(TAKE_FROM_STOCK, (first,))</span>
+<span class="del">-        both_have_one.wait(timeout=5)</span>
+<span class="del">-        conn.execute(TAKE_FROM_STOCK, (second,))</span>
+<span class="add">+        for item in sorted((first, second)):</span>
+<span class="add">+            conn.execute(TAKE_FROM_STOCK, (item,))</span></code></pre></figure>
+<p>Retrying also works, because Postgres has already rolled the cancelled transaction back. Code <code>40P01</code> tells you it&#x27;s safe.</p>
+<h3>Try the fix</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> Make that edit in <code>labs/lab5-postgres/app/shop.py</code>, and save it.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab5</code></pre></figure></li>
+  <li><strong>Fire the same request.</strong> It should now answer HTTP 200 with <code>failed_orders</code> at 0.<div data-fire="deadlock" data-lab="lab5"></div></li>
+  <li><strong>Check Postgres&#x27;s log.</strong> <strong>Deadlocks Postgres broke</strong> should find nothing new.</li>
+  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it.<figure class="code"><pre><code>git restore labs/lab5-postgres/app/shop.py
+make lab5</code></pre></figure></li>
+</ol>
+
+<div class="quiz" data-quiz="dl1"><p class="q">Check yourself: Why did the failed UPDATE take about a second?</p><button type="button" data-right="false" data-why="It updates one small row. The time wasn&#x27;t spent working.">Because the row was large.</button><button type="button" data-right="true" data-why="1 second by default. Checking is expensive, so it only looks after waiting that long.">Because Postgres waits for deadlock_timeout before it checks for a deadlock.</button><button type="button" data-right="false" data-why="It doesn&#x27;t retry. Postgres cancelled it once, and the app reported that.">Because the app retried.</button></div>
+<div class="quiz" data-quiz="dl2"><p class="q">Check yourself: What does Postgres&#x27;s log add to what the span&#x27;s exception already says?</p><button type="button" data-right="false" data-why="The exception already says that.">That it was a deadlock.</button><button type="button" data-right="true" data-why="The exception names the processes, and sends you to the server log for the queries.">The statements each process was running.</button><button type="button" data-right="false" data-why="This lab leaves those out of the log on purpose.">The values in the query.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

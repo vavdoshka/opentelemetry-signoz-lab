@@ -1,0 +1,101 @@
+# Lab 5: added on top of signoz/k8s-infra-values.yaml by `make lab5`. It works
+# with or without Lab 3's file.
+#
+# Nothing runs inside Postgres. The cluster collector asks it for statistics, and
+# the node agents read its log.
+presets:
+  logsCollection:
+    blacklist:
+      # filelog/postgres below reads this container's output instead. Helm replaces
+      # a list rather than merging it, so this has to match Lab 3's.
+      containers: [audit-log, journal-log, postgres-log]
+
+otelDeployment:
+  additionalEnvs:
+    POSTGRES_MONITOR_PASSWORD:
+      valueFrom:
+        secretKeyRef: { name: lab5-postgres-monitor, key: password }
+  config:
+    receivers:
+      # The standard way: reads Postgres's statistics views as otel_monitor. It runs
+      # in the one cluster collector, so nothing is collected twice.
+      postgresql:
+        endpoint: postgres.lab5.svc.cluster.local:5432
+        transport: tcp
+        username: otel_monitor
+        password: ${env:POSTGRES_MONITOR_PASSWORD}
+        databases: [lab]
+        collection_interval: 10s
+        tls: { insecure: true }
+        metrics:
+          # These are off by default. So is postgresql.database.locks, which stays off:
+          # in this version it asks from the postgres database, and can only name tables
+          # there. Here that's never the app's tables, only the collector's own locks.
+          postgresql.deadlocks: { enabled: true }
+          postgresql.sequential_scans: { enabled: true }
+      # So nothing above says a session is stuck waiting for a lock. Ask for that directly.
+      sqlquery/postgres:
+        driver: postgres
+        datasource: "host=postgres.lab5.svc.cluster.local port=5432 user=otel_monitor password=${env:POSTGRES_MONITOR_PASSWORD} dbname=lab sslmode=disable"
+        collection_interval: 10s
+        max_open_conn: 1
+        queries:
+          - sql: "SELECT count(*) AS blocked FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
+            metrics:
+              - { metric_name: postgres.sessions.blocked, value_column: blocked, value_type: int, data_type: gauge }
+    processors:
+      resource/postgres:
+        attributes:
+          - { key: service.name, value: postgres, action: upsert }
+          - { key: k8s.namespace.name, value: lab5, action: upsert }
+    service:
+      pipelines:
+        metrics/postgres:
+          receivers: [postgresql, sqlquery/postgres]
+          processors: [resource/postgres, resourcedetection, batch]
+          exporters: [otlphttp]
+
+otelAgent:
+  config:
+    receivers:
+      # Postgres's log, one JSON object per entry, from the postgres-log container.
+      filelog/postgres:
+        include: [/var/log/pods/lab5_postgres-*/postgres-log/*.log]
+        include_file_name: false
+        start_at: end
+        operators:
+          # The container runtime writes each line as "<time> <stream> <tag> <line>".
+          - type: regex_parser
+            regex: '^\S+ (?P<stream>stdout|stderr) \S+ (?P<line>.*)$'
+          - { type: filter, expr: 'attributes.stream != "stdout"' }
+          - { type: move, from: attributes.line, to: body }
+          - { type: remove, field: attributes.stream }
+          - type: json_parser
+            parse_to: attributes.pg
+            timestamp: { parse_from: attributes.pg.timestamp, layout: '%Y-%m-%d %H:%M:%S.%L %Z' }
+            severity:
+              parse_from: attributes.pg.error_severity
+              mapping:
+                debug: [DEBUG, DEBUG1, DEBUG2, DEBUG3, DEBUG4, DEBUG5]
+                info: [LOG, INFO, NOTICE]
+                warn: WARNING
+                error: ERROR
+                fatal: [FATAL, PANIC]
+          # The body is what Postgres said. These are what you search and group on.
+          - { type: move, from: attributes.pg.state_code, to: 'attributes["postgres.state_code"]', if: 'attributes.pg.state_code != nil' }
+          - { type: move, from: attributes.pg.backend_type, to: 'attributes["postgres.backend_type"]', if: 'attributes.pg.backend_type != nil' }
+          - { type: move, from: attributes.pg.user, to: 'attributes["postgres.user"]', if: 'attributes.pg.user != nil' }
+          - { type: move, from: attributes.pg.detail, to: 'attributes["postgres.detail"]', if: 'attributes.pg.detail != nil' }
+          - { type: move, from: attributes.pg.statement, to: 'attributes["postgres.statement"]', if: 'attributes.pg.statement != nil' }
+          - { type: move, from: attributes.pg.message, to: body }
+          - { type: remove, field: attributes.pg }
+          - { type: add, field: 'resource["service.name"]', value: postgres }
+          - { type: add, field: 'resource["k8s.namespace.name"]', value: lab5 }
+    service:
+      pipelines:
+        # resourcedetection adds the node and cluster names. k8sattributes is left
+        # out, because this comes from a file, not from a pod's connection.
+        logs/postgres:
+          receivers: [filelog/postgres]
+          processors: [resourcedetection, batch]
+          exporters: [otlphttp]

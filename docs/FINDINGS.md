@@ -200,6 +200,11 @@ back at 21:51. This time both replicas got stuck, with the same `PrepareBatch` e
 read-only replicas. Deleting both pods brought linked logs back within 14 seconds. The smoke test's "logs linked to
 traces" step is what exposed it, so that step now prints this diagnosis.
 
+It happened a third time on 2026-11-09, while building Lab 5. Loading 2 million rows into Postgres while the collectors
+restarted, then repeating expensive scans in a smoke test, pushed the load to 74. ClickHouse failed its liveness probe
+and restarted. The last log was written at 07:06:24, and both collectors stayed stuck until we deleted them at 07:17.
+Loading 500,000 rows, and running each heavy step on its own, peaked at a load of 59 for about a minute, with no drops.
+
 This matches an open issue, [signoz-otel-collector#965](https://github.com/SigNoz/signoz-otel-collector/issues/965)
 "clickhouselogsexporter: pushToClickhouse deadlocks when the consumer exits early", which others confirm on
 v0.144.15, the version here and the latest release at the time of writing. A commenter there reproduced it from
@@ -611,6 +616,39 @@ name has to allow for that. A test that matched the exact name reported that thi
 
 **`eval_window` in SigNoz's log is misleading.** It logs 300000 for every rule, because that's a legacy
 field that defaults to 5 minutes. The query uses `evaluation.spec.evalWindow`, as the timings confirm.
+
+## Looking inside Postgres
+
+Lab 5 is optional. A trace sees a query from outside: its SQL, how long it took, and whether it failed. These settings get
+the rest from Postgres, with nothing running inside it. Each incident was triggered for real on 2026-11-09.
+
+| Incident | What the trace showed | What Postgres added |
+|---|---|---|
+| Lock wait | Two identical one-row `UPDATE`s, of 28 ms and 14,112 ms, and no reason | `still waiting for ShareLock`, and `Process holding the lock: 2295` |
+| Deadlock | An error span, whose exception already says `deadlock detected`, and sends you to the server log for the queries | The statement each process was running, and a running count |
+| Missing index | A `SELECT` of about 250 ms | `Seq Scan on sales`, from `auto_explain`, and a climbing count of whole-table reads |
+| Out of connections | A 503, with **no span at all** for the order that failed, because it never ran a query | `FATAL` with code `53300` for each refusal, and connections at 23 against a limit of 30 |
+
+Each fix was deployed and tried, then undone. The second order went from 14.2 s to 0.1 s. The deadlock scenario answered 200 with 0
+failed orders. The lookup span went from about 250 ms to about 3 ms. Capping connections at 10 let the next order succeed.
+None of them left a new error in Postgres's log.
+
+Four things didn't work the way their documentation suggests:
+
+- **`postgresql.database.locks` can't see your tables.** In collector v0.139.0 it asks from a connection to the `postgres`
+  database, and joins `pg_class` there. During a real lock wait on `stock`, it listed only `pg_class`, `pg_locks` and
+  other catalogs: the collector's own locks. `connect_database`, which newer versions document, makes this version
+  refuse to start. A `sqlquery` receiver counting `wait_event_type = 'Lock'` read exactly 1 during the wait.
+- **SigNoz's Postgres dashboard opens empty.** `postgresql/postgresql.json` saves `host.name = Srikanths-MacBook-Pro.local` as a
+  filter, along with someone else's tables. Lab 5 has its own dashboard instead.
+- **Turning off parameter logging doesn't hide values from plans.** With all three settings at 0, `auto_explain` still logged
+  `Filter: (lower(email) = 'customer4518@example.com'::text)`.
+- **Reserving connections for monitoring made little difference.** The collector reuses connections it already holds. With the
+  reservation removed, `postgresql.backends` still read 23, and only `postgresql.db_size` missed one scrape. It might
+  matter more if the collector had to reconnect during an incident, which we didn't test.
+
+It costs little: 59 series from 22 metric names, 2 log records every 5 minutes when idle, and about 25m of CPU and 42 MiB.
+`postgresql.deadlocks` can take about a minute to move.
 
 ## AI analysis
 

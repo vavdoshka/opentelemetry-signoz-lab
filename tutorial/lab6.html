@@ -15,7 +15,7 @@
 <main id="main">
 <p class="eyebrow">Lab 6: AI analysis</p>
 <h1>Connect an AI agent</h1>
-<p class="lead">An AI agent can query SigNoz the way you do, read the answer, and decide what to ask next. This lab connects one with read-only access, then measures how well it works.</p>
+<p class="lead">An AI agent can query SigNoz the way you do, read the answer, and decide what to ask next. This lab connects one with read-only access, then measures how well it works. It doesn&#x27;t need Lab 5.</p>
 
 <h2 id="fits">Where this lab fits</h2>
 <p>The new parts connect to the rest from outside, with read-only access. Everything else stays as it was.</p>
@@ -130,8 +130,8 @@ claude</code></pre></figure>
 <h2>What it costs</h2>
 <p>At idle, in the cluster: 129 MiB for the MCP server, with almost no CPU. The real cost is the model. <a href="ai-ask.html">A question</a> cost $0.10 to $0.16 here, on Sonnet 5.5. <a href="ai-measured.html">Investigations</a> are measured separately.</p>
 
-<div class="quiz" data-quiz="l1"><p class="q">Check yourself: What actually stops the AI from deleting an alert rule?</p><button type="button" data-right="false" data-why="Instructions ask. They can&#x27;t enforce anything.">The instructions in AGENTS.md.</button><button type="button" data-right="true" data-why="The check happens outside the AI, so no prompt can get past it.">SigNoz refuses it, because the key only has the viewer role.</button><button type="button" data-right="false" data-why="It has several. With this key they fail with 403.">The MCP server has no delete tool.</button></div>
-<div class="quiz" data-quiz="l2"><p class="q">Check yourself: Why use the MCP server instead of giving the agent SigNoz's API docs?</p><button type="button" data-right="false" data-why="The API is open. The lab&#x27;s own scripts use it.">It&#x27;s the only way to reach SigNoz.</button><button type="button" data-right="true" data-why="That&#x27;s why the same server works with Claude Code and OpenCode.">Any harness can use the same tools, with descriptions written for agents.</button><button type="button" data-right="false" data-why="It provides tools. How well they&#x27;re used still depends on the model.">It makes the model more accurate by itself.</button></div>
+<div class="quiz" data-quiz="lb6a"><p class="q">Check yourself: What actually stops the AI from deleting an alert rule?</p><button type="button" data-right="false" data-why="Instructions ask. They can&#x27;t enforce anything.">The instructions in AGENTS.md.</button><button type="button" data-right="true" data-why="The check happens outside the AI, so no prompt can get past it.">SigNoz refuses it, because the key only has the viewer role.</button><button type="button" data-right="false" data-why="It has several. With this key they fail with 403.">The MCP server has no delete tool.</button></div>
+<div class="quiz" data-quiz="lb6b"><p class="q">Check yourself: Why use the MCP server instead of giving the agent SigNoz's API docs?</p><button type="button" data-right="false" data-why="The API is open. The lab&#x27;s own scripts use it.">It&#x27;s the only way to reach SigNoz.</button><button type="button" data-right="true" data-why="That&#x27;s why the same server works with Claude Code and OpenCode.">Any harness can use the same tools, with descriptions written for agents.</button><button type="button" data-right="false" data-why="It provides tools. How well they&#x27;re used still depends on the model.">It makes the model more accurate by itself.</button></div>
 
 
 <section class="page-end" id="page-end" aria-label="Page navigation"></section>

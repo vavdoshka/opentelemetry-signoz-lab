@@ -151,6 +151,32 @@ labelled `lab: lab4` that it no longer lists.
 shows it at `lab4.localhost:8080`. To use a real service, change the channel's `config` in
 `alerts.json`. SigNoz's OpenAPI file (`docs/api/openapi.yml` in its repo) has an example for each one.
 
+## Lab 5: Postgres (optional)
+
+Lab 5 has its own Postgres, so Labs 1 and 2 stay as they are. Nothing runs inside it. `make lab5` adds
+`labs/lab5-postgres/k8s-infra-values.yaml` to the collectors, and `make up` keeps it there if the `lab5`
+namespace exists.
+
+| Setting | File | Why |
+|---|---|---|
+| `logging_collector=on`, `log_destination=jsonlog` | `k8s/app.yaml` | One JSON object per log entry. As plain text, a deadlock's detail and a query plan would each become many log lines |
+| `log_min_duration_statement=100` | `k8s/app.yaml` | Logs any statement over 100 ms |
+| `shared_preload_libraries=auto_explain`, `auto_explain.log_min_duration=100` | `k8s/app.yaml` | Logs the plan of the same statements, which says why they were slow |
+| `log_lock_waits=on` | `k8s/app.yaml` | Logs any lock wait longer than `deadlock_timeout`, 1 second by default |
+| `log_parameter_max_length=0`, `log_parameter_max_length_on_error=0`, `auto_explain.log_parameter_max_length=0` | `k8s/app.yaml` | Leaves a query's values out of the logs. A plan can still show one |
+| `max_parallel_workers_per_gather=0` | `k8s/app.yaml` | One process per scan, because this VM is small |
+| `max_connections=30`, `reserved_connections=2` | `k8s/app.yaml` | Low, so the scenario reaches the limit quickly. The reserved ones let the collector connect when the app has used the rest |
+| Role `otel_monitor`, with `pg_monitor` and `pg_use_reserved_connections` | `k8s/app.yaml` | What the collector logs in as. It can read statistics, and can't read or change your data |
+| Role `shop` | `k8s/app.yaml` | What the app logs in as. The image's own user is a superuser, which could use the reserved connections too |
+| `postgres-log` container | `k8s/app.yaml` | Prints the log file, so the node agents can read it |
+| `postgresql` receiver, every 10 s | `k8s-infra-values.yaml` | The standard statistics. Runs in the one cluster collector, so nothing is collected twice |
+| `postgresql.deadlocks`, `postgresql.sequential_scans` | `k8s-infra-values.yaml` | Off by default |
+| `postgresql.database.locks` left off | `k8s-infra-values.yaml` | In collector v0.139.0 it asks from the `postgres` database, and can only name tables there. It only showed the collector's own locks |
+| `sqlquery/postgres` receiver | `k8s-infra-values.yaml` | So nothing else says a session is stuck waiting for a lock. This asks for that directly |
+| `filelog/postgres` receiver | `k8s-infra-values.yaml` | Turns each log entry into one log record, with `service.name = postgres` |
+| `postgres-log` in `presets.logsCollection.blacklist.containers` | `k8s-infra-values.yaml`, and Lab 3's | So the chart's own log collection doesn't read it too. Helm replaces a list rather than merging it, so both files have the same one |
+| Dashboard `Lab 5: Postgres` | `labs/lab5-postgres/dashboard.json` | Its own, because SigNoz's `postgresql/postgresql.json` opens empty: its saved filters name one person's laptop |
+
 ## Lab 6: AI analysis
 
 The agent is the one on your machine, with the login it already has. `make lab6` only deploys what it connects to:

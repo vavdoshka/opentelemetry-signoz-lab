@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Out of connections · Lab 5 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="connections">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 5: incident 4 of 4</p>
+<h1>Out of connections</h1>
+<p class="lead">Postgres refuses new connections, and the next order fails. There&#x27;s no failed query to look at, because the order never got as far as running one.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#trace">3. What the trace shows</a></li><li><a href="#postgres">4. What Postgres shows</a></li><li><a href="#cause">5. Root cause</a></li><li><a href="#fix">6. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p><code>too_many_clients</code> opens connections and keeps them until Postgres refuses one. Then it tries to place an ordinary order, and holds the connections for 15 seconds, so the statistics catch it.</p>
+<div data-fire="too_many_clients" data-lab="lab5" data-hint="Takes about 15 seconds."></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>HTTP 503. It opened 21 connections before Postgres refused, and the next order failed too:</p>
+<figure class="code"><figcaption><span>The response</span></figcaption><pre><code>{&quot;scenario&quot;:&quot;too_many_clients&quot;,&quot;status&quot;:503,&quot;result&quot;:{&quot;connections_opened&quot;:21,
+ &quot;refused_with&quot;:&quot;connection failed: connection to server at \&quot;10.43.21.22\&quot;, port 5432 failed: FATAL:  remaining connection slots are reserved for roles with privileges of the \&quot;pg_use_reserved_connections\&quot; role&quot;,
+ &quot;next_order&quot;:&quot;failed&quot;}}</code></pre></figure>
+
+<h2 class="step" id="trace"><span class="n">3</span>What the trace shows</h2>
+<p>Very little. The request span has an error, and took 15 seconds:</p>
+<figure class="code"><pre><code>POST /api/scenario/{name}    15,924 ms    error
+(no span for the order that failed)</code></pre></figure>
+<p>What&#x27;s missing is the point: there&#x27;s no span for the order that failed. The agent traces queries, and that order never got far enough to run one. If you only search for failed database calls, you&#x27;ll find nothing.</p>
+
+<h2 class="step" id="postgres"><span class="n">4</span>What Postgres shows</h2>
+<div data-query="l-lab5-refused">Loading saved query...</div>
+<figure class="code"><figcaption><span>One log record, with its attributes</span></figcaption><pre><code>FATAL  remaining connection slots are reserved for roles with privileges of the &quot;pg_use_reserved_connections&quot; role
+postgres.state_code: 53300
+postgres.user:       shop</code></pre></figure>
+<p>Note the level, <code>FATAL</code>, and the code, <code>53300</code>. Postgres logged each refusal, even though the app never ran a query. The statistics show how close to the limit it is, which you could alert on before anyone gets refused:</p>
+<div data-query="m-lab5-connections">Loading saved query...</div>
+<p><code>postgresql.backends</code> peaked at 23, against a <code>postgresql.connection.max</code> of 30. It only counts the <code>lab</code> database: the app&#x27;s 21, plus 2 from the collector, which has another 2 open to the <code>postgres</code> database.</p>
+
+<h3>Why monitoring gets its own connections</h3>
+<p>The limit is 30, but ordinary users only get 25: 3 are for superusers, and 2 are the <code>reserved_connections</code> this lab sets up for <code>otel_monitor</code>. We ran this incident both ways: <span class="badge api">Query API only</span></p>
+<table>
+  <thead><tr><th>Monitoring&#x27;s user</th><th>During the incident</th></tr></thead>
+  <tbody><tr><td>Has <code>pg_use_reserved_connections</code></td><td>Every metric kept arriving, and <code>postgresql.backends</code> read 23</td></tr><tr><td>Doesn&#x27;t</td><td>Almost every metric kept arriving, and <code>postgresql.backends</code> still read 23. One, <code>postgresql.db_size</code>, missed one scrape, with <code>remaining connection slots are reserved</code> in the collector&#x27;s log</td></tr></tbody>
+</table>
+<p>The difference was small, because the collector keeps its connections open and reuses them. It would matter more if the collector had to reconnect during an incident, for example after a restart. We didn&#x27;t test that. <span class="badge untested">Untested</span></p>
+
+<h2 class="step" id="cause"><span class="n">5</span>Root cause</h2>
+<figure class="code"><figcaption><span><code>labs/lab5-postgres/app/shop.py</code> lines 101–107</span></figcaption><pre><code><span class="ln">101</span>def open_until_refused(held: list) -&gt; str:
+<span class="ln">102</span>    while len(held) &lt; 100:
+<span class="ln">103</span>        try:
+<span class="ln">104</span>            held.append(psycopg.connect(DSN))
+<span class="ln">105</span>        except psycopg.OperationalError as exc:
+<span class="ln">106</span>            return str(exc).strip().splitlines()[-1]
+<span class="ln">107</span>    return &quot;&quot;</code></pre></figure>
+<p>Each connection is a whole Postgres process, so a limit is there on purpose, and this lab sets a low one. This app keeps opening them with nothing to stop it. The collector&#x27;s 4 connections count too, which is why the app got 21 of the 25.</p>
+
+<h2 class="step" id="fix"><span class="n">6</span>Resolution</h2>
+<p>Limit how many connections the app can open. Here that&#x27;s a simple cap, which stands in for a connection pool, such as <code>psycopg_pool.ConnectionPool(max_size=10)</code> in a real app:</p>
+<figure class="code"><figcaption><span>The fix for labs/lab5-postgres/app/shop.py. Tried on 2026-11-09, then undone <span class="badge api">Query API only</span></span></figcaption><pre><code><span class="del">-    while len(held) &lt; 100:</span>
+<span class="add">+    while len(held) &lt; 10:</span></code></pre></figure>
+<h3>Try the fix</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> Make that edit in <code>labs/lab5-postgres/app/shop.py</code>, and save it.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab5</code></pre></figure></li>
+  <li><strong>Fire the same request.</strong> It should now answer HTTP 200, open 10 connections, and the next order should succeed.<div data-fire="too_many_clients" data-lab="lab5"></div></li>
+  <li><strong>Check Postgres&#x27;s log.</strong> <strong>Connections Postgres refused</strong> should find nothing new.</li>
+  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it.<figure class="code"><pre><code>git restore labs/lab5-postgres/app/shop.py
+make lab5</code></pre></figure></li>
+</ol>
+
+<div class="quiz" data-quiz="cc1"><p class="q">Check yourself: Why is there no span for the order that failed?</p><button type="button" data-right="false" data-why="The agent was fine. It recorded the request&#x27;s span.">Because the agent was overloaded.</button><button type="button" data-right="true" data-why="Postgres refused the connection first, so there was no query to record.">Because it never ran a query, and the agent traces queries.</button><button type="button" data-right="false" data-why="Failed spans are kept. There was just nothing to record here.">Because spans aren&#x27;t kept for failures.</button></div>
+<div class="quiz" data-quiz="cc2"><p class="q">Check yourself: The limit is 30. Why does the app only get 21?</p><button type="button" data-right="false" data-why="It doesn&#x27;t round anything.">Because Postgres rounds it down.</button><button type="button" data-right="true" data-why="30 minus 3 for superusers and 2 for monitoring leaves 25, and monitoring was already using 4 of those.">Because 5 are reserved, and the monitoring user&#x27;s 4 connections count too.</button><button type="button" data-right="false" data-why="It has no limit, which is the bug.">Because the app has a limit of 21.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

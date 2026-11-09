@@ -88,7 +88,7 @@
 <h2 id="setup">Gap 5: nothing is set up for you</h2>
 <p>A fresh install has 0 dashboards, 0 alert rules, 0 notification channels, 0 log pipelines and 0 saved views <span class="badge api">API</span>. You should plan to:</p>
 <ul>
-  <li><strong>Import dashboards.</strong> <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a> has folders such as <code>apm/</code>, <code>k8s-infra-metrics/</code> and <code>postgresql/</code>. <a href="lab3.html">Lab 3</a> imports four Kubernetes ones. The others are <span class="badge untested">Untested</span> here.</li>
+  <li><strong>Import dashboards.</strong> <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a> has folders such as <code>apm/</code>, <code>k8s-infra-metrics/</code> and <code>postgresql/</code>. <a href="lab3.html">Lab 3</a> imports four Kubernetes ones. The Postgres one opens empty, as <a href="lab5.html">Lab 5</a> explains. The others are <span class="badge untested">Untested</span> here.</li>
   <li><strong>Write alerts.</strong> That repo has no alert definitions, so you write your own. <a href="lab4.html">Lab 4</a> has eight, each proved against a real failure.</li>
   <li><strong>Add a notification channel</strong>, or alerts will have nowhere to go.</li>
 </ul>
@@ -100,7 +100,7 @@
 <p>If that isn&#x27;t 0, restart them. Logs came back within 14 seconds when we did:</p>
 <figure class="code"><pre><code>kubectl -n signoz delete pod -l app.kubernetes.io/component=otel-collector</code></pre></figure>
 <p><strong>It can stop all logs, not just some.</strong> It happened again on 2026-11-08, when two load generators and an image build, running together, overloaded the VM at about 21:40 UTC. ClickHouse restarted twice, and was healthy again by 21:51. This time both collectors got stuck, repeating <code>couldn&#x27;t PrepareBatch for inserting resource fingerprints: context deadline exceeded</code>. No log was written after 21:39:57, and nothing recovered by itself: 45 minutes later both pods were still <code>1/1 Running</code> with 0 restarts, and spans were still arriving, so traces looked fine. The Logs page just showed nothing new. So if logs stop and traces don&#x27;t, check this first. The smoke test in <code>make lab1</code> and <code>make lab2</code> now suggests it. <span class="badge api">API</span></p>
-<p>It&#x27;s why this tutorial asks you to run one load generator at a time.</p>
+<p>It&#x27;s why this tutorial asks you to run one load generator at a time. It happened a third time while we built <a href="lab5.html">Lab 5</a>, when loading a large table and restarting the collectors at once stopped logs for 12 minutes.</p>
 
 <h2 id="noise">Gap 7: smaller issues</h2>
 <h3>Span noise</h3>

@@ -2,7 +2,7 @@
 # The other commands find the running cluster themselves.
 
 .DEFAULT_GOAL := help
-.PHONY: help check up lab1 lab2 lab3 lab4 lab6 investigate compare status tutorial down
+.PHONY: help check up lab1 lab2 lab3 lab4 lab5 lab6 investigate compare status tutorial down
 
 help: ## Show the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z0-9]+:.*## / {printf "  make %-10s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -24,6 +24,9 @@ lab3: ## Deploy Lab 3 and its extra scrape jobs
 
 lab4: ## Deploy Lab 4: alert rules and a place to receive them
 	@scripts/deploy-alerts.sh
+
+lab5: ## Optional. Deploy Lab 5: Postgres's own logs and statistics
+	@scripts/deploy-lab.sh 5
 
 lab6: ## Deploy Lab 6: SigNoz's MCP server and read-only access for AI agents
 	@scripts/deploy-ai.sh

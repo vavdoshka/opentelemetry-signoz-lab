@@ -26,6 +26,7 @@
   <li><strong>Getting telemetry out.</strong> The OpenTelemetry Operator adds a Python agent to each app pod as it starts. The agent sends traces, logs and metrics over OTLP to a node agent.</li>
   <li><strong>Collecting the rest.</strong> Node agents also read every container&#x27;s output, and collect pod and node metrics. Lab 3 adds more from the kubelet, the kernel and the API server.</li>
   <li><strong>Storing and reading it.</strong> Two SigNoz collectors write everything to ClickHouse, and the SigNoz UI and API read it from there.</li>
+  <li><strong>Looking inside the database (optional).</strong> Lab 5 runs its own Postgres with its logging turned up. The node agents read that log, and the cluster collector asks Postgres for its statistics.</li>
   <li><strong>Acting on it.</strong> Lab 4&#x27;s alert rules post to a small alert sink. Lab 6&#x27;s AI agent runs on your machine, and reads through an MCP server and a read-only Kubernetes account.</li>
 </ol>
 
@@ -35,6 +36,7 @@
   <tbody>
     <tr><td><code>frontend</code>, <code>backend</code></td><td><strong>Yes.</strong> A Python agent, added by the Operator. Lab 2 also adds OpenTelemetry API calls to their code</td><td>Traces, logs and metrics, from inside the app</td></tr>
     <tr><td>Postgres</td><td><strong>No</strong></td><td>Only what can be seen from outside it, as explained below</td></tr>
+    <tr><td>Lab 5&#x27;s Postgres</td><td><strong>No.</strong> Its settings make it report on itself</td><td>Its own log, including slow queries, query plans and lock waits, and its statistics</td></tr>
     <tr><td><code>lab3-workload</code></td><td><strong>Yes.</strong> The same Python agent, with no OpenTelemetry code</td><td>Traces, logs and metrics, from inside the app</td></tr>
     <tr><td>Load generators</td><td>Labs 1 and 2: <strong>no</strong>, because they only make traffic. Lab 3: <strong>yes</strong>, because a killed pod can&#x27;t report itself, so its caller records the failures</td><td>Their output and pod metrics. Lab 3&#x27;s also sends spans</td></tr>
     <tr><td>kubelet, nodes, API server</td><td><strong>No</strong></td><td>What they already publish: metrics and log files, collected by Lab 3</td></tr>
@@ -48,14 +50,15 @@
     <li><strong>Its log lines, from the node agents.</strong> They read what Postgres prints. Those lines have no <code>service.name</code>, so search with <code>k8s.container.name = &#x27;postgres&#x27;</code>.</li>
     <li><strong>Its pod&#x27;s CPU and memory,</strong> from the kubelet.</li>
   </ul>
+  <p><a href="lab5.html">Lab 5</a> is optional, and shows how to get what Postgres knows about itself, still with nothing running inside it.</p>
 </div>
 
-<h2>Five labs, in order</h2>
+<h2>Six labs, in order</h2>
 <table>
   <thead><tr><th>Lab</th><th>What you do</th><th>What you learn</th><th>Start it</th></tr></thead>
-  <tbody><tr><td><strong>1. Hands-off</strong></td><td>Get telemetry from an app with no OpenTelemetry code</td><td>How much you get for free, through six incidents</td><td><code>make up</code></td></tr><tr><td><strong>2. Custom dimensions</strong></td><td>Add a few OpenTelemetry API calls, only where they help</td><td>How to slice telemetry by things only your code knows, through four incidents</td><td><code>make lab2</code></td></tr><tr><td><strong>3. Kubernetes</strong></td><td>Watch what the app runs on: pods, nodes, the kubelet and the API server</td><td>How to debug throttling, OOM kills and failed probes, and which metrics quietly miss them</td><td><code>make lab3</code></td></tr><tr><td><strong>4. Alerts</strong></td><td>Add eight alert rules, and a place to receive them</td><td>How to write alerts that fire for real failures, and how long they take</td><td><code>make lab4</code></td></tr><tr><td><strong>5. AI analysis</strong></td><td>Connect your own AI agent, with read-only access</td><td>How to set it up safely, what to ask it, and how good its answers are</td><td><code>make lab6</code></td></tr></tbody>
+  <tbody><tr><td><strong>1. Hands-off</strong></td><td>Get telemetry from an app with no OpenTelemetry code</td><td>How much you get for free, through six incidents</td><td><code>make up</code></td></tr><tr><td><strong>2. Custom dimensions</strong></td><td>Add a few OpenTelemetry API calls, only where they help</td><td>How to slice telemetry by things only your code knows, through four incidents</td><td><code>make lab2</code></td></tr><tr><td><strong>3. Kubernetes</strong></td><td>Watch what the app runs on: pods, nodes, the kubelet and the API server</td><td>How to debug throttling, OOM kills and failed probes, and which metrics quietly miss them</td><td><code>make lab3</code></td></tr><tr><td><strong>4. Alerts</strong></td><td>Add eight alert rules, and a place to receive them</td><td>How to write alerts that fire for real failures, and how long they take</td><td><code>make lab4</code></td></tr><tr><td><strong>5. Postgres</strong> (optional)</td><td>Make Postgres report on itself, with nothing running inside it</td><td>How to find out why a query was slow or stuck, through four incidents</td><td><code>make lab5</code></td></tr><tr><td><strong>6. AI analysis</strong></td><td>Connect your own AI agent, with read-only access</td><td>How to set it up safely, what to ask it, and how good its answers are</td><td><code>make lab6</code></td></tr></tbody>
 </table>
-<p>Each lab builds on the last, and they all run side by side and send to the same SigNoz. You move on only for what the last lab couldn&#x27;t show.</p>
+<p>Each lab builds on the last, and they all run side by side and send to the same SigNoz. You move on only for what the last lab couldn&#x27;t show. Lab 5 is optional, and Lab 6 doesn&#x27;t need it.</p>
 
 <h2>Before you start</h2>
 <h3>1. Start the lab</h3>

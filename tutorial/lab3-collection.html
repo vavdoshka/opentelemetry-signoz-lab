@@ -18,23 +18,23 @@
 <p class="lead">The incidents used this data without asking where it came from. This page covers the scrape jobs and cluster logs behind it, and what storing them costs.</p>
 <h2>The scrape jobs</h2>
 <p>All four are in <code>labs/lab3-kubernetes/k8s-infra-values.yaml</code>. This is the one that adds throttling:</p>
-<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code> lines 43–59</span></figcaption><pre><code><span class="ln">43</span>      # cAdvisor, which is built into the kubelet: throttling and OOM events.
-<span class="ln">44</span>      - job_name: cadvisor
-<span class="ln">45</span>        scrape_interval: 30s
-<span class="ln">46</span>        scheme: https
-<span class="ln">47</span>        metrics_path: /metrics/cadvisor
-<span class="ln">48</span>        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
-<span class="ln">49</span>        tls_config: { insecure_skip_verify: true }
-<span class="ln">50</span>        kubernetes_sd_configs: [{ role: node }]
-<span class="ln">51</span>        relabel_configs:
-<span class="ln">52</span>          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
-<span class="ln">53</span>        metric_relabel_configs:
-<span class="ln">54</span>          - source_labels: [__name__]
-<span class="ln">55</span>            action: keep
-<span class="ln">56</span>            regex: container_cpu_cfs_(throttled_)?periods_total|container_cpu_cfs_throttled_seconds_total|container_oom_events_total
-<span class="ln">57</span>          # An empty container label means the pod&#x27;s cgroup or its pause container.
-<span class="ln">58</span>          - { source_labels: [container], action: drop, regex: &quot;&quot; }
-<span class="ln">59</span>          - { action: labeldrop, regex: id|image|name }</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code> lines 44–60</span></figcaption><pre><code><span class="ln">44</span>      # cAdvisor, which is built into the kubelet: throttling and OOM events.
+<span class="ln">45</span>      - job_name: cadvisor
+<span class="ln">46</span>        scrape_interval: 30s
+<span class="ln">47</span>        scheme: https
+<span class="ln">48</span>        metrics_path: /metrics/cadvisor
+<span class="ln">49</span>        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
+<span class="ln">50</span>        tls_config: { insecure_skip_verify: true }
+<span class="ln">51</span>        kubernetes_sd_configs: [{ role: node }]
+<span class="ln">52</span>        relabel_configs:
+<span class="ln">53</span>          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
+<span class="ln">54</span>        metric_relabel_configs:
+<span class="ln">55</span>          - source_labels: [__name__]
+<span class="ln">56</span>            action: keep
+<span class="ln">57</span>            regex: container_cpu_cfs_(throttled_)?periods_total|container_cpu_cfs_throttled_seconds_total|container_oom_events_total
+<span class="ln">58</span>          # An empty container label means the pod&#x27;s cgroup or its pause container.
+<span class="ln">59</span>          - { source_labels: [container], action: drop, regex: &quot;&quot; }
+<span class="ln">60</span>          - { action: labeldrop, regex: id|image|name }</code></pre></figure>
 <p>Three things to notice:</p>
 <ul>
   <li><strong>The keep-list.</strong> <code>action: keep</code> throws away everything else before it reaches SigNoz. This endpoint has about 3,000 series per node, and this job keeps a handful.</li>

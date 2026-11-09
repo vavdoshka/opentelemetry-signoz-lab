@@ -23,6 +23,7 @@ Lab 1     $LAB1_URL
 Lab 2     $LAB2_URL
 Lab 3     $LAB3_URL
 Lab 4     $LAB4_URL
+Lab 5     $LAB5_URL  (optional)
 MCP       http://mcp.localhost:8080/mcp
 SigNoz    $SIGNOZ_URL  (to see the login: cat .lab-credentials)
 Tutorial  run: make tutorial

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lab 5: inside Postgres</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22 role=%22img%22 aria-label=%22Spans in a trace%2C the last one failing%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%231f62b5%22/%3E%3Crect x=%225%22 y=%227%22 width=%2222%22 height=%224.5%22 rx=%222.25%22 fill=%22%23fff%22/%3E%3Crect x=%229%22 y=%2214%22 width=%2213%22 height=%224.5%22 rx=%222.25%22 fill=%22%23fff%22/%3E%3Crect x=%2214%22 y=%2221%22 width=%2213%22 height=%224.5%22 rx=%222.25%22 fill=%22%23ffa26e%22/%3E%3C/svg%3E">
+<style>
+  :root { --bg:#f7f7f5; --card:#fff; --ink:#1d1d1b; --muted:#6b6b66; --line:#e3e2dc; --ok:#1f7a4d; --err:#b3261e; --accent:#2f5bd3; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:20px 28px 8px; }
+  header h1 { margin:0 0 4px; font-size:20px; }
+  header p { margin:0; color:var(--muted); }
+  main { display:grid; grid-template-columns: minmax(380px, 1fr) minmax(380px, 1fr); gap:20px; padding:16px 28px 28px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; }
+  h2 { font-size:15px; margin:0 0 12px; }
+  .scenario { display:flex; gap:12px; align-items:flex-start; padding:8px 0; border-top:1px solid var(--line); }
+  .scenario:first-of-type { border-top:none; }
+  .scenario button { min-width:120px; }
+  .scenario .desc { color:var(--muted); }
+  button { font:inherit; padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  input { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px; width:80px; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:8px 0; }
+  #results { font:12px/1.5 ui-monospace, Menlo, monospace; max-height:560px; overflow:auto; }
+  .res { padding:6px 0; border-top:1px solid var(--line); }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Lab 5: inside Postgres</h1>
+  <p>A small shop whose database is where things go wrong. Each scenario shows what a trace can see, and what only Postgres can tell you.</p>
+</header>
+<main>
+  <div>
+    <section>
+      <h2>Scenarios</h2>
+      <div id="scenarios"></div>
+    </section>
+  </div>
+  <section>
+    <h2>Results</h2>
+    <div id="results"></div>
+  </section>
+</main>
+<script>
+async function run(name) {
+  const div = document.createElement("div");
+  div.className = "res";
+  try {
+    const r = await fetch(`/api/scenario/${name}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    div.textContent = `${r.status} ${name} ${JSON.stringify((await r.json()).result ?? "")}`;
+  } catch (e) { div.textContent = `${name}: ${e}`; }
+  document.getElementById("results").prepend(div);
+}
+
+async function loadScenarios() {
+  const list = await (await fetch("/api/scenarios")).json();
+  const box = document.getElementById("scenarios");
+  for (const s of list) {
+    const row = document.createElement("div");
+    row.className = "scenario";
+    row.innerHTML = `<button onclick="run('${s.name}')">${s.name}</button><span class="desc">${s.description}</span>`;
+    box.appendChild(row);
+  }
+}
+
+
+loadScenarios();
+</script>
+</body>
+</html>

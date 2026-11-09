@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A query that reads everything · Lab 5 · Telemetry with SigNoz</title>
+<link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js" defer></script>
+</head>
+<body data-page="missingindex">
+<a class="skip" href="#main">Skip to content</a>
+<nav id="sidebar" aria-label="Tutorial pages"></nav>
+<main id="main">
+<p class="eyebrow">Lab 5: incident 3 of 4</p>
+<h1>A query that reads everything</h1>
+<p class="lead">A lookup is a little slow, and nothing else is wrong. The trace says how long it took. The plan says what it spent the time on.</p>
+<ul class="steps" aria-label="Steps on this page"><li><a href="#trigger">1. Trigger it</a></li><li><a href="#symptom">2. Symptom</a></li><li><a href="#trace">3. What the trace shows</a></li><li><a href="#postgres">4. What Postgres shows</a></li><li><a href="#cause">5. Root cause</a></li><li><a href="#fix">6. Resolution</a></li></ul>
+
+<h2 class="step" id="trigger"><span class="n">1</span>Trigger it</h2>
+<p><code>missing_index</code> looks up one customer&#x27;s sales by email, in a table of 500,000 rows.</p>
+<div data-fire="missing_index" data-lab="lab5"></div>
+
+<h2 class="step" id="symptom"><span class="n">2</span>Symptom</h2>
+<p>Each lookup takes about 250 ms, to find about a dozen rows. Nothing fails. It isn&#x27;t slow enough for anyone to notice one request, which is how this kind of problem grows with the table.</p>
+
+<h2 class="step" id="trace"><span class="n">3</span>What the trace shows</h2>
+<div data-query="t-lab5-sales">Loading saved query...</div>
+<p>The span has the SQL and how long it took. Unlike the lock wait, the time really was spent working, but the span can&#x27;t say on what.</p>
+
+<h2 class="step" id="postgres"><span class="n">4</span>What Postgres shows</h2>
+<p>Any statement over 100 ms gets its plan logged, because of <code>auto_explain</code>:</p>
+<div data-query="l-lab5-plans">Loading saved query...</div>
+<figure class="code"><figcaption><span>The body of one log record</span></figcaption><pre><code>duration: 221.035 ms  plan:
+Query Text: SELECT count(*), coalesce(sum(total), 0) FROM sales WHERE lower(email) = $1
+Aggregate  (cost=12667.50..12667.51 rows=1 width=40)
+  -&gt;  Seq Scan on sales  (cost=0.00..12655.00 rows=2500 width=7)
+        Filter: (lower(email) = &#x27;customer4518@example.com&#x27;::text)</code></pre></figure>
+<p><code>Seq Scan on sales</code> means it read the whole table. The statistics agree, because sequential scans on <code>sales</code> climb with each lookup:</p>
+<div data-query="m-lab5-seq-scans">Loading saved query...</div>
+<div class="note"><p>Look at the <code>Filter</code> line. The settings keep values out of the log, but the plan still shows this customer&#x27;s email. It&#x27;s made up here. On a real system, it wouldn&#x27;t be.</p></div>
+
+<h2 class="step" id="cause"><span class="n">5</span>Root cause</h2>
+<figure class="code"><figcaption><span><code>labs/lab5-postgres/app/shop.py</code> lines 86–92</span></figcaption><pre><code><span class="ln">86</span>def customer_history(email: str) -&gt; tuple[int, float]:
+<span class="ln">87</span>    with psycopg.connect(DSN) as conn:
+<span class="ln">88</span>        # Deliberate bug: nothing indexes lower(email), so this reads the whole table.
+<span class="ln">89</span>        row = conn.execute(
+<span class="ln">90</span>            &quot;SELECT count(*), coalesce(sum(total), 0) FROM sales WHERE lower(email) = %s&quot;, (email,)
+<span class="ln">91</span>        ).fetchone()
+<span class="ln">92</span>    return row[0], float(row[1])</code></pre></figure>
+<p>Nothing indexes <code>lower(email)</code>, so Postgres has no choice but to read every row and compute it. An index on <code>email</code> alone wouldn&#x27;t help: it has to match the expression in the query.</p>
+
+<h2 class="step" id="fix"><span class="n">6</span>Resolution</h2>
+<p>This one is a database change, not code, so there&#x27;s nothing to deploy. Add the index:</p>
+<figure class="code"><pre><code>kubectl -n lab5 exec deploy/postgres -c postgres -- psql -U lab -d lab -c &quot;CREATE INDEX sales_lower_email ON sales (lower(email))&quot;</code></pre></figure>
+<p>Then fire the same request again:</p>
+<div data-fire="missing_index" data-lab="lab5"></div>
+<p>In our run, the <code>SELECT</code> span went from about 250 ms to about 3 ms. <span class="badge api">Query API only</span> There&#x27;s no plan in the log any more, because it no longer passes 100 ms, so ask for it directly:</p>
+<figure class="code"><pre><code>kubectl -n lab5 exec deploy/postgres -c postgres -- psql -U lab -d lab -c &quot;EXPLAIN SELECT count(*) FROM sales WHERE lower(email) = &#x27;customer1@example.com&#x27;&quot;</code></pre></figure>
+<figure class="code"><figcaption><span>Part of its output, in our run</span></figcaption><pre><code> Aggregate  (cost=4357.80..4357.81 rows=1 width=8)
+   -&gt;  Bitmap Heap Scan on sales  (cost=35.80..4351.55 rows=2500 width=0)
+         Recheck Cond: (lower(email) = &#x27;customer1@example.com&#x27;::text)
+         -&gt;  Bitmap Index Scan on sales_lower_email  (cost=0.00..35.17 rows=2500 width=0)
+               Index Cond: (lower(email) = &#x27;customer1@example.com&#x27;::text)</code></pre></figure>
+<p>Put the bug back, because this page&#x27;s button needs it:</p>
+<figure class="code"><pre><code>kubectl -n lab5 exec deploy/postgres -c postgres -- psql -U lab -d lab -c &quot;DROP INDEX sales_lower_email&quot;</code></pre></figure>
+<p>On a real database, make this a migration, and use <code>CREATE INDEX CONCURRENTLY</code>, so that building it doesn&#x27;t block writes. <span class="badge untested">Untested</span></p>
+<div class="quiz" data-quiz="mi1"><p class="q">Check yourself: Which part of the plan tells you the table has no useful index?</p><button type="button" data-right="false" data-why="That&#x27;s the count and the sum. It would be there either way.">Aggregate.</button><button type="button" data-right="true" data-why="It read every row. With a usable index you&#x27;d see an index scan or a bitmap scan instead.">Seq Scan on sales.</button><button type="button" data-right="false" data-why="That&#x27;s only the statement.">Query Text.</button></div>
+<div class="quiz" data-quiz="mi2"><p class="q">Check yourself: Why wouldn&#x27;t CREATE INDEX ON sales (email) help this query?</p><button type="button" data-right="false" data-why="They index fine.">Because emails are too long to index.</button><button type="button" data-right="true" data-why="Postgres can&#x27;t use an index on email to answer a question about lower(email).">Because the query filters on lower(email), and the index has to match that expression.</button><button type="button" data-right="false" data-why="The size isn&#x27;t what stops it.">Because the table is too small.</button></div>
+
+<section class="page-end" id="page-end" aria-label="Page navigation"></section>
+</main>
+</body>
+</html>

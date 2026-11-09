@@ -15,13 +15,14 @@ breaks. One command, on k3d or kind.
 | **2. Custom dimensions** | Add a few OpenTelemetry API calls, only where they help | How to slice telemetry by things only your code knows, through four incidents | `make lab2` |
 | **3. Kubernetes** | Run a workload with real limits, scrape the kubelet, cAdvisor and API server, and collect cluster, kernel and API audit logs | How to debug throttling, OOM kills and failed probes, through five incidents, and which metrics quietly miss them | `make lab3` |
 | **4. Alerts** | Add eight alert rules, and a page showing what they send | How to write alerts that fire for real failures, and how long they take | `make lab4` |
-| **5. AI analysis** | Connect your own AI agent to SigNoz with read-only access, ask it questions, and let alerts start investigations | How to set it up safely, and how good it is, measured on incidents with known causes | `make lab6` |
+| **5. Postgres** (optional) | Make Postgres report on itself, with nothing running inside it: slow queries, query plans, lock waits and its statistics | How to find out why a query was slow or stuck, through four incidents | `make lab5` |
+| **6. AI analysis** | Connect your own AI agent to SigNoz with read-only access, ask it questions, and let alerts start investigations | How to set it up safely, and how good it is, measured on incidents with known causes | `make lab6` |
 
 Each lab builds on the one before and adds only what it needs. They run side by side on a local
-two-node cluster and send to the same SigNoz.
+two-node cluster and send to the same SigNoz. Lab 5 is optional, and Lab 6 doesn't need it.
 
-An interactive tutorial walks you through all of it: 32 pages, with buttons that trigger real
-failures, 96 saved searches, and code quoted straight from this repo.
+An interactive tutorial walks you through all of it: 37 pages, with buttons that trigger real
+failures, 106 saved searches, and code quoted straight from this repo.
 
 ## What you'll learn
 
@@ -64,6 +65,12 @@ failures, 96 saved searches, and code quoted straight from this repo.
 - Choose a signal that really sees the failure, and a threshold above your normal
 - Send notifications through a webhook, and measure how long they take
 - Automate dashboards and alerts with a service account, instead of a password
+
+**Lab 5 (optional): find out why a query was slow**
+
+- See what a trace can't tell you about a database, and what Postgres can
+- Collect its statistics with the OpenTelemetry Collector's `postgresql` receiver, and its log as one record per entry
+- Work through a lock wait, a deadlock, a missing index and running out of connections
 
 **Lab 6: let an AI agent investigate**
 
@@ -140,6 +147,7 @@ make lab2      # custom dimensions
 make compare   # sends Labs 1 and 2 the same requests and shows what each captured
 make lab3      # Kubernetes
 make lab4      # alerts. Needs Lab 3
+make lab5      # optional: what Postgres knows about itself
 make lab6      # AI analysis: connects your own agent, such as Claude Code
 ```
 
@@ -149,6 +157,7 @@ make lab6      # AI analysis: connects your own agent, such as Claude Code
 | SigNoz | http://signoz.localhost:8080. `make up` generates the login: to see it, `cat .lab-credentials` |
 | Labs 1 to 3 | http://lab1.localhost:8080, and `lab2`, `lab3` in the same form |
 | Alerts received | http://lab4.localhost:8080 |
+| Lab 5 | http://lab5.localhost:8080 |
 | MCP server, for agents | http://mcp.localhost:8080/mcp |
 
 Start the load generator on a lab's page, so SigNoz has data to show, and stop it when you finish.
@@ -163,6 +172,7 @@ Start the load generator on a lab's page, so SigNoz has data to show, and stop i
 | `make lab2` | Deploys Lab 2 and its SigNoz dashboard, or redeploys it after you change its code |
 | `make lab3` | Deploys Lab 3, its extra scrape jobs and its dashboards |
 | `make lab4` | Deploys Lab 4's alert sink and rules, and proves a notification gets through. Needs Lab 3 |
+| `make lab5` | Optional. Deploys Lab 5's app and its own Postgres, and adds that Postgres's log and statistics to the collectors |
 | `make lab6` | Deploys SigNoz's MCP server and read-only access for agents, and proves the access is read-only |
 | `make investigate` | Runs your own AI agent on Lab 4's alerts as they fire. `HARNESS=claude`, `opencode` or `codex`. Needs Lab 4 |
 | `make compare` | Shows what SigNoz captures from Labs 1 and 2 |
@@ -211,6 +221,15 @@ step in:
 | `api_denied` | Asks the API server for secrets it isn't allowed to read |
 
 Lab 4 adds no app of its own. Its rules watch Labs 1 and 3, so these same scenarios set them off.
+
+Lab 5 runs a small shop with its own Postgres, so Labs 1 and 2 stay as they are. Each scenario makes the database the problem:
+
+| Scenario | What happens |
+|---|---|
+| `lock_wait` | One order keeps a row locked during a slow call, and the next order waits for it |
+| `deadlock` | Two orders take the same rows in opposite orders, so Postgres cancels one |
+| `missing_index` | Looks up one customer's sales in a table with no index for that |
+| `too_many_clients` | Opens connections until Postgres refuses, then tries to place an order |
 
 ## Use it on your own cluster
 

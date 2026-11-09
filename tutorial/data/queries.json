@@ -8731,6 +8731,691 @@
     "end": "2026-11-08T17:58:00Z"
    },
    "verified": "api"
+  },
+  {
+   "id": "t-lab5-sales",
+   "group": "Lab 5: traces",
+   "lab": "lab5",
+   "signal": "traces",
+   "title": "Customer lookups",
+   "why": "The span has the SQL and how long it took, but not how Postgres ran it.",
+   "expr": "service.name = 'lab5-app' AND db.statement CONTAINS 'FROM sales'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [
+    "db.statement"
+   ],
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "service.name = 'lab5-app' AND db.statement CONTAINS 'FROM sales'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     },
+     {
+      "name": "db.statement",
+      "fieldContext": "attribute"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "service.name": "lab5-app",
+      "name": "SELECT",
+      "duration_nano": 241845583,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "e86e204fd6743fda6821f82f6e8b2cc9",
+      "timestamp": "2026-11-09T08:00:31.466197303Z",
+      "db.statement": "SELECT count(*), coalesce(sum(total), 0) FROM sales WHERE lower(email) = %s"
+     },
+     {
+      "service.name": "lab5-app",
+      "name": "SELECT",
+      "duration_nano": 257761667,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "ce438220532f8290205ec44584b3bc92",
+      "timestamp": "2026-11-09T08:00:31.120984136Z",
+      "db.statement": "SELECT count(*), coalesce(sum(total), 0) FROM sales WHERE lower(email) = %s"
+     },
+     {
+      "service.name": "lab5-app",
+      "name": "SELECT",
+      "duration_nano": 237460251,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "98eee2fddbd1723b2ac2204a3f599096",
+      "timestamp": "2026-11-09T08:00:30.797234927Z",
+      "db.statement": "SELECT count(*), coalesce(sum(total), 0) FROM sales WHERE lower(email) = %s"
+     },
+     {
+      "service.name": "lab5-app",
+      "name": "SELECT",
+      "duration_nano": 283741125,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "3d4a335e38abe1628684a7c43feaf5b3",
+      "timestamp": "2026-11-09T08:00:30.490672219Z",
+      "db.statement": "SELECT count(*), coalesce(sum(total), 0) FROM sales WHERE lower(email) = %s"
+     },
+     {
+      "service.name": "lab5-app",
+      "name": "SELECT",
+      "duration_nano": 954604001,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "293e5eaa5398cf7ad424efacdda33158",
+      "timestamp": "2026-11-09T08:00:29.449190635Z",
+      "db.statement": "SELECT count(*), coalesce(sum(total), 0) FROM sales WHERE lower(email) = %s"
+     }
+    ],
+    "warnings": [],
+    "matched": 5
+   },
+   "savedWindow": {
+    "start": "2026-11-09T07:58:51Z",
+    "end": "2026-11-09T08:03:11Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-lab5-deadlocks",
+   "group": "Lab 5: logs",
+   "lab": "lab5",
+   "signal": "logs",
+   "title": "Deadlocks Postgres broke",
+   "why": "40P01 is Postgres's code for a deadlock. postgres.detail has the statements involved.",
+   "expr": "service.name = 'postgres' AND postgres.state_code = '40P01'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name = 'postgres' AND postgres.state_code = '40P01'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-09T08:00:13.511Z",
+      "service": "postgres",
+      "severity": "ERROR",
+      "body": "deadlock detected",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 1
+   },
+   "savedWindow": {
+    "start": "2026-11-09T07:58:51Z",
+    "end": "2026-11-09T08:03:11Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-lab5-plans",
+   "group": "Lab 5: logs",
+   "lab": "lab5",
+   "signal": "logs",
+   "title": "Plans of slow statements",
+   "why": "From auto_explain, for anything over 100 ms. Seq Scan means it read the whole table.",
+   "expr": "service.name = 'postgres' AND body CONTAINS 'plan:'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name = 'postgres' AND body CONTAINS 'plan:'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-09T08:00:31.708Z",
+      "service": "postgres",
+      "severity": "LOG",
+      "body": "duration: 221.035 ms  plan:\nQuery Text: SELECT count(*), coalesce(sum(total), 0) FROM sales WHERE lower(email) = $1\nAggregate  (cost=12667.50..12667.51 rows=1 width=40)\n  ->  Seq Scan on sales  (cost=0.00..12655.00 rows=2500 width=7)\n        Filter: (lower(email) = 'customer4518@example.com'::text)",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-09T08:00:31.379Z",
+      "service": "postgres",
+      "severity": "LOG",
+      "body": "duration: 246.126 ms  plan:\nQuery Text: SELECT count(*), coalesce(sum(total), 0) FROM sales WHERE lower(email) = $1\nAggregate  (cost=12667.50..12667.51 rows=1 width=40)\n  ->  Seq Scan on sales  (cost=0.00..12655.00 rows=2500 width=7)\n        Filter: (lower(email) = 'customer34918@example.com'::text)",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-09T08:00:31.035Z",
+      "service": "postgres",
+      "severity": "LOG",
+      "body": "duration: 234.218 ms  plan:\nQuery Text: SELECT count(*), coalesce(sum(total), 0) FROM sales WHERE lower(email) = $1\nAggregate  (cost=12667.50..12667.51 rows=1 width=40)\n  ->  Seq Scan on sales  (cost=0.00..12655.00 rows=2500 width=7)\n        Filter: (lower(email) = 'customer30559@example.com'::text)",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-09T08:00:30.774Z",
+      "service": "postgres",
+      "severity": "LOG",
+      "body": "duration: 277.520 ms  plan:\nQuery Text: SELECT count(*), coalesce(sum(total), 0) FROM sales WHERE lower(email) = $1\nAggregate  (cost=12667.50..12667.51 rows=1 width=40)\n  ->  Seq Scan on sales  (cost=0.00..12655.00 rows=2500 width=7)\n        Filter: (lower(email) = 'customer8956@example.com'::text)",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-09T08:00:30.41Z",
+      "service": "postgres",
+      "severity": "LOG",
+      "body": "duration: 917.279 ms  plan:\nQuery Text: SELECT count(*), coalesce(sum(total), 0) FROM sales WHERE lower(email) = $1\nAggregate  (cost=12667.50..12667.51 rows=1 width=40)\n  ->  Seq Scan on sales  (cost=0.00..12655.00 rows=2500 width=7)\n        Filter: (lower(email) = 'customer31237@example.com'::text)",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 5
+   },
+   "savedWindow": {
+    "start": "2026-11-09T07:58:51Z",
+    "end": "2026-11-09T08:03:11Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-lab5-refused",
+   "group": "Lab 5: logs",
+   "lab": "lab5",
+   "signal": "logs",
+   "title": "Connections Postgres refused",
+   "why": "53300 means too many connections. These have no span, because no query ever ran.",
+   "expr": "service.name = 'postgres' AND postgres.state_code = '53300'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name = 'postgres' AND postgres.state_code = '53300'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-09T08:01:41.642Z",
+      "service": "postgres",
+      "severity": "FATAL",
+      "body": "remaining connection slots are reserved for roles with privileges of the \"pg_use_reserved_connections\" role",
+      "trace_id": ""
+     },
+     {
+      "timestamp": "2026-11-09T08:01:41.538Z",
+      "service": "postgres",
+      "severity": "FATAL",
+      "body": "remaining connection slots are reserved for roles with privileges of the \"pg_use_reserved_connections\" role",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 2
+   },
+   "savedWindow": {
+    "start": "2026-11-09T07:58:51Z",
+    "end": "2026-11-09T08:03:11Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-lab5-deadlocks",
+   "group": "Lab 5: metrics",
+   "lab": "lab5",
+   "signal": "metrics",
+   "title": "Deadlocks so far",
+   "why": "A running total per database, off by default in the receiver. It can take about a minute to move.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": {
+    "metricName": "postgresql.deadlocks",
+    "timeAggregation": "max",
+    "spaceAggregation": "sum"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "time_series",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "postgresql.deadlocks",
+      "timeAggregation": "max",
+      "spaceAggregation": "sum"
+     }
+    ],
+    "stepInterval": 60
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {},
+      "points": 5,
+      "last": 4,
+      "peak": 4,
+      "peak_at": "08:00 UTC"
+     }
+    ],
+    "total_series": 1,
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-09T07:58:51Z",
+    "end": "2026-11-09T08:03:11Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-lab5-seq-scans",
+   "group": "Lab 5: metrics",
+   "lab": "lab5",
+   "signal": "metrics",
+   "title": "Whole-table reads, by table",
+   "why": "A running total, off by default in the receiver. A climbing line on a large table is worth a look.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": [
+    "postgresql.table.name"
+   ],
+   "metric": {
+    "metricName": "postgresql.sequential_scans",
+    "timeAggregation": "max",
+    "spaceAggregation": "sum"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "time_series",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "postgresql.sequential_scans",
+      "timeAggregation": "max",
+      "spaceAggregation": "sum"
+     }
+    ],
+    "stepInterval": 60,
+    "groupBy": [
+     {
+      "name": "postgresql.table.name"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {
+       "postgresql.table.name": "public.sales"
+      },
+      "points": 5,
+      "last": 23,
+      "peak": 23,
+      "peak_at": "08:00 UTC"
+     },
+     {
+      "labels": {
+       "postgresql.table.name": "public.stock"
+      },
+      "points": 5,
+      "last": 1,
+      "peak": 1,
+      "peak_at": "07:58 UTC"
+     }
+    ],
+    "total_series": 2,
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-09T07:58:51Z",
+    "end": "2026-11-09T08:03:11Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-lab5-connections",
+   "group": "Lab 5: metrics",
+   "lab": "lab5",
+   "signal": "metrics",
+   "title": "Connections in use",
+   "why": "Compare it with postgresql.connection.max. You can alert on this before anyone gets refused.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": {
+    "metricName": "postgresql.backends",
+    "timeAggregation": "max",
+    "spaceAggregation": "sum"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "time_series",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "postgresql.backends",
+      "timeAggregation": "max",
+      "spaceAggregation": "sum"
+     }
+    ],
+    "stepInterval": 60
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {},
+      "points": 5,
+      "last": 2,
+      "peak": 23,
+      "peak_at": "08:01 UTC"
+     }
+    ],
+    "total_series": 1,
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-09T07:58:51Z",
+    "end": "2026-11-09T08:03:11Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "t-lab5-writes",
+   "group": "Lab 5: traces",
+   "lab": "lab5",
+   "signal": "traces",
+   "title": "How long each stock update took",
+   "why": "The same one-row statement. A big difference between two runs means one was waiting, not working.",
+   "expr": "service.name = 'lab5-app' AND db.statement CONTAINS 'UPDATE stock'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [
+    "db.statement"
+   ],
+   "spec": {
+    "name": "A",
+    "signal": "traces",
+    "filter": {
+     "expression": "service.name = 'lab5-app' AND db.statement CONTAINS 'UPDATE stock'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ],
+    "selectFields": [
+     {
+      "name": "service.name",
+      "fieldContext": "resource"
+     },
+     {
+      "name": "name",
+      "fieldContext": "span"
+     },
+     {
+      "name": "duration_nano",
+      "fieldContext": "span"
+     },
+     {
+      "name": "response_status_code",
+      "fieldContext": "span"
+     },
+     {
+      "name": "has_error",
+      "fieldContext": "span"
+     },
+     {
+      "name": "db.statement",
+      "fieldContext": "attribute"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "service.name": "lab5-app",
+      "name": "UPDATE",
+      "duration_nano": 14111752284,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "19de23efa5f8ce1ece8a99700cb5dbcd",
+      "timestamp": "2026-11-09T08:07:04.054738304Z",
+      "db.statement": "UPDATE stock SET qty = qty - 1 WHERE item = %s"
+     },
+     {
+      "service.name": "lab5-app",
+      "name": "UPDATE",
+      "duration_nano": 28287709,
+      "response_status_code": "",
+      "has_error": false,
+      "trace_id": "19de23efa5f8ce1ece8a99700cb5dbcd",
+      "timestamp": "2026-11-09T08:07:03.068979928Z",
+      "db.statement": "UPDATE stock SET qty = qty - 1 WHERE item = %s"
+     }
+    ],
+    "warnings": [],
+    "matched": 2
+   },
+   "savedWindow": {
+    "start": "2026-11-09T08:07:02Z",
+    "end": "2026-11-09T08:07:58Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "l-lab5-lock-waits",
+   "group": "Lab 5: logs",
+   "lab": "lab5",
+   "signal": "logs",
+   "title": "Sessions waiting for a lock",
+   "why": "Logged once a wait passes deadlock_timeout. postgres.detail names the process holding the lock.",
+   "expr": "service.name = 'postgres' AND body CONTAINS 'still waiting for'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name = 'postgres' AND body CONTAINS 'still waiting for'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-09T08:07:05.08Z",
+      "service": "postgres",
+      "severity": "LOG",
+      "body": "process 3132 still waiting for ShareLock on transaction 784 after 1009.415 ms",
+      "trace_id": ""
+     }
+    ],
+    "warnings": [],
+    "matched": 1
+   },
+   "savedWindow": {
+    "start": "2026-11-09T08:07:02Z",
+    "end": "2026-11-09T08:07:58Z"
+   },
+   "verified": "api"
+  },
+  {
+   "id": "m-lab5-blocked",
+   "group": "Lab 5: metrics",
+   "lab": "lab5",
+   "signal": "metrics",
+   "title": "Sessions blocked on a lock",
+   "why": "From the sqlquery receiver, every 10 seconds. The postgresql receiver has nothing that says this.",
+   "expr": "",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": {
+    "metricName": "postgres.sessions.blocked",
+    "timeAggregation": "max",
+    "spaceAggregation": "sum"
+   },
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "time_series",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "metrics",
+    "aggregations": [
+     {
+      "metricName": "postgres.sessions.blocked",
+      "timeAggregation": "max",
+      "spaceAggregation": "sum"
+     }
+    ],
+    "stepInterval": 60
+   },
+   "saved": {
+    "kind": "metric",
+    "series": [
+     {
+      "labels": {},
+      "points": 4,
+      "last": 0,
+      "peak": 1,
+      "peak_at": "08:07 UTC"
+     }
+    ],
+    "total_series": 1,
+    "warnings": []
+   },
+   "savedWindow": {
+    "start": "2026-11-09T08:05:50Z",
+    "end": "2026-11-09T08:09:30Z"
+   },
+   "verified": "api"
   }
  ]
 }

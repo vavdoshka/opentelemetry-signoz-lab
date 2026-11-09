@@ -1,0 +1,32 @@
+# The same setup as Lab 1: the app gets a Python agent, with no code. Postgres
+# opts out in app.yaml, because a Python agent can't run inside it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab5
+  annotations:
+    instrumentation.opentelemetry.io/inject-python: "true"
+---
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: zero-code
+  namespace: lab5
+spec:
+  exporter:
+    # The SigNoz agent on the same node.
+    endpoint: http://k8s-infra-otel-agent.signoz.svc.cluster.local:4318
+  sampler:
+    type: parentbased_always_on
+  propagators:
+    - tracecontext
+    - baggage
+  resource:
+    resourceAttributes:
+      deployment.environment: lab5
+  python:
+    env:
+      - { name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: "true" }
+      - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
+      - { name: OTEL_BSP_SCHEDULE_DELAY, value: "500" }
+      - { name: OTEL_METRIC_EXPORT_INTERVAL, value: "10000" }
