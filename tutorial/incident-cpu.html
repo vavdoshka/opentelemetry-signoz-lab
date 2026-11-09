@@ -50,8 +50,13 @@
   <li>Then find what was running at that moment, with a search for long spans in that service.</li>
   <li>Infra Monitoring in SigNoz has Hosts and Kubernetes tabs. See below for what was confirmed.</li>
 </ol>
-<div class="note"><p><strong>Where this metric comes from.</strong> Not from the app: the Python agent sends traces, logs and the app&#x27;s own metrics, but not how much CPU its pod uses. <code>k8s.pod.cpu.usage</code> comes from the SigNoz agent that <code>make up</code> runs on each node, as part of the <code>k8s-infra</code> chart. Its <code>kubeletstats</code> receiver asks the kubelet for every pod&#x27;s usage every 30 seconds. That&#x27;s why it lags, and why short spikes hide, as the evidence below shows.</p>
-<p>So you get it for free, with no change to the app. <a href="lab3.html#collectors">Lab 3</a> explains these agents and what they collect, and shows what pod CPU alone can&#x27;t tell you: a pod held back by its CPU limit can look almost idle on this same chart.</p></div>
+<div class="note"><p><strong>Where this metric comes from.</strong> <code>k8s.pod.cpu.usage</code> doesn&#x27;t come from the app. It comes from the SigNoz agent that <code>make up</code> runs on each node, as part of the <code>k8s-infra</code> chart. Its <code>kubeletstats</code> receiver asks the kubelet for every pod&#x27;s usage every 30 seconds. That&#x27;s why it lags, and why short spikes hide, as the evidence below shows. It works for any pod, with no change to the app, including Postgres, which has no agent.</p>
+<p>The app&#x27;s own Python agent reports CPU too, but differently. In a 45-second burn on 2026-11-09 <span class="badge api">Query API only</span>:</p>
+<table>
+  <thead><tr><th>Metric</th><th>Sent by</th><th>What it measures</th><th>During the burn</th></tr></thead>
+  <tbody><tr><td><code>k8s.pod.cpu.usage</code></td><td>The node agent</td><td>The whole pod, in cores</td><td>0.84</td></tr><tr><td><code>process.cpu.utilization</code></td><td>The app&#x27;s Python agent</td><td>The app&#x27;s process, as a share of all the machine&#x27;s CPUs</td><td>0.24, which on this 4-CPU machine is about one core</td></tr><tr><td><code>system.cpu.utilization</code></td><td>The app&#x27;s Python agent</td><td>The whole machine, not the pod</td><td>Moved with everything else running</td></tr></tbody>
+</table>
+<p>Use the first: it&#x27;s in cores, it covers every container in the pod, and it doesn&#x27;t need an agent. <a href="lab3.html#collectors">Lab 3</a> explains the node agents and what they collect, and shows what pod CPU alone can&#x27;t tell you: a pod held back by its CPU limit can look almost idle on this same chart.</p></div>
 <div class="note"><p><strong>From a trace to its pod:</strong> every span in this lab carries <code>k8s.pod.name</code>, added by the SigNoz agent on the node. So you can go straight from a slow trace to the pod that served it, and then to that pod's CPU. In the saved run it is <code>lab1-backend-7554c777f4-khppk</code>.</p></div>
 
 <h2 class="step" id="search"><span class="n">4</span>Search</h2>
