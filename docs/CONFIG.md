@@ -151,21 +151,21 @@ labelled `lab: lab4` that it no longer lists.
 shows it at `lab4.localhost:8080`. To use a real service, change the channel's `config` in
 `alerts.json`. SigNoz's OpenAPI file (`docs/api/openapi.yml` in its repo) has an example for each one.
 
-## Lab 5: AI analysis
+## Lab 6: AI analysis
 
-The agent is the one on your machine, with the login it already has. `make lab5` only deploys what it connects to:
+The agent is the one on your machine, with the login it already has. `make lab6` only deploys what it connects to:
 
 | What | Where | Why |
 |---|---|---|
-| SigNoz's MCP server, `signoz/signoz-mcp-server:v0.18.0` | `labs/lab5-ai/k8s/mcp.yaml` | Turns SigNoz's API into tools agents can call. Pinned, because each release targets the newest SigNoz |
+| SigNoz's MCP server, `signoz/signoz-mcp-server:v0.18.0` | `labs/lab6-ai/k8s/mcp.yaml` | Turns SigNoz's API into tools agents can call. Pinned, because each release targets the newest SigNoz |
 | `SIGNOZ_API_KEY` from Secret `signoz-viewer` | `scripts/create_ai_access.py` | A service account with the `signoz-viewer` role, so SigNoz refuses changes. The script checks that reading gives 200 and creating a dashboard gives 403 |
 | `SIGNOZ_DOCS_REFRESH_INTERVAL=0`, `SIGNOZ_DOCS_FULL_REFRESH_INTERVAL=0` | `mcp.yaml` | Serves the docs shipped with the server, instead of refetching them from signoz.io |
 | `ANALYTICS_ENABLED=false` | `mcp.yaml` | No product analytics |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME=signoz-mcp` | `mcp.yaml` | The server's own traces go to SigNoz, so you can see each tool call |
 | Ingress at `mcp.localhost` | `mcp.yaml` | Lets agents on your machine connect. It has no login, so anyone who can reach it can read your SigNoz. Fine on a laptop, not on a shared cluster |
-| Ingress at `otlp.localhost` | `labs/lab5-ai/k8s/otlp-ingress.yaml` | Lets an agent on your machine send its own telemetry. It has no login either |
-| ServiceAccount `ai-reader`, ClusterRole `lab5-ai-reader` | `labs/lab5-ai/k8s/reader-rbac.yaml` | Read-only: pods, logs, events, nodes, workloads. No Secrets, ConfigMaps or `exec` |
-| `labs/lab5-ai/workspace/` | `AGENTS.md`, `.mcp.json`, `.claude/settings.json`, `opencode.jsonc` | One directory with the instructions, MCP address and permissions, so nothing else on your machine changes |
+| Ingress at `otlp.localhost` | `labs/lab6-ai/k8s/otlp-ingress.yaml` | Lets an agent on your machine send its own telemetry. It has no login either |
+| ServiceAccount `ai-reader`, ClusterRole `lab6-ai-reader` | `labs/lab6-ai/k8s/reader-rbac.yaml` | Read-only: pods, logs, events, nodes, workloads. No Secrets, ConfigMaps or `exec` |
+| `labs/lab6-ai/workspace/` | `AGENTS.md`, `.mcp.json`, `.claude/settings.json`, `opencode.jsonc` | One directory with the instructions, MCP address and permissions, so nothing else on your machine changes |
 | `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_*` | `workspace/.claude/settings.json` | Claude Code's cost, tokens and tool calls go to your SigNoz, only for sessions in this directory. Prompts aren't included |
 | `.kubeconfig`, `.claude/settings.local.json` in the workspace | `scripts/create_ai_access.py`, git-ignored | A 30-day token for `ai-reader`, and `KUBECONFIG` pointing at it, so an agent's `kubectl` isn't your admin login |
 | SigNoz's skills, pinned to one commit | `scripts/fetch_signoz_skills.py`, git-ignored | `signoz-investigating-alerts`, `signoz-generating-queries` and `signoz-explaining-alerts`, from SigNoz/agent-skills (MIT) |
@@ -175,15 +175,15 @@ The agent is the one on your machine, with the login it already has. `make lab5`
 | What | Why |
 |---|---|
 | Polls Lab 4's sink | SigNoz already sends alerts there, and nothing has to reach into your machine |
-| `labs/lab5-ai/investigate.json` | Which rules start an investigation. Not every alert should spend money, and the file gives the reason for each rule, including those left out |
+| `labs/lab6-ai/investigate.json` | Which rules start an investigation. Not every alert should spend money, and the file gives the reason for each rule, including those left out |
 | `HARNESS=claude`, `opencode` or `codex` | Which agent to run. Only Claude Code has run an investigation here |
 | `--settings .claude/settings.json` | Claude Code ignores a folder's allow list until someone trusts the folder interactively, which can't happen in a headless run |
 | `--setting-sources project,local` | Leaves out your user settings, whose hooks could rewrite commands so they no longer match the allow list |
 | `--strict-mcp-config --mcp-config .mcp.json` | Only this MCP server, not any others you've set up |
 | `MAX_BUDGET_USD = "1.00"`, `MAX_TURNS = "40"`, `MAX_PER_HOUR = 10` | Limits on what one investigation, or a flapping alert, can cost |
-| `labs/lab5-ai/reports/`, git-ignored | Each report, with its cost and turns. The tutorial's live feed reads it |
+| `labs/lab6-ai/reports/`, git-ignored | Each report, with its cost and turns. The tutorial's live feed reads it |
 
-Lab 5 also changes two SigNoz settings, in `signoz/signoz-values.yaml`:
+Lab 6 also changes two SigNoz settings, in `signoz/signoz-values.yaml`:
 
 | What | Why |
 |---|---|

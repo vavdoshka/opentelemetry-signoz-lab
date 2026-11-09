@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Proves Lab 5's cluster side works, with no AI and no cost.
+"""Proves Lab 6's cluster side works, with no AI and no cost.
 
 - The MCP server answers, lists its tools, can read, and is refused writes.
 - The AI's Kubernetes account can read pods and can't read Secrets.
@@ -49,19 +49,19 @@ def main():
     if failed:
         raise SystemExit(f"Reading through MCP failed: {text[:300]}")
     print("  ok: it can read SigNoz")
-    failed, text = call("signoz_create_dashboard", {"title": "Lab 5 smoke test, should be refused", "layout": [], "widgets": []})
+    failed, text = call("signoz_create_dashboard", {"title": "Lab 6 smoke test, should be refused", "layout": [], "widgets": []})
     if not failed or "403" not in text:
         raise SystemExit(f"Creating a dashboard through MCP wasn't refused with 403: {text[:300]}")
     print("  ok: SigNoz refuses its writes (403)")
 
-    reader = ["--as", "system:serviceaccount:lab5:ai-reader"]
+    reader = ["--as", "system:serviceaccount:lab6:ai-reader"]
     if kubectl(context, *reader, "-n", "lab3", "get", "pods").returncode != 0:
         raise SystemExit("The AI's Kubernetes account can't list pods.")
-    if kubectl(context, *reader, "-n", "lab5", "get", "secrets").returncode == 0:
+    if kubectl(context, *reader, "-n", "lab6", "get", "secrets").returncode == 0:
         raise SystemExit("The AI's Kubernetes account can read Secrets. It shouldn't.")
     print("  ok: its Kubernetes account can read pods, and not Secrets")
 
-    print("Smoke test passed: Lab 5's MCP server and read-only access work.")
+    print("Smoke test passed: Lab 6's MCP server and read-only access work.")
 
 
 if __name__ == "__main__":

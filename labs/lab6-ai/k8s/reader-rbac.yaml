@@ -9,11 +9,11 @@
 # machine uses instead of your own login.
 apiVersion: v1
 kind: ServiceAccount
-metadata: { name: ai-reader, namespace: lab5 }
+metadata: { name: ai-reader, namespace: lab6 }
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
-metadata: { name: lab5-ai-reader }
+metadata: { name: lab6-ai-reader }
 rules:
   - apiGroups: [""]
     resources: [pods, pods/log, events, nodes, services, endpoints, namespaces, persistentvolumeclaims]
@@ -31,7 +31,7 @@ rules:
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
-metadata: { name: lab5-ai-reader }
-roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: lab5-ai-reader }
+metadata: { name: lab6-ai-reader }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: lab6-ai-reader }
 subjects:
-  - { kind: ServiceAccount, name: ai-reader, namespace: lab5 }
+  - { kind: ServiceAccount, name: ai-reader, namespace: lab6 }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How good is it? · Lab 5 · Telemetry with SigNoz</title>
+<title>How good is it? · Lab 6 · Telemetry with SigNoz</title>
 <link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
@@ -13,7 +13,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <nav id="sidebar" aria-label="Tutorial pages"></nav>
 <main id="main">
-<p class="eyebrow">Lab 5: AI analysis</p>
+<p class="eyebrow">Lab 6: AI analysis</p>
 <h1>How good is it?</h1>
 <p class="lead">We triggered five incidents whose causes we already knew, let real alerts start real investigations, and read every report. Most of it was right, one was confidently wrong, and the difference is worth seeing.</p>
 
@@ -72,9 +72,9 @@
 <p>The agent didn't notice the stuck collector. It has no way to know what's missing. We found it because the evaluation expected an alert that never came, and we went looking. That's a reason to test your alert path with real failures, as <a href="lab4.html">Lab 4</a> does. <code>evaluate_ai.py</code> now records how many batches the collectors dropped during each case. In all five results above it was 0.</p>
 
 <h2>Watch the AI in SigNoz</h2>
-<p>The AI is a production service too, so SigNoz monitors it. The MCP server sends traces of every tool call, and Claude Code sends its cost, tokens and tool use, because of settings in <code>labs/lab5-ai/k8s/mcp.yaml</code> and <code>labs/lab5-ai/workspace/.claude/settings.json</code>. Claude Code runs on your machine, so it reaches SigNoz through an ingress, <code>labs/lab5-ai/k8s/otlp-ingress.yaml</code>. These are from the five investigations above:</p>
-<div data-query="a-lab5-tools">Loading saved query...</div>
-<div data-query="a-lab5-cost">Loading saved query...</div>
+<p>The AI is a production service too, so SigNoz monitors it. The MCP server sends traces of every tool call, and Claude Code sends its cost, tokens and tool use, because of settings in <code>labs/lab6-ai/k8s/mcp.yaml</code> and <code>labs/lab6-ai/workspace/.claude/settings.json</code>. Claude Code runs on your machine, so it reaches SigNoz through an ingress, <code>labs/lab6-ai/k8s/otlp-ingress.yaml</code>. These are from the five investigations above:</p>
+<div data-query="a-lab6-tools">Loading saved query...</div>
+<div data-query="a-lab6-cost">Loading saved query...</div>
 <p>The second adds up to $0.83, exactly what those five reports said they cost, so you could watch spending with an ordinary SigNoz alert. <span class="badge untested">Untested</span> It also shows why this is affordable: nearly all of the input comes from the cache. Prompts aren't recorded, unless you set <code>OTEL_LOG_USER_PROMPTS=1</code>.</p>
 
 <h2>Every report, in full</h2>

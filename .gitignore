@@ -7,8 +7,8 @@ __pycache__/
 .DS_Store
 .playwright-mcp/
 
-# Lab 5: read-only Kubernetes access for agents, written by make lab5.
-labs/lab5-ai/workspace/.kubeconfig
-labs/lab5-ai/workspace/.claude/settings.local.json
-labs/lab5-ai/workspace/.claude/skills/
-labs/lab5-ai/reports/
+# Lab 6: read-only Kubernetes access for agents, written by make lab6.
+labs/lab6-ai/workspace/.kubeconfig
+labs/lab6-ai/workspace/.claude/settings.local.json
+labs/lab6-ai/workspace/.claude/skills/
+labs/lab6-ai/reports/

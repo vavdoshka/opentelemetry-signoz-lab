@@ -15,7 +15,7 @@ breaks. One command, on k3d or kind.
 | **2. Custom dimensions** | Add a few OpenTelemetry API calls, only where they help | How to slice telemetry by things only your code knows, through four incidents | `make lab2` |
 | **3. Kubernetes** | Run a workload with real limits, scrape the kubelet, cAdvisor and API server, and collect cluster, kernel and API audit logs | How to debug throttling, OOM kills and failed probes, through five incidents, and which metrics quietly miss them | `make lab3` |
 | **4. Alerts** | Add eight alert rules, and a page showing what they send | How to write alerts that fire for real failures, and how long they take | `make lab4` |
-| **5. AI analysis** | Connect your own AI agent to SigNoz with read-only access, ask it questions, and let alerts start investigations | How to set it up safely, and how good it is, measured on incidents with known causes | `make lab5` |
+| **5. AI analysis** | Connect your own AI agent to SigNoz with read-only access, ask it questions, and let alerts start investigations | How to set it up safely, and how good it is, measured on incidents with known causes | `make lab6` |
 
 Each lab builds on the one before and adds only what it needs. They run side by side on a local
 two-node cluster and send to the same SigNoz.
@@ -65,7 +65,7 @@ failures, 96 saved searches, and code quoted straight from this repo.
 - Send notifications through a webhook, and measure how long they take
 - Automate dashboards and alerts with a service account, instead of a password
 
-**Lab 5: let an AI agent investigate**
+**Lab 6: let an AI agent investigate**
 
 - Connect Claude Code to SigNoz through SigNoz's MCP server, and see how OpenCode and Codex connect the same way
 - Keep it read-only with limits it can't talk its way past: a SigNoz viewer key and Kubernetes RBAC
@@ -140,7 +140,7 @@ make lab2      # custom dimensions
 make compare   # sends Labs 1 and 2 the same requests and shows what each captured
 make lab3      # Kubernetes
 make lab4      # alerts. Needs Lab 3
-make lab5      # AI analysis: connects your own agent, such as Claude Code
+make lab6      # AI analysis: connects your own agent, such as Claude Code
 ```
 
 | What | Where |
@@ -163,7 +163,7 @@ Start the load generator on a lab's page, so SigNoz has data to show, and stop i
 | `make lab2` | Deploys Lab 2 and its SigNoz dashboard, or redeploys it after you change its code |
 | `make lab3` | Deploys Lab 3, its extra scrape jobs and its dashboards |
 | `make lab4` | Deploys Lab 4's alert sink and rules, and proves a notification gets through. Needs Lab 3 |
-| `make lab5` | Deploys SigNoz's MCP server and read-only access for agents, and proves the access is read-only |
+| `make lab6` | Deploys SigNoz's MCP server and read-only access for agents, and proves the access is read-only |
 | `make investigate` | Runs your own AI agent on Lab 4's alerts as they fire. `HARNESS=claude`, `opencode` or `codex`. Needs Lab 4 |
 | `make compare` | Shows what SigNoz captures from Labs 1 and 2 |
 | `make status` | Shows nodes, pods and URLs |
@@ -279,7 +279,7 @@ The full write-ups:
 
 "Yes" for Labs 1 and 2 means they boot from nothing and `make compare` gives the same results.
 Rerunning `make up` is tested in the e2e workflow and on both providers on macOS. Recovery after
-stopping the cluster is tested on k3d on macOS, with Labs 1 to 3. Lab 5's MCP server and read-only access are
+stopping the cluster is tested on k3d on macOS, with Labs 1 to 3. Lab 6's MCP server and read-only access are
 tested in the e2e workflow on both providers, with no AI. The AI itself ran on k3d on macOS, headless, with Claude
 Code, and OpenCode was only checked to connect. Other platforms, including Windows and Linux on
 ARM, are untested.

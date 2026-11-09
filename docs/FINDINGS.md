@@ -181,7 +181,7 @@ A fresh install has 0 dashboards, 0 alert rules, 0 notification channels, 0 log 
 
 ### 6. A collector can silently stop writing logs, while reporting healthy
 
-During an overload in Lab 5, one of the two `signoz-otel-collector` pods stopped writing logs to ClickHouse
+During an overload in Lab 6, one of the two `signoz-otel-collector` pods stopped writing logs to ClickHouse
 at 14:11:41, and never recovered. For 84 minutes it stayed `1/1 Running` with 0 restarts, while logging
 `couldn't PrepareBatch for inserting resource fingerprints: context deadline exceeded` and `Exporting failed.
 Dropping data`. The other replica had no such errors, and ClickHouse was answering inserts in about 100 ms.
@@ -614,7 +614,7 @@ field that defaults to 5 minutes. The query uses `evaluation.spec.evalWindow`, a
 
 ## AI analysis
 
-Lab 5 connects your own agent to SigNoz, read-only, through SigNoz's own MCP server. These runs used Claude Code 2.1.319
+Lab 6 connects your own agent to SigNoz, read-only, through SigNoz's own MCP server. These runs used Claude Code 2.1.319
 on Sonnet 5.5, on the Mac. SigNoz's built-in AI assistant isn't an option when self-hosted: the UI has the code, but it
 needs a separate backend that SigNoz hasn't published, and `ai_assistant_url` is unset. OpenCode 2.2.5 connects to the
 same server, but ran no investigation. Codex wasn't tested.

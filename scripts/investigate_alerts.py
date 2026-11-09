@@ -2,9 +2,9 @@
 """Investigates Lab 4's alerts with the AI agent on your machine.
 
 Watches what SigNoz sends to Lab 4's sink. For each alert listed in
-labs/lab5-ai/investigate.json that starts firing, it runs your agent once in
-labs/lab5-ai/workspace, with that directory's instructions, MCP connection and
-permissions, and saves the report in labs/lab5-ai/reports/. The agent uses the
+labs/lab6-ai/investigate.json that starts firing, it runs your agent once in
+labs/lab6-ai/workspace, with that directory's instructions, MCP connection and
+permissions, and saves the report in labs/lab6-ai/reports/. The agent uses the
 login it already has.
 
 It polls the sink, so nothing has to reach into your machine, and it only looks
@@ -26,9 +26,9 @@ from pathlib import Path
 from signoz_client import received_alerts
 
 ROOT = Path(__file__).resolve().parent.parent
-WORKSPACE = ROOT / "labs/lab5-ai/workspace"
-REPORTS = ROOT / "labs/lab5-ai/reports"
-RULES = ROOT / "labs/lab5-ai/investigate.json"
+WORKSPACE = ROOT / "labs/lab6-ai/workspace"
+REPORTS = ROOT / "labs/lab6-ai/reports"
+RULES = ROOT / "labs/lab6-ai/investigate.json"
 
 MAX_TURNS = "40"
 # A cap on Claude Code's own cost estimate for one investigation.

@@ -5,8 +5,8 @@ signoz:
     # ones the MCP server gives AI agents, which otherwise point at an address
     # inside the cluster.
     signoz_global_external__url: http://signoz.localhost:8080
-    # Lab 5's MCP server. This only shows SigNoz's MCP settings page, with how to
-    # connect a client. The server itself is deployed by make lab5.
+    # Lab 6's MCP server. This only shows SigNoz's MCP settings page, with how to
+    # connect a client. The server itself is deployed by make lab6.
     signoz_global_mcp__url: http://mcp.localhost:8080/mcp
 
 otelCollector:

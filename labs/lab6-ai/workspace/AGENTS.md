@@ -33,7 +33,7 @@ says nothing about what has gone wrong before: find that out from the data.
 - `lab3`: `lab3-workload`, with limits of 200m CPU and 256Mi memory and a
   liveness probe. `lab3-loadgen` sends it traffic, and is traced, so its
   spans show failures from the caller's side.
-- `lab4`: the alert sink. `lab5`: the MCP server.
+- `lab4`: the alert sink. `lab6`: the MCP server.
 - `signoz`: SigNoz itself. It's the observer, not the subject.
 
 ## Where the signals are

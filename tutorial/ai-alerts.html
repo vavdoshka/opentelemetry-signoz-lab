@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Investigate alerts by itself · Lab 5 · Telemetry with SigNoz</title>
+<title>Investigate alerts by itself · Lab 6 · Telemetry with SigNoz</title>
 <link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
@@ -13,13 +13,13 @@
 <a class="skip" href="#main">Skip to content</a>
 <nav id="sidebar" aria-label="Tutorial pages"></nav>
 <main id="main">
-<p class="eyebrow">Lab 5: AI analysis</p>
+<p class="eyebrow">Lab 6: AI analysis</p>
 <h1>Investigate alerts by itself</h1>
 <p class="lead">A person gets paged and starts from a one-line alert. Here, your own agent has already looked, and its report is waiting for them.</p>
 <ul class="steps" aria-label="Steps on this page"><li><a href="#start">1. Start it</a></li><li><a href="#trigger">2. Trigger it</a></li><li><a href="#how">3. What happens</a></li><li><a href="#report">4. What it found</a></li><li><a href="#limits">5. What keeps it under control</a></li></ul>
 
 <h2 class="step" id="start"><span class="n">1</span>Start it</h2>
-<p>There's nothing new to install or log in to. The agent is the one you already use, in the workspace from <a href="lab5.html">the start of this lab</a>. In a terminal, from the repo's root:</p>
+<p>There's nothing new to install or log in to. The agent is the one you already use, in the workspace from <a href="lab6.html">the start of this lab</a>. In a terminal, from the repo's root:</p>
 <figure class="code"><pre><code>make investigate</code></pre></figure>
 <p>It runs until you stop it with Ctrl-C. It uses Claude Code unless you choose another. Only Claude Code has run an investigation here, so the others are <span class="badge untested">Untested</span>:</p>
 <figure class="code"><pre><code>make investigate HARNESS=opencode
@@ -44,8 +44,8 @@ SigNoz rule fires ───► Lab 4's sink, in the cluster
                        claude -p "A SigNoz alert just fired..."
                             │  queries SigNoz and Kubernetes, read-only
                             ▼
-                       labs/lab5-ai/reports/, and your terminal</code></pre></figure>
-<p>The script polls the sink that <a href="lab4.html">Lab 4</a> already has, so nothing needs to reach into your machine. It only investigates the rules in <code>labs/lab5-ai/investigate.json</code>, because not every alert should spend money. That file gives a reason for each rule, including those left out: the load generator causes errors on purpose, so an error-rate alert would run all day.</p>
+                       labs/lab6-ai/reports/, and your terminal</code></pre></figure>
+<p>The script polls the sink that <a href="lab4.html">Lab 4</a> already has, so nothing needs to reach into your machine. It only investigates the rules in <code>labs/lab6-ai/investigate.json</code>, because not every alert should spend money. That file gives a reason for each rule, including those left out: the load generator causes errors on purpose, so an error-rate alert would run all day.</p>
 <p>For each alert that starts firing, it runs one headless Claude Code in the workspace:</p>
 <figure class="code"><figcaption><span><code>scripts/investigate_alerts.py</code> lines 53–68</span></figcaption><pre><code><span class="ln">53</span>    if harness == &quot;claude&quot;:
 <span class="ln">54</span>        return [
@@ -63,7 +63,7 @@ SigNoz rule fires ───► Lab 4's sink, in the cluster
 <span class="ln">66</span>            &quot;--max-budget-usd&quot;, MAX_BUDGET_USD,
 <span class="ln">67</span>            &quot;--output-format&quot;, &quot;json&quot;,
 <span class="ln">68</span>        ]</code></pre></figure>
-<p>Each flag is there for a reason we found out the hard way, as <a href="lab5.html">the traps</a> describe. The prompt only passes on what the notification said, and asks for SigNoz's investigation skill:</p>
+<p>Each flag is there for a reason we found out the hard way, as <a href="lab6.html">the traps</a> describe. The prompt only passes on what the notification said, and asks for SigNoz's investigation skill:</p>
 <figure class="code"><figcaption><span><code>scripts/investigate_alerts.py</code> lines 40–49</span></figcaption><pre><code><span class="ln">40</span>PROMPT = &quot;&quot;&quot;A SigNoz alert just fired. Find out why, using the signoz-investigating-alerts skill if you have it.
 <span class="ln">41</span>
 <span class="ln">42</span>Alert: {alertname}

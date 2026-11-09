@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Gives Lab 5's AI read-only access to SigNoz and Kubernetes.
+"""Gives Lab 6's AI read-only access to SigNoz and Kubernetes.
 
-1. A SigNoz service account, lab5-ai, with the signoz-viewer role. Its key goes
-   into the Kubernetes Secret lab5/signoz-viewer, for the MCP server. SigNoz
+1. A SigNoz service account, lab6-ai, with the signoz-viewer role. Its key goes
+   into the Kubernetes Secret lab6/signoz-viewer, for the MCP server. SigNoz
    refuses any change made with it.
-2. A kubeconfig for the lab5/ai-reader ServiceAccount, for the agent on your
-   machine: labs/lab5-ai/workspace/.kubeconfig. RBAC in
-   labs/lab5-ai/k8s/reader-rbac.yaml makes it read-only.
+2. A kubeconfig for the lab6/ai-reader ServiceAccount, for the agent on your
+   machine: labs/lab6-ai/workspace/.kubeconfig. RBAC in
+   labs/lab6-ai/k8s/reader-rbac.yaml makes it read-only.
 
 Safe to rerun: an existing key is kept while SigNoz still accepts it.
 Usage: create_ai_access.py KUBE_CONTEXT
@@ -21,10 +21,10 @@ from pathlib import Path
 
 from signoz_client import SIGNOZ_URL, request, session
 
-ACCOUNT = "lab5-ai"
+ACCOUNT = "lab6-ai"
 ROLE = "signoz-viewer"
-NAMESPACE = "lab5"
-WORKSPACE = Path(__file__).resolve().parent.parent / "labs/lab5-ai/workspace"
+NAMESPACE = "lab6"
+WORKSPACE = Path(__file__).resolve().parent.parent / "labs/lab6-ai/workspace"
 
 
 def kubectl(context, *args, stdin=None):
@@ -91,7 +91,7 @@ def write_kubeconfig(context):
     """A kubeconfig for ai-reader, with this cluster's address and CA."""
     full = json.loads(kubectl(context, "config", "view", "--raw", "--minify", "--flatten", "-o", "json"))
     cluster = full["clusters"][0]["cluster"]
-    # Valid for 30 days. Rerun make lab5 for a new one. This calls the
+    # Valid for 30 days. Rerun make lab6 for a new one. This calls the
     # TokenRequest API directly, because `kubectl create token` needs kubectl 1.24+.
     request_body = {"apiVersion": "authentication.k8s.io/v1", "kind": "TokenRequest", "spec": {"expirationSeconds": 30 * 24 * 3600}}
     response = kubectl(context, "create", "--raw", f"/api/v1/namespaces/{NAMESPACE}/serviceaccounts/ai-reader/token", "-f", "-", stdin=json.dumps(request_body))

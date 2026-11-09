@@ -8558,9 +8558,9 @@
    "verified": "api"
   },
   {
-   "id": "a-lab5-tools",
-   "group": "Lab 5: the AI itself",
-   "lab": "lab5",
+   "id": "a-lab6-tools",
+   "group": "Lab 6: the AI itself",
+   "lab": "lab6",
    "signal": "traces",
    "title": "What the AI asked SigNoz",
    "why": "The MCP server's own traces: each tool call, and how long it took. Prompts and answers aren't in them.",
@@ -8657,9 +8657,9 @@
    "verified": "api"
   },
   {
-   "id": "a-lab5-cost",
-   "group": "Lab 5: the AI itself",
-   "lab": "lab5",
+   "id": "a-lab6-cost",
+   "group": "Lab 6: the AI itself",
+   "lab": "lab6",
    "signal": "logs",
    "title": "What the AI cost",
    "why": "Claude Code's own telemetry, one event per model call. The total matched what it reported for each investigation.",

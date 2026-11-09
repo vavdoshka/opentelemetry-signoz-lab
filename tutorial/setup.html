@@ -32,8 +32,8 @@
     <tr><td><strong>Dashboards</strong></td><td>One for Lab 2, and five for Lab 3</td><td><code>labs/*/dashboard.json</code>, <code>scripts/create_dashboard.py</code></td></tr>
     <tr><td><strong>Scrape jobs</strong></td><td>Lab 3's kubelet, cAdvisor and API server metrics</td><td><code>labs/lab3-kubernetes/k8s-infra-values.yaml</code></td></tr>
     <tr><td><strong>Alerts</strong></td><td>Lab 4's channel and rules</td><td><code>labs/lab4-alerts/alerts.json</code></td></tr>
-    <tr><td><strong>MCP server</strong></td><td>Lab 5's route for AI agents into SigNoz, with a read-only key</td><td><code>labs/lab5-ai/k8s/mcp.yaml</code>, <code>labs/lab5-ai/k8s/otlp-ingress.yaml</code>, <code>scripts/create_ai_access.py</code></td></tr>
-    <tr><td><strong>Your AI agent</strong></td><td>Runs on your machine, not in the cluster. Lab 5 gives it a workspace, and <code>make investigate</code> starts it on alerts</td><td><code>labs/lab5-ai/workspace/</code>, <code>scripts/investigate_alerts.py</code>, <code>labs/lab5-ai/investigate.json</code></td></tr>
+    <tr><td><strong>MCP server</strong></td><td>Lab 6's route for AI agents into SigNoz, with a read-only key</td><td><code>labs/lab6-ai/k8s/mcp.yaml</code>, <code>labs/lab6-ai/k8s/otlp-ingress.yaml</code>, <code>scripts/create_ai_access.py</code></td></tr>
+    <tr><td><strong>Your AI agent</strong></td><td>Runs on your machine, not in the cluster. Lab 6 gives it a workspace, and <code>make investigate</code> starts it on alerts</td><td><code>labs/lab6-ai/workspace/</code>, <code>scripts/investigate_alerts.py</code>, <code>labs/lab6-ai/investigate.json</code></td></tr>
   </tbody>
 </table>
 
@@ -42,7 +42,7 @@
   <thead><tr><th>Setting</th><th>Why</th></tr></thead>
   <tbody>
     <tr><td><code>signoz.env.signoz_global_external__url</code></td><td>The address you open in a browser. SigNoz puts it in links, including those in the MCP server&#x27;s answers, which otherwise point inside the cluster</td></tr>
-    <tr><td><code>signoz.env.signoz_global_mcp__url</code></td><td>Shows SigNoz&#x27;s MCP settings page, with how to connect a client. Lab 5 deploys the server itself</td></tr>
+    <tr><td><code>signoz.env.signoz_global_mcp__url</code></td><td>Shows SigNoz&#x27;s MCP settings page, with how to connect a client. Lab 6 deploys the server itself</td></tr>
     <tr><td><code>otelCollector.replicaCount: 2</code></td><td>Keeps ingestion running if a node dies</td></tr>
     <tr><td><code>otelCollector.config.processors.batch.timeout: 5s</code></td><td>Default 1s. Fewer, larger writes cost ClickHouse much less CPU. Data appears up to 5 seconds later</td></tr>
     <tr><td><code>clickhouse.files</code></td><td>Turns off five of ClickHouse's logs about itself, which wrote more rows than the telemetry it stores</td></tr>

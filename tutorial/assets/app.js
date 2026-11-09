@@ -31,10 +31,10 @@
     { id: 'apiserver', href: 'incident-apiserver.html', title: 'The API server', group: 'Lab 3: Kubernetes' },
     { id: 'lab3-collection', href: 'lab3-collection.html', title: "How it's collected, and what it costs", group: 'Lab 3: Kubernetes' },
     { id: 'lab4', href: 'lab4.html', title: 'Alerts that reach you', group: 'Lab 4: alerts' },
-    { id: 'lab5', href: 'lab5.html', title: 'Connect an AI agent', group: 'Lab 5: AI analysis' },
-    { id: 'ai-ask', href: 'ai-ask.html', title: 'Ask it questions', group: 'Lab 5: AI analysis' },
-    { id: 'ai-alerts', href: 'ai-alerts.html', title: 'Investigate alerts by itself', group: 'Lab 5: AI analysis' },
-    { id: 'ai-measured', href: 'ai-measured.html', title: 'How good is it?', group: 'Lab 5: AI analysis' },
+    { id: 'lab6', href: 'lab6.html', title: 'Connect an AI agent', group: 'Lab 6: AI analysis' },
+    { id: 'ai-ask', href: 'ai-ask.html', title: 'Ask it questions', group: 'Lab 6: AI analysis' },
+    { id: 'ai-alerts', href: 'ai-alerts.html', title: 'Investigate alerts by itself', group: 'Lab 6: AI analysis' },
+    { id: 'ai-measured', href: 'ai-measured.html', title: 'How good is it?', group: 'Lab 6: AI analysis' },
     { id: 'queries', href: 'queries.html', title: 'Search query reference', group: 'Reference' },
     { id: 'setup', href: 'setup.html', title: 'How SigNoz is configured', group: 'Reference' },
     { id: 'automate', href: 'automate.html', title: 'Automate it', group: 'Reference' },
@@ -43,7 +43,7 @@
 
   const SIGNOZ = 'http://signoz.localhost:8080';
   const STORE = 'telemetry-tutorial-v1';
-  const LAB_NAMES = { lab1: 'Lab 1', lab2: 'Lab 2', lab3: 'Lab 3', lab5: 'Lab 5' };
+  const LAB_NAMES = { lab1: 'Lab 1', lab2: 'Lab 2', lab3: 'Lab 3', lab6: 'Lab 6' };
   const LAB_START = { lab1: 'make up', lab2: 'make lab2', lab3: 'make lab3' };
   const LAB_FRONTEND = { lab1: 'lab1-frontend', lab2: 'frontend', lab3: 'lab3-workload' };
   const SPAN_ARRIVAL_WAIT_MS = 2000;
@@ -685,7 +685,7 @@
   ];
   const ARCH_PARTS = [
     { id: 'browser', x: 40, y: 28, w: 170, h: 42, title: ['Your browser'] },
-    { id: 'ai', lab: 5, x: 800, y: 28, w: 170, h: 42, title: ['AI agent'], detail: ['Claude Code, or your own'] },
+    { id: 'ai', lab: 6, x: 800, y: 28, w: 170, h: 42, title: ['AI agent'], detail: ['Claude Code, or your own'] },
     { id: 'frontend', lab: 1, x: 45, y: 152, w: 125, h: 112, title: ['frontend'], detail: ['FastAPI'],
       chips: [{ id: 'frontend.agent', text: 'Python agent' }, { id: 'frontend.code', text: 'OTel API calls', lab: 2 }] },
     { id: 'backend', lab: 1, x: 190, y: 152, w: 125, h: 112, title: ['backend'], detail: ['FastAPI'],
@@ -701,7 +701,7 @@
       chips: [{ id: 'signoz.rules', text: 'Alert rules', lab: 4 }] },
     { id: 'clickhouse', lab: 1, x: 665, y: 268, w: 160, h: 56, title: ['ClickHouse'], detail: ['Stores all of it'] },
     { id: 'collectors', lab: 1, x: 665, y: 370, w: 160, h: 62, title: ['2 SigNoz collectors'], detail: ['Receive and write'] },
-    { id: 'mcp', lab: 5, x: 860, y: 152, w: 110, h: 72, title: ['MCP server'], detail: ['Read-only key'] },
+    { id: 'mcp', lab: 6, x: 860, y: 152, w: 110, h: 72, title: ['MCP server'], detail: ['Read-only key'] },
     { id: 'sink', lab: 4, x: 860, y: 290, w: 110, h: 72, title: ['Alert sink'], detail: ['Stands in for', 'Slack or PagerDuty'] },
     { id: 'kubelet', lab: 3, x: 45, y: 492, w: 180, h: 104, title: ['kubelet'], detail: ['Pod and node metrics,', 'container limits and', 'probe results'] },
     { id: 'nodes', lab: 3, x: 240, y: 492, w: 180, h: 104, title: ['Nodes and kernel'], detail: ['Host metrics, the kernel', 'log with its OOM kills,', 'k3s log or journal'] },
@@ -724,10 +724,10 @@
     { d: 'M745,370 V324', from: 'collectors', to: 'clickhouse' },
     { d: 'M745,268 V234', from: 'clickhouse', to: 'signoz' },
     { d: 'M825,214 H843 V326 H860', from: 'signoz', to: 'sink', label: ['webhook', 862, 284] },
-    { d: 'M860,188 H825', from: 'mcp', to: 'signoz', covers: ['lab5'], label: ['reads', 843, 180, null, 'middle'] },
+    { d: 'M860,188 H825', from: 'mcp', to: 'signoz', covers: ['lab6'], label: ['reads', 843, 180, null, 'middle'] },
     { d: 'M915,70 V152', from: 'ai', to: 'mcp', label: ['asks through MCP', 908, 95, null, 'end'] },
-    { d: 'M970,49 H982 V326 H970', from: 'ai', to: 'sink', covers: ['lab5'], label: ['polls', 968, 284, null, 'end'] },
-    { d: 'M982,326 V544 H615', from: 'ai', to: 'apiserver', covers: ['lab5'], label: ['kubectl, read-only', 800, 536, null, 'middle'] },
+    { d: 'M970,49 H982 V326 H970', from: 'ai', to: 'sink', covers: ['lab6'], label: ['polls', 968, 284, null, 'end'] },
+    { d: 'M982,326 V544 H615', from: 'ai', to: 'apiserver', covers: ['lab6'], label: ['kubectl, read-only', 800, 536, null, 'middle'] },
     { d: 'M190,492 V432', from: 'kubelet', to: 'nodeagents', label: ['scraped and read', 197, 450] },
     { d: 'M330,492 V432', from: 'nodes', to: 'nodeagents' },
     { d: 'M525,492 V432', from: 'apiserver', to: 'nodeagents' },
@@ -754,7 +754,7 @@
       covered: ['signoz', 'signoz.rules', 'sink'],
       off: [...ARCH_CODE, 'mcp', 'ai'],
     },
-    lab5: {
+    lab6: {
       covered: ['ai', 'mcp'],
       off: [],
     },
@@ -844,7 +844,7 @@
         ? 'Running at ' + load.rps + ' requests/s' + (hasErrors ? ' with ' + load.error_pct + '% errors' : '') + '. Sent ' + load.sent + '. Please stop it when you finish.'
         : 'Stopped.';
     };
-    /* Several labs' traffic at once can overload a small Docker VM, as Lab 5 found. */
+    /* Several labs' traffic at once can overload a small Docker VM, as Lab 6 found. */
     const others = el('p', { class: 'meta', style: 'margin:.5rem 0 0' });
     const showOthers = () => {
       others.textContent = '';

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetches SigNoz's official agent skills into Lab 5's workspace.
+"""Fetches SigNoz's official agent skills into Lab 6's workspace.
 
 They come from https://github.com/SigNoz/agent-skills (MIT), pinned to one
 commit so upstream changes can't change the lab's results. A skill is a
@@ -10,7 +10,7 @@ read-only:
 - signoz-generating-queries: how to write SigNoz queries for a question.
 - signoz-explaining-alerts: what a rule checks, and how it's evaluated.
 
-They go into labs/lab5-ai/workspace/.claude/skills/, which Claude Code reads
+They go into labs/lab6-ai/workspace/.claude/skills/, which Claude Code reads
 when it starts in the workspace. They aren't committed to this repo.
 """
 
@@ -24,7 +24,7 @@ SKILLS = {
     "signoz-explaining-alerts": ["SKILL.md"],
 }
 BASE = f"https://raw.githubusercontent.com/SigNoz/agent-skills/{COMMIT}"
-TARGET = Path(__file__).resolve().parent.parent / "labs/lab5-ai/workspace/.claude/skills"
+TARGET = Path(__file__).resolve().parent.parent / "labs/lab6-ai/workspace/.claude/skills"
 
 
 def main():

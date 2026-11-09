@@ -48,7 +48,7 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("TUTORIAL_PORT", "8765"))
 SIGNOZ_URL = os.environ.get("TUTORIAL_SIGNOZ_URL", "http://signoz.localhost:8080").rstrip("/")
 ALERT_SINK_URL = os.environ.get("TUTORIAL_LAB4_URL", "http://lab4.localhost:8080").rstrip("/")
-REPORTS = HERE.parent / "labs/lab5-ai/reports"
+REPORTS = HERE.parent / "labs/lab6-ai/reports"
 
 LABS = {
     "lab1": {

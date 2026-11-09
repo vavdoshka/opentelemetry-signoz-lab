@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ask it questions · Lab 5 · Telemetry with SigNoz</title>
+<title>Ask it questions · Lab 6 · Telemetry with SigNoz</title>
 <link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
@@ -13,12 +13,12 @@
 <a class="skip" href="#main">Skip to content</a>
 <nav id="sidebar" aria-label="Tutorial pages"></nav>
 <main id="main">
-<p class="eyebrow">Lab 5: AI analysis</p>
+<p class="eyebrow">Lab 6: AI analysis</p>
 <h1>Ask it questions</h1>
 <p class="lead">Two use cases: why something broke, and a business question. Each answer is shown in full, and checked against what really happened.</p>
 <ul class="steps" aria-label="Steps on this page"><li><a href="#incident">1. Why did this restart?</a></li><li><a href="#analytics">2. A business question</a></li><li><a href="#use">3. What it~~s good for</a></li></ul>
 
-<p>Each answer below comes from Claude Code, started in <code>labs/lab5-ai/workspace</code>, on Sonnet 5.5. We ran them headless to record the cost, with this command. In a normal session, you just type the question.</p>
+<p>Each answer below comes from Claude Code, started in <code>labs/lab6-ai/workspace</code>, on Sonnet 5.5. We ran them headless to record the cost, with this command. In a normal session, you just type the question.</p>
 <figure class="code"><pre><code>KUBECONFIG=$PWD/.kubeconfig claude -p "lab3-workload restarted in the last 15 minutes. Find out why." \
   --setting-sources project,local --settings .claude/settings.json \
   --permission-mode dontAsk --output-format json --max-turns 40</code></pre></figure>

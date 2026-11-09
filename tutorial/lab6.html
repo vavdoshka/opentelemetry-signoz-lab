@@ -3,30 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Connect an AI agent · Lab 5 · Telemetry with SigNoz</title>
+<title>Connect an AI agent · Lab 6 · Telemetry with SigNoz</title>
 <link rel="icon" href="assets/icon.png" sizes="64x64" type="image/png">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/app.js" defer></script>
 </head>
-<body data-page="lab5">
+<body data-page="lab6">
 <a class="skip" href="#main">Skip to content</a>
 <nav id="sidebar" aria-label="Tutorial pages"></nav>
 <main id="main">
-<p class="eyebrow">Lab 5: AI analysis</p>
+<p class="eyebrow">Lab 6: AI analysis</p>
 <h1>Connect an AI agent</h1>
 <p class="lead">An AI agent can query SigNoz the way you do, read the answer, and decide what to ask next. This lab connects one with read-only access, then measures how well it works.</p>
 
 <h2 id="fits">Where this lab fits</h2>
 <p>The new parts connect to the rest from outside, with read-only access. Everything else stays as it was.</p>
-<div class="wide arch" data-arch="lab5"></div>
+<div class="wide arch" data-arch="lab6"></div>
 <table>
   <thead><tr><th>Part</th><th>In this lab</th></tr></thead>
-  <tbody><tr><td>AI agent</td><td>Runs on your machine, with the login it already has. Nothing of it runs in the cluster</td></tr><tr><td>MCP server</td><td>New, in namespace <code>lab5</code>. Lets the agent query SigNoz with a Viewer key, so SigNoz refuses any write</td></tr><tr><td>API server</td><td>Now also read by the agent, through <code>kubectl</code> with a read-only account. It can&#x27;t read Secrets</td></tr><tr><td>Alert sink</td><td>Polled by the agent&#x27;s script, to find new alerts to investigate</td></tr><tr><td>Everything else</td><td>Unchanged. The agent can only see what SigNoz has, so it also sees Postgres only from outside</td></tr></tbody>
+  <tbody><tr><td>AI agent</td><td>Runs on your machine, with the login it already has. Nothing of it runs in the cluster</td></tr><tr><td>MCP server</td><td>New, in namespace <code>lab6</code>. Lets the agent query SigNoz with a Viewer key, so SigNoz refuses any write</td></tr><tr><td>API server</td><td>Now also read by the agent, through <code>kubectl</code> with a read-only account. It can&#x27;t read Secrets</td></tr><tr><td>Alert sink</td><td>Polled by the agent&#x27;s script, to find new alerts to investigate</td></tr><tr><td>Everything else</td><td>Unchanged. The agent can only see what SigNoz has, so it also sees Postgres only from outside</td></tr></tbody>
 </table>
 
 <h2>Start it</h2>
-<figure class="code"><pre><code>make lab5</code></pre></figure>
+<figure class="code"><pre><code>make lab6</code></pre></figure>
 <p>That deploys what an agent connects to, and proves it's read-only. It takes under a minute and costs nothing. The agent itself is the one on your machine, with the login it already has. This lab uses <a href="https://code.claude.com/docs" target="_blank" rel="noopener">Claude Code</a>, and <a href="#other-harnesses">others connect the same way</a>.</p>
 
 <h2>What's really happening</h2>
@@ -55,13 +55,13 @@
   <thead><tr><th>Limit</th><th>Enforced by</th><th>What it stops</th><th>Tested</th></tr></thead>
   <tbody><tr><td>A SigNoz viewer key</td><td>SigNoz</td><td>Any change. The MCP server also has tools that create and delete alerts and dashboards, and they fail</td><td><code>signoz_create_dashboard</code> returned 403</td></tr><tr><td>A read-only Kubernetes account</td><td>The API server</td><td>Changes, <code>exec</code>, Secrets and ConfigMaps</td><td><code>kubectl auth can-i</code>: pods and logs yes, the rest no</td></tr><tr><td>Allow and deny lists</td><td>The harness</td><td>The agent trying other tools at all. Not a security boundary: a rule can match more or less than you meant</td><td>A <code>kubectl delete</code> was refused before it ran</td></tr><tr><td>Budget and turn caps</td><td>The harness</td><td>A runaway run, in <code>make investigate</code>. Claude Code stops at its own cost estimate, and can overshoot a little</td><td>Not hit</td></tr></tbody>
 </table>
-<figure class="code"><figcaption><span><code>labs/lab5-ai/k8s/mcp.yaml</code> lines 9–13</span></figcaption><pre><code><span class="ln">9</span># It holds a SigNoz API key, so clients connect with no key of their own. The
+<figure class="code"><figcaption><span><code>labs/lab6-ai/k8s/mcp.yaml</code> lines 9–13</span></figcaption><pre><code><span class="ln">9</span># It holds a SigNoz API key, so clients connect with no key of their own. The
 <span class="ln">10</span># key belongs to a service account with the signoz-viewer role, which
 <span class="ln">11</span># scripts/create_ai_access.py creates, so SigNoz refuses any change the AI
 <span class="ln">12</span># tries. The server also has tools that create and delete alerts and
 <span class="ln">13</span># dashboards: with this key they fail with 403.</code></pre></figure>
-<figure class="code"><figcaption><span><code>labs/lab5-ai/k8s/reader-rbac.yaml</code> lines 15–30</span></figcaption><pre><code><span class="ln">15</span>kind: ClusterRole
-<span class="ln">16</span>metadata: { name: lab5-ai-reader }
+<figure class="code"><figcaption><span><code>labs/lab6-ai/k8s/reader-rbac.yaml</code> lines 15–30</span></figcaption><pre><code><span class="ln">15</span>kind: ClusterRole
+<span class="ln">16</span>metadata: { name: lab6-ai-reader }
 <span class="ln">17</span>rules:
 <span class="ln">18</span>  - apiGroups: [&quot;&quot;]
 <span class="ln">19</span>    resources: [pods, pods/log, events, nodes, services, endpoints, namespaces, persistentvolumeclaims]
@@ -80,12 +80,12 @@
 <div class="note"><p><strong>What leaves your machine.</strong> Everything the agent reads goes to the model: log lines, span attributes, pod names. Here that's made-up shop data. On a real system, logs can hold customer data and credentials, so check your provider's terms, and what your logs contain, first.</p></div>
 
 <h2>Connect Claude Code</h2>
-<p>All of it lives in one directory, <code>labs/lab5-ai/workspace/</code>, so it doesn't change how Claude Code behaves anywhere else:</p>
+<p>All of it lives in one directory, <code>labs/lab6-ai/workspace/</code>, so it doesn't change how Claude Code behaves anywhere else:</p>
 <table>
   <thead><tr><th>File</th><th>What it does</th></tr></thead>
-  <tbody><tr><td><code>.mcp.json</code></td><td>Where the MCP server is</td></tr><tr><td><code>.claude/settings.json</code></td><td>The model, what's allowed and denied, and sending Claude Code's own telemetry to your SigNoz</td></tr><tr><td><code>.claude/settings.local.json</code></td><td>Written by <code>make lab5</code>. Points <code>kubectl</code> at the read-only account. Not committed</td></tr><tr><td><code>.kubeconfig</code></td><td>Written by <code>make lab5</code>. The read-only account's login, valid for 30 days. Not committed</td></tr><tr><td><code>AGENTS.md</code></td><td>What a new colleague would need: what runs where, and which signal is where. Most harnesses read this file. <code>CLAUDE.md</code> just imports it</td></tr><tr><td><code>.claude/skills/</code></td><td>Fetched by <code>make lab5</code>, from SigNoz/agent-skills, pinned to one commit. Not committed</td></tr></tbody>
+  <tbody><tr><td><code>.mcp.json</code></td><td>Where the MCP server is</td></tr><tr><td><code>.claude/settings.json</code></td><td>The model, what's allowed and denied, and sending Claude Code's own telemetry to your SigNoz</td></tr><tr><td><code>.claude/settings.local.json</code></td><td>Written by <code>make lab6</code>. Points <code>kubectl</code> at the read-only account. Not committed</td></tr><tr><td><code>.kubeconfig</code></td><td>Written by <code>make lab6</code>. The read-only account's login, valid for 30 days. Not committed</td></tr><tr><td><code>AGENTS.md</code></td><td>What a new colleague would need: what runs where, and which signal is where. Most harnesses read this file. <code>CLAUDE.md</code> just imports it</td></tr><tr><td><code>.claude/skills/</code></td><td>Fetched by <code>make lab6</code>, from SigNoz/agent-skills, pinned to one commit. Not committed</td></tr></tbody>
 </table>
-<figure class="code"><figcaption><span><code>labs/lab5-ai/workspace/.mcp.json</code> lines 1–8</span></figcaption><pre><code><span class="ln">1</span>{
+<figure class="code"><figcaption><span><code>labs/lab6-ai/workspace/.mcp.json</code> lines 1–8</span></figcaption><pre><code><span class="ln">1</span>{
 <span class="ln">2</span>  &quot;mcpServers&quot;: {
 <span class="ln">3</span>    &quot;signoz&quot;: {
 <span class="ln">4</span>      &quot;type&quot;: &quot;http&quot;,
@@ -94,7 +94,7 @@
 <span class="ln">7</span>  }
 <span class="ln">8</span>}</code></pre></figure>
 <p>Start it, and accept the prompt to trust the folder:</p>
-<figure class="code"><pre><code>cd labs/lab5-ai/workspace
+<figure class="code"><pre><code>cd labs/lab6-ai/workspace
 claude</code></pre></figure>
 <p>Inside it, run <code>/mcp</code>. It should list <code>signoz</code> as connected. Then <a href="ai-ask.html">ask it something</a>.</p>
 <p>The trust prompt and <code>/mcp</code> come from Claude Code's documentation. Every run recorded in this lab was headless, with the same files, so we could measure it. <span class="badge untested">Untested</span></p>
@@ -110,7 +110,7 @@ claude</code></pre></figure>
 <h2 id="other-harnesses">Other harnesses</h2>
 <p>MCP is why this isn't tied to one tool. The server and the accounts stay the same, and only the client's config changes.</p>
 <h3>OpenCode</h3>
-<figure class="code"><figcaption><span><code>labs/lab5-ai/workspace/opencode.jsonc</code> lines 1–12</span></figcaption><pre><code><span class="ln">1</span>// OpenCode&#x27;s settings for this workspace. It reads AGENTS.md by itself.
+<figure class="code"><figcaption><span><code>labs/lab6-ai/workspace/opencode.jsonc</code> lines 1–12</span></figcaption><pre><code><span class="ln">1</span>// OpenCode&#x27;s settings for this workspace. It reads AGENTS.md by itself.
 <span class="ln">2</span>// Start it with your kubectl pointed at the read-only account:
 <span class="ln">3</span>//   KUBECONFIG=$PWD/.kubeconfig opencode
 <span class="ln">4</span>{

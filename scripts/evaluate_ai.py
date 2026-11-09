@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scores Lab 5's AI on incidents whose real causes are already known.
+"""Scores Lab 6's AI on incidents whose real causes are already known.
 
 For each case this triggers the real failure, waits for the real alert to
 reach Lab 4's sink, runs the AI agent on your machine on that alert, and checks

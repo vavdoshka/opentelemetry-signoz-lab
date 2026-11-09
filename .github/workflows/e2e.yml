@@ -71,8 +71,8 @@ jobs:
         run: python3 scripts/smoke_alerts.py
       # No AI here, so this proves everything except the AI itself: the MCP server
       # and its read-only access.
-      - name: Deploy Lab 5
-        run: make lab5
+      - name: Deploy Lab 6
+        run: make lab6
 
       - name: Rerun make up
         run: make up
