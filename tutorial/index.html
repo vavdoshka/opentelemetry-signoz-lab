@@ -48,7 +48,6 @@
     <li><strong>Its log lines, from the node agents.</strong> They read what Postgres prints. Those lines have no <code>service.name</code>, so search with <code>k8s.container.name = &#x27;postgres&#x27;</code>.</li>
     <li><strong>Its pod&#x27;s CPU and memory,</strong> from the kubelet.</li>
   </ul>
-  <p>What you don&#x27;t get is anything from inside it, such as locks, cache hit rate or query plans. None of the 268 metric names SigNoz had on 2026-11-08 came from Postgres <span class="badge data">ClickHouse SQL</span>. So a trace can show you that a query was slow, but not why.</p>
 </div>
 
 <h2>Five labs, in order</h2>
