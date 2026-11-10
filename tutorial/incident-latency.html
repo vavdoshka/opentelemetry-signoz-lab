@@ -84,7 +84,7 @@
   <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
   <li><strong>Fire the same request</strong> a few times. Each one should now take milliseconds. The response still says <code>slept_s</code>, because the fix only removes the sleep.<div data-fire="slow" data-lab="lab1"></div></li>
   <li><strong>Re-run the search, and compare P99 before and after.</strong> Use <strong>Backend latency by route</strong> above, with a time range that starts after you deployed, so it doesn&#x27;t mix in the older requests. Over 8 requests each, <code>/work/slow</code> went from a P99 of 3,033 ms to 7 ms.</li>
-  <li><strong>Put the bug back,</strong> because other pages need it. The <code>timeout</code> scenario calls the same handler, so until you do, it answers 200 instead of timing out.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/backend.py
+  <li><strong>Undo the fix when you&#x27;re done.</strong> The bugs in this lab are there on purpose, and other pages need this one. The <code>timeout</code> scenario calls the same handler, so until you do, it answers 200 instead of timing out.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/backend.py
 make lab1</code></pre></figure></li>
 </ol>
 <p>When you alert on this, use a high percentile rather than the median: in the saved run P50 was only 34 ms, while P99 was over 2.7 seconds.</p>

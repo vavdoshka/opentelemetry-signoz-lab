@@ -67,7 +67,7 @@
   <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
   <li><strong>Fire a crash in Lab 1.</strong> The response should now include <code>trace_id</code>. <span class="badge api">Query API only</span><div data-fire="crash" data-lab="lab1"></div></li>
   <li><strong>Open that trace</strong> at <code>http://signoz.localhost:8080/trace/&lt;trace ID&gt;</code>.</li>
-  <li><strong>Put the bug back,</strong> because Lab 1 is meant to have no OpenTelemetry code.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/requirements.txt labs/lab1-hands-off/app/frontend.py
+  <li><strong>Undo the change when you&#x27;re done,</strong> because Lab 1 is meant to have no OpenTelemetry code.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/requirements.txt labs/lab1-hands-off/app/frontend.py
 make lab1</code></pre></figure></li>
 </ol>
 

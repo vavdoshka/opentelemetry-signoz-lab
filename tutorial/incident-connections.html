@@ -63,15 +63,14 @@ postgres.user:       shop</code></pre></figure>
 
 <h2 class="step" id="fix"><span class="n">6</span>Resolution</h2>
 <p>Limit how many connections the app can open. Here that&#x27;s a simple cap, which stands in for a connection pool, such as <code>psycopg_pool.ConnectionPool(max_size=10)</code> in a real app:</p>
-<figure class="code"><figcaption><span>The fix for labs/lab5-postgres/app/shop.py. Tried on 2026-11-09, then undone <span class="badge api">Query API only</span></span></figcaption><pre><code><span class="del">-    while len(held) &lt; 100:</span>
-<span class="add">+    while len(held) &lt; 10:</span></code></pre></figure>
+<figure class="code"><figcaption><span>The fix for labs/lab5-postgres/app/shop.py. Tried on 2026-11-09, then undone <span class="badge api">Query API only</span></span></figcaption><pre><code><span class="del">-    while len(held) &lt; 100:</span><span class="add">+    while len(held) &lt; 10:</span></code></pre></figure>
 <h3>Try the fix</h3>
 <ol class="try">
   <li><strong>Change it.</strong> Make that edit in <code>labs/lab5-postgres/app/shop.py</code>, and save it.</li>
   <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab5</code></pre></figure></li>
   <li><strong>Fire the same request.</strong> It should now answer HTTP 200, open 10 connections, and the next order should succeed.<div data-fire="too_many_clients" data-lab="lab5"></div></li>
   <li><strong>Check Postgres&#x27;s log.</strong> <strong>Connections Postgres refused</strong> should find nothing new.</li>
-  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it.<figure class="code"><pre><code>git restore labs/lab5-postgres/app/shop.py
+  <li><strong>Undo the fix when you&#x27;re done.</strong> The bugs in this lab are there on purpose. With the fix deployed, this page&#x27;s button can no longer show the incident, for you or anyone else using this copy of the lab.<figure class="code"><pre><code>git restore labs/lab5-postgres/app/shop.py
 make lab5</code></pre></figure></li>
 </ol>
 

@@ -41,12 +41,80 @@ def fetch(path):
     return json.loads(result.stdout)
 
 
+NAMESPACE_CLAUSE = "k8s.namespace.name IN $k8s.namespace.name"
+POD_VARIABLE = {
+    "kind": "ListVariable",
+    "spec": {
+        "display": {"name": "k8s.pod.name", "description": "The k8s pod name. Added by this lab."},
+        "allowAllValue": True,
+        "allowMultiple": True,
+        "customAllValue": "",
+        "capturingRegexp": "",
+        "sort": "alphabetical-asc",
+        "plugin": {"kind": "signoz/DynamicVariable", "spec": {"name": "k8s.pod.name", "signal": "all"}},
+        "name": "k8s.pod.name",
+    },
+}
+
+
+def pod_filter_edits(dashboard):
+    """The one change this lab makes to SigNoz's Pod dashboard: a pod filter.
+
+    It filters by cluster, node and namespace only, so one pod can't be singled out.
+    Returns JSON Patch operations: a k8s.pod.name variable, and that variable added
+    to every panel query that filters by namespace.
+    """
+    edits = []
+
+    def walk(node, path):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                here = f"{path}/{key}"
+                if key == "expression" and isinstance(value, str) and NAMESPACE_CLAUSE in value and "$k8s.pod.name" not in value:
+                    new = value.replace(NAMESPACE_CLAUSE, f"{NAMESPACE_CLAUSE} AND k8s.pod.name IN $k8s.pod.name")
+                    edits.append({"op": "replace", "path": here, "value": new})
+                else:
+                    walk(value, here)
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                walk(value, f"{path}/{index}")
+
+    walk(dashboard["spec"]["panels"], "/spec/panels")
+    names = [v["spec"]["name"] for v in dashboard["spec"]["variables"]]
+    if "k8s.pod.name" not in names:
+        edits.append({"op": "add", "path": "/spec/variables/-", "value": POD_VARIABLE})
+    return edits
+
+
+def apply_edits(dashboard, edits):
+    for edit in edits:
+        keys = edit["path"].strip("/").split("/")
+        target = dashboard
+        for key in keys[:-1]:
+            target = target[int(key)] if isinstance(target, list) else target[key]
+        if keys[-1] == "-":
+            target.append(edit["value"])
+        else:
+            target[int(keys[-1]) if isinstance(target, list) else keys[-1]] = edit["value"]
+
+
+# Changes made to SigNoz's dashboards before importing them, by path.
+CHANGES = {"k8s-infra-metrics/kubernetes-pod-metrics-detailed.json": pod_filter_edits}
+
+
 def main():
     lab = sys.argv[1] if len(sys.argv) > 1 else ""
     if lab not in LOCAL:
         raise SystemExit("Usage: create_dashboard.py 2|3|5")
     dashboards = [json.loads(path.read_text()) for path in LOCAL[lab] if path.exists()]
-    dashboards += [fetch(path) for path in REMOTE[lab]]
+    for path in REMOTE[lab]:
+        dashboard = fetch(path)
+        if path in CHANGES:
+            edits = CHANGES[path](dashboard)
+            if not edits:
+                raise SystemExit(f"{path} no longer looks as expected, so its change can't be applied.")
+            apply_edits(dashboard, edits)
+        dashboards.append(dashboard)
 
     token = session()
     if not token:

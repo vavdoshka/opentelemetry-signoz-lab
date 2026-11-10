@@ -85,7 +85,7 @@
   <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab2</code></pre></figure></li>
   <li><strong>Fire the same request in Lab 2</strong> a few times. It should get faster, because far fewer lookups miss.<div data-fire="cache_miss" data-lab="lab2"></div></li>
   <li><strong>Re-run the search, Catalogue latency by cache result,</strong> with a time range that starts after you deployed. In our run, the P99 of <code>GET /catalog</code> went from 844 ms to 3.3 ms, and each run of six lookups went from 1 to 2 seconds down to about 35 ms. That&#x27;s only 12 lookups each way, and 5% still miss, so you&#x27;ll see a slow one now and then.</li>
-  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it.<figure class="code"><pre><code>git restore labs/lab2-custom-dimensions/app/backend.py
+  <li><strong>Undo the fix when you&#x27;re done.</strong> The bugs in this lab are there on purpose. With the fix deployed, this page&#x27;s button can no longer show the incident, for you or anyone else using this copy of the lab.<figure class="code"><pre><code>git restore labs/lab2-custom-dimensions/app/backend.py
 make lab2</code></pre></figure></li>
 </ol>
 

@@ -1125,15 +1125,15 @@
     return parts.join('  |  ');
   }
 
-  function copyButton(text) {
+  function copyButton(text, label = 'Copy') {
     return el('button', {
       class: 'copy',
-      text: 'Copy',
+      text: label,
       onclick: async (event) => {
         try {
           await navigator.clipboard.writeText(text);
           event.target.textContent = 'Copied';
-          setTimeout(() => { event.target.textContent = 'Copy'; }, 1200);
+          setTimeout(() => { event.target.textContent = label; }, 1200);
         } catch (error) {
           event.target.textContent = 'Press Cmd+C';
         }
@@ -1360,11 +1360,45 @@
     });
   }
 
+  // A diff shows removed and added lines as block spans, with no newline
+  // characters between them. Copying its text would run lines together and keep
+  // the removed ones, so a diff copies the code as it reads after the change.
+  function codeAfterDiff(code) {
+    const lines = [];
+    let afterBlock = false;
+    code.childNodes.forEach((node) => {
+      if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('ln')) return;
+      const isDel = node.nodeType === Node.ELEMENT_NODE && node.classList.contains('del');
+      const isAdd = node.nodeType === Node.ELEMENT_NODE && node.classList.contains('add');
+      if (isDel || isAdd) {
+        if (isAdd) lines.push(node.textContent);
+        afterBlock = true;
+        return;
+      }
+      // A block span already ends its line, so a newline right after it is not a new line.
+      let text = node.textContent;
+      if (afterBlock && text.startsWith('\n')) text = text.slice(1);
+      afterBlock = false;
+      const parts = text.split('\n');
+      parts.forEach((part, index) => {
+        if (index < parts.length - 1 || part !== '') lines.push(part);
+      });
+    });
+    // Each line starts with the diff's marker column: a space, or + for added lines.
+    return lines.map((line) => (/^[ +]/.test(line) ? line.slice(1) : line)).join('\n') + '\n';
+  }
+
   function setupCodeCopy() {
     document.querySelectorAll('figure.code').forEach((figure) => {
       const caption = figure.querySelector('figcaption');
       const code = figure.querySelector('pre code');
       if (!caption || !code) return;
+      if (code.querySelector('.del, .add')) {
+        const button = copyButton(codeAfterDiff(code), 'Copy new code');
+        button.title = 'Copies the code after this change, without the removed lines';
+        caption.append(button);
+        return;
+      }
       const text = [...code.childNodes].map((node) => {
         if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('ln')) return '';
         return node.textContent;

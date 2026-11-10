@@ -149,7 +149,10 @@ collector, and `k8s/metrics-rbac.yaml` gives that collector permission to read t
   namespace `lab3` exists. Without that, rerunning `make up` would remove them with no error.
 - **Dashboards:** `make lab3` creates `labs/lab3-kubernetes/dashboard.json`, and imports four from
   [SigNoz/dashboards](https://github.com/SigNoz/dashboards) (Apache-2.0), pinned to one commit in
-  `scripts/create_dashboard.py`.
+  `scripts/create_dashboard.py`. One is changed before import: Kubernetes Pod Metrics - Detailed gets a
+  `k8s.pod.name` variable, added to every panel's filter, because it can't otherwise show one pod.
+  A dashboard imported before this change keeps its old form, because the script skips dashboards that
+  exist. Delete it in SigNoz and rerun `make lab3` to get the new one.
 
 ## Lab 4: alerts
 

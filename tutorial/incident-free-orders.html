@@ -120,7 +120,7 @@
   <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab2</code></pre></figure></li>
   <li><strong>Fire the same request in Lab 2.</strong> <code>revenue</code> in the response should now be above 0.<div data-fire="free_orders" data-lab="lab2"></div></li>
   <li><strong>Re-run the search, Orders priced at zero,</strong> with a time range that starts after you deployed. It should match nothing. In our run it went from 5 matches to 0.</li>
-  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it.<figure class="code"><pre><code>git restore labs/lab2-custom-dimensions/app/backend.py
+  <li><strong>Undo the fix when you&#x27;re done.</strong> The bugs in this lab are there on purpose. With the fix deployed, this page&#x27;s button can no longer show the incident, for you or anyone else using this copy of the lab.<figure class="code"><pre><code>git restore labs/lab2-custom-dimensions/app/backend.py
 make lab2</code></pre></figure></li>
 </ol>
 <p>Then make sure you hear about it next time. A fresh install has no alerts, so you would write a rule on <code>orders.value.sum</code> yourself (<a href="gaps.html#setup">gap 5</a>).</p>

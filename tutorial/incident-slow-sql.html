@@ -78,7 +78,7 @@
   <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
   <li><strong>Fire the same request.</strong> It should now fail with HTTP 500 after about 1.4 seconds. Before, it answered 200 after about 2.2 seconds.<div data-fire="slow_query" data-lab="lab1"></div></li>
   <li><strong>Check SigNoz.</strong> The <strong>Failed database calls</strong> search should find the failed <code>SELECT</code>, and the Exceptions page should list <code>psycopg.errors.QueryCanceled</code>.</li>
-  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs the slow query to succeed.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/backend.py
+  <li><strong>Undo the fix when you&#x27;re done.</strong> The bugs in this lab are there on purpose. With the timeout in place, this page&#x27;s button gets an error instead of the slow query you investigated. Lab 4&#x27;s slow-query alert and Lab 6&#x27;s AI evaluation are both tested against this slow query too.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/backend.py
 make lab1</code></pre></figure></li>
 </ol>
 

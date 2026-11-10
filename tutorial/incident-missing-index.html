@@ -63,7 +63,7 @@ Aggregate  (cost=12667.50..12667.51 rows=1 width=40)
          Recheck Cond: (lower(email) = &#x27;customer1@example.com&#x27;::text)
          -&gt;  Bitmap Index Scan on sales_lower_email  (cost=0.00..35.17 rows=2500 width=0)
                Index Cond: (lower(email) = &#x27;customer1@example.com&#x27;::text)</code></pre></figure>
-<p>Put the bug back, because this page&#x27;s button needs it:</p>
+<p><strong>Undo the fix when you&#x27;re done.</strong> The bugs in this lab are there on purpose. With the index in place, this page&#x27;s button can no longer show the incident, for you or anyone else using this copy of the lab. To undo it, drop the index:</p>
 <figure class="code"><pre><code>kubectl -n lab5 exec deploy/postgres -c postgres -- psql -U lab -d lab -c &quot;DROP INDEX sales_lower_email&quot;</code></pre></figure>
 <p>On a real database, make this a migration, and use <code>CREATE INDEX CONCURRENTLY</code>, so that building it doesn&#x27;t block writes. <span class="badge untested">Untested</span></p>
 <div class="quiz" data-quiz="mi1"><p class="q">Check yourself: Which part of the plan tells you the table has no useful index?</p><button type="button" data-right="false" data-why="That&#x27;s the count and the sum. It would be there either way.">Aggregate.</button><button type="button" data-right="true" data-why="It read every row. With a usable index you&#x27;d see an index scan or a bitmap scan instead.">Seq Scan on sales.</button><button type="button" data-right="false" data-why="That&#x27;s only the statement.">Query Text.</button></div>

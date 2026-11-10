@@ -80,7 +80,7 @@
   <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
   <li><strong>Fire the same request.</strong> It should now answer HTTP 200 with <code>{&quot;ok&quot;: true}</code>, not 502.<div data-fire="backend_500" data-lab="lab1"></div></li>
   <li><strong>Check the Exceptions page.</strong> The <code>RuntimeError</code> row for <code>lab1-backend</code> should stop growing, and its <strong>Last Seen</strong> should stay at the time before you deployed.</li>
-  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/backend.py
+  <li><strong>Undo the fix when you&#x27;re done.</strong> The bugs in this lab are there on purpose. With the fix deployed, this page&#x27;s button can no longer show the incident, for you or anyone else using this copy of the lab. Lab 1&#x27;s load generator also uses this scenario as one of its five kinds of error, which Lab 4&#x27;s error-rate alert is tested with.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/backend.py
 make lab1</code></pre></figure></li>
 </ol>
 <p>What carries over: the fix belongs in the backend, even though the alert would fire on the frontend's 502s. A trace stops you from debugging the wrong service.</p>

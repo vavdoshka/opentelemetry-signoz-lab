@@ -93,7 +93,7 @@
   <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab2</code></pre></figure></li>
   <li><strong>Fire the same request in Lab 2.</strong> It should now take well under a second, not about 4 seconds.<div data-fire="slow_item" data-lab="lab2"></div></li>
   <li><strong>Re-run the latency-by-product search,</strong> <strong>Pricing latency by product</strong>, with a time range that starts after you deployed. <code>catering</code> should drop to the same level as the others. In our run its P99 went from 1,507 ms to 23 ms.</li>
-  <li><strong>Put the bug back,</strong> because this page&#x27;s button needs it.<figure class="code"><pre><code>git restore labs/lab2-custom-dimensions/app/backend.py
+  <li><strong>Undo the fix when you&#x27;re done.</strong> The bugs in this lab are there on purpose. With the fix deployed, this page&#x27;s button can no longer show the incident, for you or anyone else using this copy of the lab.<figure class="code"><pre><code>git restore labs/lab2-custom-dimensions/app/backend.py
 make lab2</code></pre></figure></li>
 </ol>
 

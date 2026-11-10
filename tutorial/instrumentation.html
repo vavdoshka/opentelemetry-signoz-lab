@@ -168,7 +168,7 @@
   <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
   <li><strong>List some orders.</strong><div data-fire="list" data-lab="lab1"></div></li>
   <li><strong>Find your span</strong> in SigNoz, with this search on Traces. It should match once per request, with <code>orders.returned</code> on each: <code>service.name = &#x27;lab1-backend&#x27; AND name = &#x27;list_orders&#x27;</code>. <span class="badge api">Query API only</span></li>
-  <li><strong>Put the bug back,</strong> because Lab 1 is meant to have no OpenTelemetry code.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/requirements.txt labs/lab1-hands-off/app/backend.py
+  <li><strong>Undo the change when you&#x27;re done,</strong> because Lab 1 is meant to have no OpenTelemetry code.<figure class="code"><pre><code>git restore labs/lab1-hands-off/app/requirements.txt labs/lab1-hands-off/app/backend.py
 make lab1</code></pre></figure></li>
 </ol>
 

@@ -108,7 +108,7 @@
   <li><strong>Change it.</strong> Make that edit in <code>labs/lab1-hands-off/k8s/app.yaml</code>, and save it. It&#x27;s YAML, not code, but you deploy it the same way, because <code>make lab1</code> also applies the lab&#x27;s manifests.</li>
   <li><strong>Deploy it,</strong> from the repo&#x27;s root. Saving the file isn&#x27;t enough, because the pods run the image from the last build. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
   <li><strong>Fire the same request, and place orders while it runs.</strong> Compare how long the orders take.<div data-fire="cpu_burn" data-lab="lab1"></div><div data-fire="order" data-lab="lab1"></div></li>
-  <li><strong>Put the bug back,</strong> so the later pages match what they describe.<figure class="code"><pre><code>git restore labs/lab1-hands-off/k8s/app.yaml
+  <li><strong>Undo the change when you&#x27;re done,</strong> so the later pages match what they describe.<figure class="code"><pre><code>git restore labs/lab1-hands-off/k8s/app.yaml
 make lab1</code></pre></figure></li>
 </ol>
 <p>We did this once, on a busy shared VM. It deployed and telemetry kept arriving, but four orders during a burn took 78 to 672 ms with two workers, and 134 to 440 ms with one. That&#x27;s too noisy to show a benefit, so measure it on your own hardware before relying on it. Moving the work out of the process is still the real fix.</p>

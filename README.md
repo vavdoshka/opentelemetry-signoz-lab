@@ -332,7 +332,8 @@ kubectl -n signoz delete pod -l app.kubernetes.io/component=otel-collector
 ```
 
 **A dashboard says "No data in this time range".** The Pod dashboard's namespace selector starts on
-`default`, which has no pods. Choose `lab3` at the top of the page.
+`default`, which has no pods. Choose `lab3` at the top of the page. To see one pod, open
+`$k8s.pod.name`, hover the pod and click Only.
 
 **An alert hasn't arrived.** Allow about 4 minutes, or about 6 for `telemetry stopped`. That one
 arrives as `[No data] Lab 3: telemetry stopped`.
