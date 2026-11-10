@@ -1,0 +1,98 @@
+{
+ "name": "Trace IDs from stdout",
+ "alias": "trace-ids-from-stdout",
+ "description": "Created by make lab3. Reads lines printed with OTEL_PYTHON_LOG_CORRELATION and the OTEL_PYTHON_LOG_FORMAT in labs/lab3-kubernetes/k8s/instrumentation.yaml, and turns the text back into fields: the trace and span IDs, the level and service.name. It applies to any app that prints that format, in any namespace.",
+ "enabled": true,
+ "filter": {
+  "op": "AND",
+  "items": [
+   {
+    "key": {"key": "body", "dataType": "string", "type": "", "isColumn": true, "isJSON": false},
+    "op": "regex",
+    "value": "\\[trace_id=[0-9a-f]+ span_id=[0-9a-f]+ service\\.name="
+   }
+  ]
+ },
+ "config": [
+  {
+   "orderId": 1,
+   "enabled": true,
+   "type": "regex_parser",
+   "id": "split-line",
+   "output": "link-trace",
+   "name": "Split the line into fields",
+   "parse_from": "body",
+   "parse_to": "attributes",
+   "regex": "^\\S+ \\S+ (?P<level>[A-Z]+) \\[(?P<logger>[^\\]]*)\\] \\[trace_id=(?P<trace_id>[0-9a-f]+) span_id=(?P<span_id>[0-9a-f]+) service\\.name=(?P<service_name>[^\\]]*)\\] (?P<message>.*)$",
+   "on_error": "send"
+  },
+  {
+   "orderId": 2,
+   "enabled": true,
+   "type": "trace_parser",
+   "id": "link-trace",
+   "output": "set-level",
+   "name": "Link the log to its trace",
+   "trace_id": {"parse_from": "attributes.trace_id"},
+   "span_id": {"parse_from": "attributes.span_id"},
+   "on_error": "send_quiet"
+  },
+  {
+   "orderId": 3,
+   "enabled": true,
+   "type": "severity_parser",
+   "id": "set-level",
+   "output": "set-service",
+   "name": "Set the level",
+   "parse_from": "attributes.level",
+   "mapping": {"debug": ["DEBUG"], "info": ["INFO"], "warn": ["WARNING"], "error": ["ERROR"], "fatal": ["CRITICAL"]},
+   "overwrite_text": true
+  },
+  {
+   "orderId": 4,
+   "enabled": true,
+   "type": "move",
+   "id": "set-service",
+   "output": "keep-message",
+   "name": "Set service.name",
+   "from": "attributes.service_name",
+   "to": "resource[\"service.name\"]"
+  },
+  {
+   "orderId": 5,
+   "enabled": true,
+   "type": "move",
+   "id": "keep-message",
+   "output": "drop-trace-id",
+   "name": "Keep only the message as the body",
+   "from": "attributes.message",
+   "to": "body"
+  },
+  {
+   "orderId": 6,
+   "enabled": true,
+   "type": "remove",
+   "id": "drop-trace-id",
+   "output": "drop-span-id",
+   "name": "Drop the copied trace ID",
+   "field": "attributes.trace_id"
+  },
+  {
+   "orderId": 7,
+   "enabled": true,
+   "type": "remove",
+   "id": "drop-span-id",
+   "output": "drop-level",
+   "name": "Drop the copied span ID",
+   "field": "attributes.span_id"
+  },
+  {
+   "orderId": 8,
+   "enabled": true,
+   "type": "remove",
+   "id": "drop-level",
+   "name": "Drop the copied level",
+   "field": "attributes.level"
+  }
+ ]
+}

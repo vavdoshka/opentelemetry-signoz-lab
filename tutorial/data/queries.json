@@ -9416,6 +9416,72 @@
     "end": "2026-11-09T08:09:30Z"
    },
    "verified": "api"
+  },
+  {
+   "id": "l-lab3-printed",
+   "group": "Lab 3: logs",
+   "lab": "lab3",
+   "signal": "logs",
+   "title": "A printed log line, linked to its trace",
+   "why": "One record per line, read from stdout. The pipeline put the trace ID, level and service back as fields.",
+   "expr": "service.name = 'lab3-workload' AND body = 'one log line, written during the request'",
+   "neg": false,
+   "aggs": null,
+   "by": null,
+   "metric": null,
+   "step": 60,
+   "liveMinutes": 60,
+   "requestType": "raw",
+   "extra": [],
+   "spec": {
+    "name": "A",
+    "signal": "logs",
+    "filter": {
+     "expression": "service.name = 'lab3-workload' AND body = 'one log line, written during the request'"
+    },
+    "limit": 5,
+    "order": [
+     {
+      "key": {
+       "name": "timestamp"
+      },
+      "direction": "desc"
+     }
+    ]
+   },
+   "saved": {
+    "kind": "rows",
+    "rows": [
+     {
+      "timestamp": "2026-11-10T08:20:00.700645429Z",
+      "service": "lab3-workload",
+      "severity": "WARN",
+      "body": "one log line, written during the request",
+      "trace_id": "2c73a03e9d3a9f6c67c6994d47f6a54d"
+     },
+     {
+      "timestamp": "2026-11-10T08:19:43.146835129Z",
+      "service": "lab3-workload",
+      "severity": "WARN",
+      "body": "one log line, written during the request",
+      "trace_id": "59219873079ae9cd827aff3633a35f66"
+     },
+     {
+      "timestamp": "2026-11-10T08:19:32.801032597Z",
+      "service": "lab3-workload",
+      "severity": "WARN",
+      "body": "one log line, written during the request",
+      "trace_id": "7a30ee0eaa4f19a4d9d4d94fa196ece2"
+     }
+    ],
+    "warnings": [],
+    "matched": 3
+   },
+   "savedWindow": {
+    "start": "2026-11-10T08:19:00Z",
+    "end": "2026-11-10T08:21:00Z"
+   },
+   "verified": "api"
   }
  ]
 }

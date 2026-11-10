@@ -30,8 +30,11 @@ spec:
       deployment.environment: lab2
   python:
     env:
-      # Python logs are off by default in the Operator.
-      - { name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: "true" }
+      # Sends Python logs over OTLP, each with its trace and span IDs and its
+      # extra= fields. The agent does this by default: it's set here so you can
+      # see it. The node agents also read stdout, so each line is stored twice.
+      # Lab 3 shows how to keep one copy.
+      - { name: OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION, value: "true" }
       # Don't create spans for kubelet probe calls.
       - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
       # Service Map fix. See gap 2 in docs/FINDINGS.md.

@@ -26,7 +26,8 @@ spec:
       deployment.environment: lab5
   python:
     env:
-      - { name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: "true" }
+      # Python logs over OTLP, as in Lab 1.
+      - { name: OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION, value: "true" }
       - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
       - { name: OTEL_BSP_SCHEDULE_DELAY, value: "500" }
       - { name: OTEL_METRIC_EXPORT_INTERVAL, value: "10000" }

@@ -79,7 +79,7 @@ LABS = {
 SCENARIOS = {
     "order", "list", "slow", "bad_input", "crash", "backend_500", "timeout",
     "slow_query", "db_error", "cpu_burn", "log_burst", "slow_item", "free_orders", "cache_miss",
-    "throttle", "oom", "liveness", "disk", "api_flood", "api_denied",
+    "throttle", "oom", "liveness", "disk", "api_flood", "api_denied", "log",
     "lock_wait", "deadlock", "missing_index", "too_many_clients",
 }
 LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}

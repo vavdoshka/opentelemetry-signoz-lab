@@ -47,7 +47,7 @@
 
 <h2>The whole configuration</h2>
 <p>This is every piece of OpenTelemetry configuration in Lab 1. The app's code doesn't mention OpenTelemetry at all, and its Kubernetes manifest only opts two pods out, as explained below. (Its image does contain the <code>opentelemetry-api</code> package, because FastAPI depends on it, but the app never imports it.)</p>
-<figure class="code"><figcaption><span><code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> lines 1–40</span></figcaption><pre><code><span class="ln">1</span># This file is all the OpenTelemetry configuration Lab 1 has.
+<figure class="code"><figcaption><span><code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> lines 1–43</span></figcaption><pre><code><span class="ln">1</span># This file is all the OpenTelemetry configuration Lab 1 has.
 <span class="ln">2</span>#
 <span class="ln">3</span># The annotation on the Namespace opts in every pod created here. The
 <span class="ln">4</span># Instrumentation resource tells the Operator how to instrument them. It must
@@ -79,25 +79,29 @@
 <span class="ln">30</span>      deployment.environment: lab1
 <span class="ln">31</span>  python:
 <span class="ln">32</span>    env:
-<span class="ln">33</span>      # Python logs are off by default in the Operator.
-<span class="ln">34</span>      - { name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: &quot;true&quot; }
-<span class="ln">35</span>      # Don&#x27;t create spans for kubelet probe calls.
-<span class="ln">36</span>      - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
-<span class="ln">37</span>      # Service Map fix. See gap 2 in docs/FINDINGS.md.
-<span class="ln">38</span>      - { name: OTEL_BSP_SCHEDULE_DELAY, value: &quot;500&quot; }
-<span class="ln">39</span>      # Export metrics every 10 seconds (default 60), so the lab feels responsive.
-<span class="ln">40</span>      - { name: OTEL_METRIC_EXPORT_INTERVAL, value: &quot;10000&quot; }</code></pre></figure>
+<span class="ln">33</span>      # Sends Python logs over OTLP, each with its trace and span IDs and its
+<span class="ln">34</span>      # extra= fields. The agent does this by default: it&#x27;s set here so you can
+<span class="ln">35</span>      # see it. The node agents also read stdout, so each line is stored twice.
+<span class="ln">36</span>      # Lab 3 shows how to keep one copy.
+<span class="ln">37</span>      - { name: OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION, value: &quot;true&quot; }
+<span class="ln">38</span>      # Don&#x27;t create spans for kubelet probe calls.
+<span class="ln">39</span>      - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
+<span class="ln">40</span>      # Service Map fix. See gap 2 in docs/FINDINGS.md.
+<span class="ln">41</span>      - { name: OTEL_BSP_SCHEDULE_DELAY, value: &quot;500&quot; }
+<span class="ln">42</span>      # Export metrics every 10 seconds (default 60), so the lab feels responsive.
+<span class="ln">43</span>      - { name: OTEL_METRIC_EXPORT_INTERVAL, value: &quot;10000&quot; }</code></pre></figure>
 
-<h2>Logs need one environment variable</h2>
-<p>Traces and metrics work as soon as a pod is injected. Python logs don&#x27;t: the agent leaves them off by default. One environment variable turns them on, on line 34 above:</p>
-<figure class="code"><pre><code>OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true</code></pre></figure>
-<p>You don&#x27;t set it on your app. Everything under <code>python.env</code> in the <code>Instrumentation</code> is added to each injected pod by the Operator, so your code and your Deployment stay as they are. Without it, SigNoz would receive no application logs from the agent. With it:</p>
+<h2 id="logs">Logs: one setting, and the name to use</h2>
+<p>Traces and metrics work as soon as a pod is injected. Python logs are sent by the agent&#x27;s logging instrumentation, and line 37 above sets it explicitly:</p>
+<figure class="code"><pre><code>OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION=true</code></pre></figure>
+<p>In this version of the agent it&#x27;s already on by default, so the line changes nothing. It&#x27;s there so you can see the setting, and so Lab 3 can turn it off. You don&#x27;t set it on your app: everything under <code>python.env</code> in the <code>Instrumentation</code> is added to each injected pod by the Operator, so your code and your Deployment stay as they are. With it:</p>
 <ul>
-  <li>Everything your app writes with Python&#x27;s <code>logging</code> goes to SigNoz.</li>
+  <li>Everything your app writes with Python&#x27;s <code>logging</code> goes to SigNoz over OTLP.</li>
   <li>Each log written during a request carries that request&#x27;s <code>trace_id</code> and <code>span_id</code>, so logs link to their span.</li>
   <li>Fields in <code>extra={...}</code> become searchable log attributes, with no OpenTelemetry code.</li>
 </ul>
-<p>Other languages have their own defaults, so check yours. The node agent also collects container stdout, but those copies have no trace link. See <a href="gaps.html">What is missing</a>.</p>
+<div class="warn"><p><strong>Older guides use another name.</strong> <code>OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true</code> is deprecated in the agent this lab runs (0.66b1). It still works, but setting it to <code>false</code> doesn&#x27;t stop logs: the logging instrumentation then sends them with its own handler. Only <code>OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION=false</code> stops them. <span class="badge lab">Tested in the lab1 pod</span></p></div>
+<p><strong>Each of these logs is stored twice.</strong> The app also prints every line to stdout, and the SigNoz agent on each node reads every container&#x27;s output. That second copy has no trace link, no level and no service name. Lab 3 shows how to keep one copy and still link it to its trace: see <a href="lab3.html#logs">Logs: one copy, from stdout</a>. Other languages have their own defaults, so check yours.</p>
 
 <h3>The other variables are nice to have</h3>
 <p>The rest of <code>python.env</code> isn&#x27;t needed for telemetry to work. Each one tidies something up:</p>

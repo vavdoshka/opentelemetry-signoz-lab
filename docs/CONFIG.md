@@ -56,7 +56,7 @@ The app has no OpenTelemetry code or settings. All of its configuration is in
 | `inject-python: "false"` on the load generator | Opts it out, because it isn't the app. Labs 1 and 2 only. Lab 3 traces its own on purpose |
 | `exporter.endpoint` set to the SigNoz agent | Sends to the agent on the same node |
 | `sampler: parentbased_always_on` | Keeps every trace, and states the default explicitly |
-| `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true` | Python logs are off by default in the Operator |
+| `OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION=true` | Sends Python logs over OTLP, with trace IDs and `extra=` fields. The agent's default, stated explicitly. Not the deprecated `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED`: setting that to `false` doesn't stop logs. Labs 1, 2 and 5. Each line is also read from stdout, so it's stored twice |
 | `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS=healthz` | No spans for Kubernetes probes |
 | `OTEL_BSP_SCHEDULE_DELAY=500` | The gap 2 fix |
 | `OTEL_METRIC_EXPORT_INTERVAL=10000` | Exports metrics every 10 seconds (default 60), so the lab feels responsive |
@@ -92,7 +92,17 @@ Postgres stays at one replica with no persistent volume, so test orders are lost
 ## Lab 3: Kubernetes
 
 The workload in `labs/lab3-kubernetes/app/` has no OpenTelemetry code, and uses the same injection as
-Lab 1. `k8s/app.yaml` sets what Labs 1 and 2 don't, because these give Kubernetes a reason to act:
+Lab 1. Its logs take one path, from stdout, set in `labs/lab3-kubernetes/k8s/instrumentation.yaml`:
+
+| What | Why |
+|---|---|
+| `OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION=false` | No logs over OTLP. The node agents already read the container's output, so sending both stores each line twice, as Labs 1 and 2 do |
+| `OTEL_PYTHON_LOG_CORRELATION=true` | The agent prints the trace and span IDs in each line, so the line can still link to its trace |
+| `OTEL_PYTHON_LOG_FORMAT` | The exact line format. The log pipeline below depends on it |
+| SigNoz log pipeline from `labs/lab3-kubernetes/log-pipeline.json`, created by `scripts/create_log_pipeline.py` | Turns the IDs, the level and `service.name` back into fields, and keeps only the message as the body. It matches the format, not a namespace, so any app printing it is parsed. The script keeps any other pipelines, because SigNoz saves them as one list |
+
+This loses `extra=` fields, and splits a traceback into one record per line.
+ `k8s/app.yaml` sets what Labs 1 and 2 don't, because these give Kubernetes a reason to act:
 
 | What | Why |
 |---|---|
@@ -249,6 +259,6 @@ The gap 2 and gap 3 fixes are applied. The other fixes in `FINDINGS.md` are not:
 - Labs 1 and 2 import no community dashboards and create no alerts. Labs 3 and 4 do, and no lab creates
   log pipelines.
 - ASGI `send`/`receive` spans still exported.
-- Duplicate logs still present.
+- Duplicate logs in Labs 1 and 2, on purpose: their pages use the OTLP copy's `extra=` fields. Lab 3 keeps one copy.
 - No trace-ID load balancing between agents and collectors.
 - SigNoz's ClickHouse schema not modified.

@@ -33,8 +33,8 @@
 
 <h3 id="fix-2">The fix that is applied</h3>
 <p>Both labs flush spans every 500 ms, so parents and children usually land in the same collector batch and share an insert. This table was measured with the chart's default 1-second batch. The lab now uses 5 seconds, which reduces load on ClickHouse:</p>
-<figure class="code"><figcaption><span><code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> lines 37–38</span></figcaption><pre><code><span class="ln">37</span>      # Service Map fix. See gap 2 in docs/FINDINGS.md.
-<span class="ln">38</span>      - { name: OTEL_BSP_SCHEDULE_DELAY, value: &quot;500&quot; }</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> lines 40–41</span></figcaption><pre><code><span class="ln">40</span>      # Service Map fix. See gap 2 in docs/FINDINGS.md.
+<span class="ln">41</span>      - { name: OTEL_BSP_SCHEDULE_DELAY, value: &quot;500&quot; }</code></pre></figure>
 <p>That helps, but it doesn't make these pages exact. This lab runs two collectors, and a parent and child on different collectors can never share an insert. These are the counts from this tutorial's load run, measured against real calls:</p>
 <div data-ch="c-map-vs-real">Loading saved SQL...</div>
 <p>Lab 2's links show about a third of their real calls. Lab 1's links show none, which is why <code>lab1-frontend</code> is missing from the map above and <code>lab1-backend</code> is missing from Services. In this deployment <code>lab1-frontend</code> and <code>lab1-backend</code> ran on different nodes, so every call crossed nodes, while Lab 2's two replicas per node also make same-node calls. That fits the explanation above, but it was not tested directly. <code>docs/FINDINGS.md</code> has earlier runs, from 85% on one node down to 41% with spans split across two collectors.</p>
@@ -83,7 +83,8 @@
 </ul>
 <div data-query="l-stdout-copies">Loading saved query...</div>
 <div data-query="l-otlp-k8s">Loading saved query...</div>
-<p><strong>Possible fix</strong> <span class="badge untested">Untested</span>: keep OTLP logs, which already go through the agent (gap 3), and exclude the lab namespaces from <code>filelog</code> collection. Alternatively, drop OTLP logs, print JSON to stdout, and parse it with a SigNoz log pipeline.</p>
+<p><strong>Fixed in Lab 3, left in Labs 1 and 2 on purpose.</strong> Lab 3&#x27;s app stops sending logs over OTLP, prints its trace IDs in each line, and a SigNoz log pipeline turns them back into fields. Each line is then stored once, linked to its trace, at the cost of <code>extra=</code> fields. Labs 1 and 2 keep both copies, because their pages use those fields. <a href="lab3.html#logs">Logs: one copy, from stdout</a> has the settings, the measurements, and the steps to try it on Lab 1.</p>
+<p><strong>Other fixes</strong> <span class="badge untested">Untested</span>: keep OTLP logs and stop the node agents reading the app containers&#x27; output, which loses uvicorn&#x27;s own lines. Or print JSON to stdout and parse it with a pipeline, which keeps the fields.</p>
 
 <h2 id="setup">Gap 5: nothing is set up for you</h2>
 <p>A fresh install has 0 dashboards, 0 alert rules, 0 notification channels, 0 log pipelines and 0 saved views <span class="badge api">API</span>. You should plan to:</p>

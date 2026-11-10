@@ -33,8 +33,11 @@
 <p>Before you add any OpenTelemetry code, look at what your logs already say. Lab 1's backend uses plain Python <code>logging</code>, with fields passed in <code>extra=</code>:</p>
 <figure class="code"><figcaption><span><code>labs/lab1-hands-off/app/backend.py</code> line 87</span></figcaption><pre><code><span class="ln">87</span>    log.info(&quot;order stored&quot;, extra={&quot;order.id&quot;: row[0], &quot;order.item&quot;: order.item, &quot;order.total&quot;: total})</code></pre></figure>
 <p>There is no OpenTelemetry code in that line. The agent's log bridge turns each field into a log attribute you can search, and the log keeps the <code>trace_id</code> and <code>span_id</code> of the span it was written in. This needs one setting, and it is already in <code>instrumentation.yaml</code>:</p>
-<figure class="code"><figcaption><span><code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> lines 33–34</span></figcaption><pre><code><span class="ln">33</span>      # Python logs are off by default in the Operator.
-<span class="ln">34</span>      - { name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: &quot;true&quot; }</code></pre></figure>
+<figure class="code"><figcaption><span><code>labs/lab1-hands-off/k8s/instrumentation.yaml</code> lines 33–37</span></figcaption><pre><code><span class="ln">33</span>      # Sends Python logs over OTLP, each with its trace and span IDs and its
+<span class="ln">34</span>      # extra= fields. The agent does this by default: it&#x27;s set here so you can
+<span class="ln">35</span>      # see it. The node agents also read stdout, so each line is stored twice.
+<span class="ln">36</span>      # Lab 3 shows how to keep one copy.
+<span class="ln">37</span>      - { name: OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION, value: &quot;true&quot; }</code></pre></figure>
 <div data-query="l-order-attrs">Loading saved query...</div>
 <p>You can do more with these than read them one at a time. Lab 1 can count, sum and chart whatever the app logged:</p>
 <div data-query="a-log-orders">Loading saved query...</div>

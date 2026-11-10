@@ -23,7 +23,7 @@
 <p>In words, from the top:</p>
 <ol>
   <li><strong>The apps.</strong> Your browser calls <code>frontend</code>, which calls <code>backend</code>, which uses Postgres. It&#x27;s a small shop that fails on demand. Lab 3 adds <code>lab3-workload</code>, which fails in ways only Kubernetes can show.</li>
-  <li><strong>Getting telemetry out.</strong> The OpenTelemetry Operator adds a Python agent to each app pod as it starts. The agent sends traces, logs and metrics over OTLP to a node agent.</li>
+  <li><strong>Getting telemetry out.</strong> The OpenTelemetry Operator adds a Python agent to each app pod as it starts. The agent sends traces, logs and metrics over OTLP to a node agent. Lab 3&#x27;s app prints its logs instead, and the node agent reads them: see <a href="lab3.html#logs">Logs: one copy, from stdout</a>.</li>
   <li><strong>Collecting the rest.</strong> Node agents also read every container&#x27;s output, and collect pod and node metrics. Lab 3 adds more from the kubelet, the kernel and the API server.</li>
   <li><strong>Storing and reading it.</strong> Two SigNoz collectors write everything to ClickHouse, and the SigNoz UI and API read it from there.</li>
   <li><strong>Looking inside the database (optional).</strong> Lab 5 runs its own Postgres with its logging turned up. The node agents read that log, and the cluster collector asks Postgres for its statistics.</li>

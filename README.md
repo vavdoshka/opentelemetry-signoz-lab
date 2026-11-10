@@ -22,7 +22,7 @@ Each lab builds on the one before and adds only what it needs. They run side by 
 two-node cluster and send to the same SigNoz. Lab 5 is optional, and Lab 6 doesn't need it.
 
 An interactive tutorial walks you through all of it: 37 pages, with buttons that trigger real
-failures, 106 saved searches, and code quoted straight from this repo.
+failures, 107 saved searches, and code quoted straight from this repo.
 
 ## What you'll learn
 
@@ -56,6 +56,8 @@ failures, 106 saved searches, and code quoted straight from this repo.
 - Collect `kube-system`, kubelet, kernel and API server audit logs: from k3s's log file on k3d, and
   from journald on kind. Find an OOM kill's process in the kernel log, and who flooded the API server
   in the audit log
+- Store each app log once, from stdout, and keep its link to the trace with a SigNoz log pipeline.
+  Labs 1 and 2 store each line twice, on purpose
 - How k3s differs from a real API server
 - See what collects what, and why there's no node-exporter or kube-state-metrics
 
@@ -170,7 +172,7 @@ Start the load generator on a lab's page, so SigNoz has data to show, and stop i
 | `make up` | Creates the cluster and deploys SigNoz and Lab 1. Safe to rerun, and recovers the lab after a restart |
 | `make lab1` | Redeploys Lab 1 after you change its code |
 | `make lab2` | Deploys Lab 2 and its SigNoz dashboard, or redeploys it after you change its code |
-| `make lab3` | Deploys Lab 3, its extra scrape jobs and its dashboards |
+| `make lab3` | Deploys Lab 3, its extra scrape jobs, its dashboards and its log pipeline |
 | `make lab4` | Deploys Lab 4's alert sink and rules, and proves a notification gets through. Needs Lab 3 |
 | `make lab5` | Optional. Deploys Lab 5's app and its own Postgres, and adds that Postgres's log and statistics to the collectors |
 | `make lab6` | Deploys SigNoz's MCP server and read-only access for agents, and proves the access is read-only |
@@ -219,6 +221,7 @@ step in:
 | `disk` | Writes 512 MiB to the node's disk, then removes it |
 | `api_flood` | Lists pods from the API server up to 20 times a second |
 | `api_denied` | Asks the API server for secrets it isn't allowed to read |
+| `log` | Writes one log line during the request, linked to its trace. Doesn't step in: it shows Lab 3's logs |
 
 Lab 4 adds no app of its own. Its rules watch Labs 1 and 3, so these same scenarios set them off.
 

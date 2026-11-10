@@ -141,6 +141,13 @@ def run_api_denied(body: ScenarioIn) -> dict:
     return {"rps": body.rps}
 
 
+def run_log(_body: ScenarioIn) -> dict:
+    # Written during the request, unlike the scenarios above, so it carries the
+    # request's trace and span IDs. The extra= field shows what stdout loses.
+    log.warning("one log line, written during the request", extra={"example.field": 42})
+    return {"logged": 1}
+
+
 SCENARIOS = {
     "throttle": (run_throttle, "Burns more CPU than the limit allows, so the kernel throttles the container"),
     "oom": (run_oom, "Leaks memory until the kernel kills the container"),
@@ -148,6 +155,7 @@ SCENARIOS = {
     "disk": (run_disk, "Writes 512 MiB to the node's disk, then removes it"),
     "api_flood": (run_api_flood, "Lists pods from the API server up to 20 times a second"),
     "api_denied": (run_api_denied, "Asks the API server for secrets it isn't allowed to read"),
+    "log": (run_log, "Writes one log line during the request, linked to its trace"),
 }
 
 

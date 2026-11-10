@@ -161,9 +161,18 @@ this section. Everything before them describes the default 5-second flush.
 - **Worse than a plain copy:** of about 166,000 stdout records, roughly 46% are stack-trace
   fragments, because each line of a traceback becomes its own record. About 29% are app lines and
   24% are access-log lines (**Data**, classified by pattern, so approximate).
-- **Fix (Untested):** keep OTLP logs, which now go through the agent (gap 3), and exclude the lab
-  namespaces from `filelog` collection. Alternatively drop OTLP logs, print JSON to stdout and parse
-  it with a SigNoz log pipeline.
+- **Fix, applied in Lab 3 (Data, 2026-11-10):** `OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION=false` stops
+  OTLP logs, `OTEL_PYTHON_LOG_CORRELATION=true` prints the trace and span IDs in each line, and a SigNoz
+  log pipeline (`labs/lab3-kubernetes/log-pipeline.json`) parses them back into fields. Applied to
+  Lab 1 for a test: 3 warnings went from 6 records to 3, each linked to its trace with level and
+  service. Lost: `extra=` fields. A traceback stays one record per line (123), but the exception is
+  still on the span. Labs 1 and 2 keep both copies, because their pages use `extra=` fields.
+- **The old switch doesn't stop OTLP logs.** In agent 0.66b1, `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED`
+  is deprecated. Removing it or setting it to `false` makes the logging instrumentation send logs
+  with its own handler instead. Only `OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION=false` stops them
+  (**Data**, tested in the lab1 pod with the console exporter).
+- **Other fixes (Untested):** keep OTLP logs and stop collecting the app containers' output, or print
+  JSON to stdout, which keeps the fields.
 
 ### 5. Nothing is set up for you: dashboards, alerts, pipelines
 
@@ -832,7 +841,7 @@ and are now Labs 3 and 4.
 1. Remove the noisy ASGI spans. This saves more than half of stored spans and loses nothing.
 2. Try trace-ID load balancing, to restore map accuracy with two collectors.
 3. Add `memory_limiter`, and send the collectors' own metrics to SigNoz.
-4. Remove duplicate logs (gap 4).
+4. Remove duplicate logs (gap 4). Done for Lab 3, kept in Labs 1 and 2 on purpose.
 5. Import dashboards from `apm/` and `postgresql/`. Lab 3 already imports the Kubernetes ones.
 6. Decide how far HA should go: ClickHouse, ZooKeeper, Postgres and the control plane.
 

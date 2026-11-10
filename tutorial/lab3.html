@@ -22,7 +22,7 @@
 <div class="wide arch" data-arch="lab3"></div>
 <table>
   <thead><tr><th>Part</th><th>In this lab</th></tr></thead>
-  <tbody><tr><td><code>lab3-workload</code></td><td>A new small app with the same Python agent and no OpenTelemetry code. It has limits, 200m of CPU and 256Mi of memory, so it can be throttled and OOM-killed</td></tr><tr><td>kubelet</td><td>The program on each node that starts and watches the pods. It serves several pages of metrics on port 10250. The node agents read only its summary page, which has usage but no throttling or probe results. So Lab 3 has the cluster collector read three more pages, with one scrape job each, named after what it reads: <code>kubelet</code> reads <code>/metrics</code>, the kubelet&#x27;s own health; <code>cadvisor</code> reads <code>/metrics/cadvisor</code>, CPU throttling; and <code>kubelet-probes</code> reads <code>/metrics/probes</code>, every probe result. <a href="#collectors">What collects it</a> explains the node agents and the cluster collector</td></tr><tr><td>API server</td><td>Read by a fourth job in the cluster collector, <code>apiserver</code>. A small pod also reads its audit log</td></tr><tr><td>Nodes and kernel</td><td>A small pod reads the kernel log, and the node agents read k3s&#x27;s log file. On kind, another small pod reads the journal instead</td></tr><tr><td>Node agents and cluster collector</td><td>Where all of that is configured: <code>labs/lab3-kubernetes/k8s-infra-values.yaml</code></td></tr><tr><td>Not in this lab</td><td><code>frontend</code>, <code>backend</code> and Postgres keep running, but this lab doesn&#x27;t use them. Alerts come in Lab 4 and AI in Lab 6</td></tr></tbody>
+  <tbody><tr><td><code>lab3-workload</code></td><td>A new small app with the same Python agent and no OpenTelemetry code. It has limits, 200m of CPU and 256Mi of memory, so it can be throttled and OOM-killed. Its logs are printed and read from stdout, not sent over OTLP: see <a href="#logs">Logs: one copy, from stdout</a></td></tr><tr><td>kubelet</td><td>The program on each node that starts and watches the pods. It serves several pages of metrics on port 10250. The node agents read only its summary page, which has usage but no throttling or probe results. So Lab 3 has the cluster collector read three more pages, with one scrape job each, named after what it reads: <code>kubelet</code> reads <code>/metrics</code>, the kubelet&#x27;s own health; <code>cadvisor</code> reads <code>/metrics/cadvisor</code>, CPU throttling; and <code>kubelet-probes</code> reads <code>/metrics/probes</code>, every probe result. <a href="#collectors">What collects it</a> explains the node agents and the cluster collector</td></tr><tr><td>API server</td><td>Read by a fourth job in the cluster collector, <code>apiserver</code>. A small pod also reads its audit log</td></tr><tr><td>Nodes and kernel</td><td>A small pod reads the kernel log, and the node agents read k3s&#x27;s log file. On kind, another small pod reads the journal instead</td></tr><tr><td>Node agents and cluster collector</td><td>Where all of that is configured: <code>labs/lab3-kubernetes/k8s-infra-values.yaml</code></td></tr><tr><td>Not in this lab</td><td><code>frontend</code>, <code>backend</code> and Postgres keep running, but this lab doesn&#x27;t use them. Alerts come in Lab 4 and AI in Lab 6</td></tr></tbody>
 </table>
 
 <h2>Start it</h2>
@@ -94,6 +94,55 @@
 <p>Everything then goes to SigNoz's own collector over OTLP. One rule to remember: the agents run on every node, so they collect what's local to a node. The cluster collector runs once, so it handles what would otherwise be counted twice. Its <code>prometheus/scraper</code> receiver is what Lab 3 adds, and it's why the kubelet and cAdvisor can be read without installing anything else.</p>
 
 <p>You don&#x27;t need the details to work through the incidents. <a href="lab3-collection.html">How it&#x27;s collected, and what it costs</a> covers the scrape jobs and logs after them.</p>
+
+<h2 id="logs">Logs: one copy, from stdout</h2>
+<p>In Labs 1 and 2, every app log reaches SigNoz twice. The agent in the app sends it over OTLP, and the node agent&#x27;s <code>filelog/k8s</code> receiver reads the same line from the container&#x27;s output. Lab 3&#x27;s app sends its logs one way only: it prints them, and the node agents collect them along with every other container&#x27;s output, with nothing set up per app. Three settings in its <code>Instrumentation</code> do it:</p>
+<figure class="code"><figcaption><span><code>labs/lab3-kubernetes/k8s/instrumentation.yaml</code> lines 33–41</span></figcaption><pre><code><span class="ln">33</span>      # Logs take one path: the app prints them, and the node agents read every
+<span class="ln">34</span>      # container&#x27;s output. Sending them over OTLP as well would store each line
+<span class="ln">35</span>      # twice, as Labs 1 and 2 do.
+<span class="ln">36</span>      - { name: OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION, value: &quot;false&quot; }
+<span class="ln">37</span>      # Prints each line&#x27;s trace and span IDs, so it still links to its trace.
+<span class="ln">38</span>      - { name: OTEL_PYTHON_LOG_CORRELATION, value: &quot;true&quot; }
+<span class="ln">39</span>      # The line&#x27;s exact format. SigNoz&#x27;s log pipeline, from log-pipeline.json,
+<span class="ln">40</span>      # reads the IDs back out of it, so change the two together.
+<span class="ln">41</span>      - { name: OTEL_PYTHON_LOG_FORMAT, value: &quot;%(asctime)s %(levelname)s [%(name)s] [trace_id=%(otelTraceID)s span_id=%(otelSpanID)s service.name=%(otelServiceName)s] %(message)s&quot; }</code></pre></figure>
+<table>
+  <thead><tr><th>To</th><th>Setting</th><th>Why</th></tr></thead>
+  <tbody><tr><td>Avoid the second copy</td><td><code>OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION=false</code></td><td>The app stops sending logs over OTLP. They still reach SigNoz, from stdout</td></tr><tr><td>Keep the trace link</td><td><code>OTEL_PYTHON_LOG_CORRELATION=true</code></td><td>The agent writes the trace and span IDs into each line. The node agent can&#x27;t find them any other way: they only exist inside the app&#x27;s process</td></tr><tr><td>Know what to parse</td><td><code>OTEL_PYTHON_LOG_FORMAT</code></td><td>The exact line format. The pipeline below expects it, so change the two together</td></tr></tbody>
+</table>
+<p>The IDs are now text, and SigNoz links a log to a trace only through the log&#x27;s own trace fields. So <code>make lab3</code> also creates a SigNoz <strong>log pipeline</strong> from <code>labs/lab3-kubernetes/log-pipeline.json</code>. It runs in SigNoz&#x27;s own collector, and you can see it in SigNoz under Logs, then Pipelines. It matches the line format, not a namespace, so it parses any app that prints it. Here is one real line, and what SigNoz stored:</p>
+<figure class="code"><figcaption><span>Printed by <code>lab3-workload</code></span></figcaption><pre><code>2026-11-10 08:20:00,699 WARNING [workload] [trace_id=2c73a03e9d3a9f6c67c6994d47f6a54d span_id=e5ef72e67bbf02ab service.name=lab3-workload] one log line, written during the request</code></pre></figure>
+<table>
+  <thead><tr><th>Field</th><th>Stored as</th></tr></thead>
+  <tbody><tr><td>Body</td><td><code>one log line, written during the request</code></td></tr><tr><td>Trace and span ID</td><td><code>2c73a03e…</code> and <code>e5ef72e67bbf02ab</code>, the request&#x27;s server span <code>POST /api/scenario/{name}</code></td></tr><tr><td>Level</td><td><code>WARN</code></td></tr><tr><td><code>service.name</code></td><td><code>lab3-workload</code></td></tr><tr><td>Copies</td><td><strong>1</strong>. In the first minutes after the deploy, Lab 3 sent 0 logs over OTLP, and 70 from stdout <span class="badge data">ClickHouse SQL</span></td></tr></tbody>
+</table>
+<p>Fire it yourself, then search for it. The <code>log</code> scenario writes one warning during the request:</p>
+<div data-fire="log" data-lab="lab3"></div>
+<div data-query="l-lab3-printed">Loading saved query...</div>
+<p>Lines written outside a request print <code>trace_id=0</code>, like the other scenarios&#x27; background work. The pipeline still sets their level and service, and leaves them unlinked, because there&#x27;s no trace to link to.</p>
+
+<h3>What it costs, measured on Lab 1</h3>
+<p>The same 3 warnings and one crash, before and after applying these settings to Lab 1, as in the steps below:</p>
+<table>
+  <thead><tr><th></th><th>OTLP and stdout (Lab 1 as shipped)</th><th>Stdout only</th></tr></thead>
+  <tbody><tr><td>3 warnings</td><td>6 records: 3 linked, 3 with no link, level or service</td><td><strong>3 records, all linked</strong>, with level and service</td></tr><tr><td>The crash&#x27;s log line</td><td>2 records. The OTLP one holds the whole stack trace</td><td><strong>1 record, linked</strong></td></tr><tr><td>The traceback</td><td>124 records, one per line, unlinked</td><td>123 records, one per line, unlinked</td></tr><tr><td><code>extra=</code> fields</td><td>On the OTLP copy</td><td><strong>Lost</strong></td></tr></tbody>
+</table>
+<ul>
+  <li><strong><code>extra=</code> fields are lost.</strong> The line carries only the message, so a search or chart on a field, like Lab 1&#x27;s <code>order.total</code>, finds nothing. Keeping fields needs OTLP, or JSON logs that a pipeline can parse.</li>
+  <li><strong>A traceback becomes one record per line,</strong> with no link. The exception isn&#x27;t lost: the request&#x27;s span still carries it as an <code>exception</code> event, about 3,100 characters here.</li>
+  <li><strong>The app&#x27;s own log format is replaced.</strong> The agent sets up logging before the app does, so Lab 1&#x27;s <code>logging.basicConfig(format=...)</code> did nothing. An app that forces its own setup, with <code>force=True</code> or <code>dictConfig</code>, would print no IDs. Put <code>%(otelTraceID)s</code> and <code>%(otelSpanID)s</code> in its own format instead.</li>
+  <li><strong>uvicorn&#x27;s own lines never carry IDs:</strong> its access log and tracebacks use its own format.</li>
+</ul>
+<p>What you gain is one copy of each line, the same as <code>kubectl logs</code> shows, and one collection path for every container, including those with no agent. Lab 4&#x27;s alert on Lab 1&#x27;s error logs still matches after the change, because the pipeline sets the level it filters on.</p>
+
+<h3>Try it on Lab 1</h3>
+<ol class="try">
+  <li><strong>Change it.</strong> In <code>labs/lab1-hands-off/k8s/instrumentation.yaml</code>, replace the <code>OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION</code> line, line 37, with the three settings above: lines 36, 38 and 41.</li>
+  <li><strong>Deploy it,</strong> from the repo&#x27;s root. It took 40 seconds here. <a href="index.html#deploy">What this command does</a>.<figure class="code"><pre><code>make lab1</code></pre></figure></li>
+  <li><strong>Fire the burst,</strong> then search Logs for <code>service.name = &#x27;lab1-frontend&#x27; AND body CONTAINS &#x27;log burst&#x27;</code>. Each line should appear once, with a trace ID. Its fields, such as <code>burst.index</code>, are gone.<div data-fire="log_burst" data-lab="lab1"></div></li>
+  <li><strong>Put it back,</strong> because Lab 1&#x27;s other pages use those fields.<figure class="code"><pre><code>git restore labs/lab1-hands-off/k8s/instrumentation.yaml
+make lab1</code></pre></figure></li>
+</ol>
 
 <h2>Dashboards</h2>
 <p>The first four are SigNoz's own, unchanged, from <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a>. They're pinned to one commit, so upstream changes can't break the lab. <code>make lab3</code> imports them through SigNoz's API, and you can also use Dashboards, then New dashboard, then Import JSON. <a href="automate.html">Automate it</a> shows how to do all of this on your own cluster.</p>

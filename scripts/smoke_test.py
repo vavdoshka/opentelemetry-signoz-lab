@@ -60,6 +60,15 @@ def smoke_test_lab3(token):
         timeout=180,
         interval=8,
     )
+    # Lab 3's app prints its logs instead of sending them, and SigNoz's log pipeline
+    # reads the trace IDs back out. log.file.path is only on lines read from a file.
+    wait_for(
+        "a printed log line, linked to its trace",
+        lambda: request(f"{LAB3_URL}/api/scenario/log", {})[0] == 200
+        and count(token, "logs", "service.name = 'lab3-workload' AND trace_id != '' AND log.file.path EXISTS", minutes=2),
+        timeout=180,
+        interval=10,
+    )
     # One metric from each scrape job. Each of these fails on its own if the job's
     # permissions, address or keep-list are wrong, with no error in the collector's status.
     for job, metric, expression in (

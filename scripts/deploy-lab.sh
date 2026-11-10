@@ -87,6 +87,13 @@ if [ -n "$missing" ]; then
   exit 1
 fi
 
+if [ "$1" = 3 ]; then
+  step "Log pipeline"
+  # Lab 3's app prints its logs, with trace IDs, instead of sending them over
+  # OTLP. This SigNoz pipeline reads the IDs back out. See k8s/instrumentation.yaml.
+  python3 scripts/create_log_pipeline.py "$dir/log-pipeline.json"
+fi
+
 step "Smoke test: Lab $1"
 # PROVIDER tells the Lab 3 test whether to expect k3s's log.
 PROVIDER="$PROVIDER" python3 scripts/smoke_test.py "$1"

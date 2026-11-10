@@ -30,8 +30,15 @@ spec:
       deployment.environment: lab3
   python:
     env:
-      # Python logs are off by default in the Operator.
-      - { name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: "true" }
+      # Logs take one path: the app prints them, and the node agents read every
+      # container's output. Sending them over OTLP as well would store each line
+      # twice, as Labs 1 and 2 do.
+      - { name: OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION, value: "false" }
+      # Prints each line's trace and span IDs, so it still links to its trace.
+      - { name: OTEL_PYTHON_LOG_CORRELATION, value: "true" }
+      # The line's exact format. SigNoz's log pipeline, from log-pipeline.json,
+      # reads the IDs back out of it, so change the two together.
+      - { name: OTEL_PYTHON_LOG_FORMAT, value: "%(asctime)s %(levelname)s [%(name)s] [trace_id=%(otelTraceID)s span_id=%(otelSpanID)s service.name=%(otelServiceName)s] %(message)s" }
       # Don't create spans for kubelet probe calls.
       - { name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: healthz }
       # Service Map fix. See gap 2 in docs/FINDINGS.md.
