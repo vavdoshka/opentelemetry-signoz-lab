@@ -102,3 +102,10 @@ if [ "$1" != 1 ]; then
   step "Dashboard"
   python3 scripts/create_dashboard.py "$1"
 fi
+
+# Searches kept in SigNoz's explorers. Any one of them ticks "Setup Saved Views"
+# on SigNoz's home page.
+if [ -f "$dir/saved-views.json" ]; then
+  step "Saved views"
+  python3 scripts/create_saved_views.py "$dir/saved-views.json"
+fi

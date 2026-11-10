@@ -187,6 +187,11 @@ A fresh install has 0 dashboards, 0 alert rules, 0 notification channels, 0 log 
   ClickHouse and 3 AWS ones.
 - **Alerts:** that repo contains no alert definitions. I did not find a ready-made alert pack, but
   that search was limited. Expect to write your own rules, as Lab 4 does.
+- **Saved views and log pipelines:** both can be created through the API. Saved views are in the
+  OpenAPI spec, with examples, at `/api/v2/saved_views`. Log pipelines are not: `/api/v1/logs/pipelines`
+  replaces the whole list, and needs each operator's `output` set. Lab 3 creates two views and one
+  pipeline. A single view ticks "Setup Saved Views", the last step of SigNoz's home page checklist
+  (**UI**, 8 of 8 on 2026-11-10).
 
 ### 6. A collector can silently stop writing logs, while reporting healthy
 

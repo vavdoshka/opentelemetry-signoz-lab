@@ -92,6 +92,8 @@
   <li><strong>Import dashboards.</strong> <a href="https://github.com/SigNoz/dashboards" target="_blank" rel="noopener">SigNoz/dashboards</a> has folders such as <code>apm/</code>, <code>k8s-infra-metrics/</code> and <code>postgresql/</code>. <a href="lab3.html">Lab 3</a> imports four Kubernetes ones. The Postgres one opens empty, as <a href="lab5.html">Lab 5</a> explains. The others are <span class="badge untested">Untested</span> here.</li>
   <li><strong>Write alerts.</strong> That repo has no alert definitions, so you write your own. <a href="lab4.html">Lab 4</a> has eight, each proved against a real failure.</li>
   <li><strong>Add a notification channel</strong>, or alerts will have nowhere to go.</li>
+  <li><strong>Save the searches you repeat</strong> as views. <a href="lab3.html">Lab 3</a> saves two, from a file, through SigNoz&#x27;s API. Any one view ticks the last step of SigNoz&#x27;s &quot;Build your observability base&quot; checklist.</li>
+  <li><strong>Add log pipelines</strong> for logs that arrive as plain text. <a href="lab3.html#logs">Lab 3</a> adds one, to link printed logs to their traces.</li>
 </ul>
 
 <h2 id="collector">Gap 6: a collector can silently stop writing logs</h2>

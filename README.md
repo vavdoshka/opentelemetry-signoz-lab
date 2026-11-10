@@ -172,7 +172,7 @@ Start the load generator on a lab's page, so SigNoz has data to show, and stop i
 | `make up` | Creates the cluster and deploys SigNoz and Lab 1. Safe to rerun, and recovers the lab after a restart |
 | `make lab1` | Redeploys Lab 1 after you change its code |
 | `make lab2` | Deploys Lab 2 and its SigNoz dashboard, or redeploys it after you change its code |
-| `make lab3` | Deploys Lab 3, its extra scrape jobs, its dashboards and its log pipeline |
+| `make lab3` | Deploys Lab 3, its extra scrape jobs, its dashboards, its log pipeline and two saved views |
 | `make lab4` | Deploys Lab 4's alert sink and rules, and proves a notification gets through. Needs Lab 3 |
 | `make lab5` | Optional. Deploys Lab 5's app and its own Postgres, and adds that Postgres's log and statistics to the collectors |
 | `make lab6` | Deploys SigNoz's MCP server and read-only access for agents, and proves the access is read-only |
@@ -310,7 +310,10 @@ ARM, are untested.
 
 **Something broke after a restart.** Run `make up`. It restarts the cluster and reapplies what a
 restart loses. Test orders are lost, because Postgres has no persistent volume, but SigNoz keeps its
-data.
+data. On k3d, a Docker restart can leave both `k8s-infra-otel-agent` pods in
+`CreateContainerError`, with `path "/" is mounted on "/" but it is not a shared or slave mount`, so no
+telemetry arrives. `make up` fixes that too. The quicker fix is `scripts/k3d-shared-mount.sh`, then
+`kubectl -n signoz delete pod -l app.kubernetes.io/component=otel-agent`.
 
 **You created the SigNoz admin yourself.** The smoke test and tutorial need that login. Save it in
 `.lab-credentials`:

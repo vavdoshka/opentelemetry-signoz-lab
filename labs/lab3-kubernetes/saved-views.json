@@ -1,0 +1,98 @@
+[
+ {
+  "name": "lab3-workload-logs",
+  "schemaVersion": "v2",
+  "source": "logs",
+  "spec": {
+   "displayName": "Lab 3: workload logs, read from stdout",
+   "panelType": "list",
+   "requestType": "raw",
+   "queries": [
+    {
+     "type": "builder_query",
+     "spec": {
+      "name": "A",
+      "signal": "logs",
+      "filter": {
+       "expression": "service.name = 'lab3-workload'"
+      },
+      "limit": 100,
+      "order": [
+       {
+        "key": {
+         "name": "timestamp"
+        },
+        "direction": "desc"
+       }
+      ]
+     }
+    }
+   ],
+   "selectedFields": [
+    {
+     "name": "service.name",
+     "signal": "logs",
+     "fieldContext": "resource",
+     "fieldDataType": "string"
+    },
+    {
+     "name": "severity_text",
+     "signal": "logs",
+     "fieldContext": "log",
+     "fieldDataType": "string"
+    },
+    {
+     "name": "trace_id",
+     "signal": "logs",
+     "fieldContext": "log",
+     "fieldDataType": "string"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lab3-kubernetes-events",
+  "schemaVersion": "v2",
+  "source": "logs",
+  "spec": {
+   "displayName": "Lab 3: Kubernetes events",
+   "panelType": "list",
+   "requestType": "raw",
+   "queries": [
+    {
+     "type": "builder_query",
+     "spec": {
+      "name": "A",
+      "signal": "logs",
+      "filter": {
+       "expression": "attribute.k8s.namespace.name = 'lab3' AND k8s.event.reason EXISTS"
+      },
+      "limit": 100,
+      "order": [
+       {
+        "key": {
+         "name": "timestamp"
+        },
+        "direction": "desc"
+       }
+      ]
+     }
+    }
+   ],
+   "selectedFields": [
+    {
+     "name": "k8s.event.reason",
+     "signal": "logs",
+     "fieldContext": "attribute",
+     "fieldDataType": "string"
+    },
+    {
+     "name": "k8s.object.name",
+     "signal": "logs",
+     "fieldContext": "resource",
+     "fieldDataType": "string"
+    }
+   ]
+  }
+ }
+]

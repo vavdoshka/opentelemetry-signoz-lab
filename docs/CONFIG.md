@@ -100,6 +100,7 @@ Lab 1. Its logs take one path, from stdout, set in `labs/lab3-kubernetes/k8s/ins
 | `OTEL_PYTHON_LOG_CORRELATION=true` | The agent prints the trace and span IDs in each line, so the line can still link to its trace |
 | `OTEL_PYTHON_LOG_FORMAT` | The exact line format. The log pipeline below depends on it |
 | SigNoz log pipeline from `labs/lab3-kubernetes/log-pipeline.json`, created by `scripts/create_log_pipeline.py` | Turns the IDs, the level and `service.name` back into fields, and keeps only the message as the body. It matches the format, not a namespace, so any app printing it is parsed. The script keeps any other pipelines, because SigNoz saves them as one list |
+| Saved views from `labs/lab3-kubernetes/saved-views.json`, created by `scripts/create_saved_views.py` | Two searches kept in the Logs Explorer: the workload's logs with their trace IDs, and Lab 3's Kubernetes events. The script skips a view whose name exists. Any view ticks "Setup Saved Views" on SigNoz's home page. Lab 1 creates none, because it uses only what SigNoz has built in |
 
 This loses `extra=` fields, and splits a traceback into one record per line.
  `k8s/app.yaml` sets what Labs 1 and 2 don't, because these give Kubernetes a reason to act:

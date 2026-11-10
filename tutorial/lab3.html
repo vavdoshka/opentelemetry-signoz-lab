@@ -26,12 +26,14 @@
 </table>
 
 <h2>Start it</h2>
-<p>Run <code>make lab3</code>. It takes a minute or two, and it does four things:</p>
+<p>Run <code>make lab3</code>. It takes about three minutes, and it does six things:</p>
 <ol>
   <li>Deploys a small workload in namespace <code>lab3</code>. Like Lab 1, it has no OpenTelemetry code.</li>
   <li>Adds four scrape jobs to the cluster collector that <code>k8s-infra</code> already runs.</li>
   <li>Gives that collector permission to read them.</li>
+  <li>Creates a SigNoz log pipeline, which links the workload&#x27;s printed logs to their traces. See <a href="#logs">Logs: one copy, from stdout</a>.</li>
   <li>Creates five dashboards: four from SigNoz, and one for this lab.</li>
+  <li>Saves two searches in SigNoz as views: <strong>Lab 3: workload logs, read from stdout</strong> and <strong>Lab 3: Kubernetes events</strong>. Open them from the Views menu in the Logs Explorer, or from Saved Views on SigNoz&#x27;s home page. They come from <code>labs/lab3-kubernetes/saved-views.json</code>.</li>
 </ol>
 <p>Start some load, at <a href="http://lab3.localhost:8080" target="_blank" rel="noopener">the lab's page</a> or here. Use 2 requests/s unless a page says otherwise. Stop it when you finish.</p>
 <div data-load-panel="lab3" data-rps="2"></div>
@@ -119,6 +121,7 @@
 <p>Fire it yourself, then search for it. The <code>log</code> scenario writes one warning during the request:</p>
 <div data-fire="log" data-lab="lab3"></div>
 <div data-query="l-lab3-printed">Loading saved query...</div>
+<p>The saved view <strong>Lab 3: workload logs, read from stdout</strong> is this search, with the trace ID as a column. It also caught something real. After a Docker restart, the node agents couldn&#x27;t start for a few minutes, and the app&#x27;s agent logged <code>Failed to export metrics batch</code> as an error. That line reached SigNoz from stdout, with its level and service, even though the agent&#x27;s own OTLP export was what had failed. Over OTLP, it would have been sent to the same node agent that wasn&#x27;t running.</p>
 <p>Lines written outside a request print <code>trace_id=0</code>, like the other scenarios&#x27; background work. The pipeline still sets their level and service, and leaves them unlinked, because there&#x27;s no trace to link to.</p>
 
 <h3>What it costs, measured on Lab 1</h3>
